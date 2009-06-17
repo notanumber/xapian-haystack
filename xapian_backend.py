@@ -42,22 +42,22 @@ DOCUMENT_CT_TERM_PREFIX = DOCUMENT_CUSTOM_TERM_PREFIX + 'CONTENTTYPE'
 
 
 class SearchBackend(BaseSearchBackend):
-    def __init__(self, site=None):
+    def __init__(self, site=None, stem_lang='en'):
         super(SearchBackend, self).__init__(site)
         if not hasattr(settings, 'HAYSTACK_XAPIAN_PATH'):
             raise ImproperlyConfigured('You must specify a HAYSTACK_XAPIAN_PATH in your settings.')
 
         self.path = settings.HAYSTACK_XAPIAN_PATH
+        self.stemmer = xapian.Stem('english')
 
         if not os.path.exists(self.path):
             os.makedirs(self.path)
 
     def update(self, index, iterable):
         database = xapian.WritableDatabase(self.path, xapian.DB_CREATE_OR_OPEN)
-        stemmer = xapian.Stem('english')
         indexer = xapian.TermGenerator()
         indexer.set_database(database)
-        indexer.set_stemmer(stemmer)
+        indexer.set_stemmer(self.stemmer)
         indexer.set_flags(xapian.TermGenerator.FLAG_SPELLING)
 
         fields_data = database.get_metadata('fields')
@@ -131,13 +131,12 @@ class SearchBackend(BaseSearchBackend):
             warnings.warn("Highlight has not been implemented yet.", Warning, stacklevel=2)
 
         database = xapian.Database(self.path)
-        stemmer = xapian.Stem('english')
         if query_string == '*':
             query = xapian.Query('') # Make '*' match everything
         else:
             qp = xapian.QueryParser()
             qp.set_database(database)
-            qp.set_stemmer(stemmer)
+            qp.set_stemmer(self.stemmer)
             qp.set_stemming_strategy(xapian.QueryParser.STEM_SOME)
             qp.add_boolean_prefix('django_ct', DOCUMENT_CT_TERM_PREFIX)
             for field in pickle.loads(database.get_metadata('fields')):

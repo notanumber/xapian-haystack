@@ -149,6 +149,16 @@ class XapianSearchBackendTestCase(TestCase):
     #     # results = self.sb.search('Index*', narrow_queries=['name:david1'])
     #     # self.assertEqual(results['hits'], 1)
 
+    def test_stemming(self):
+        self.sb.update(self.msi, self.sample_objs)
+        self.assertEqual(len(self.xapian_search('')), 3)
+
+        results = self.sb.search('index', facets=['name'])
+        self.assertEqual(results['hits'], 3)
+
+        results = self.sb.search('indexing', facets=['name'])
+        self.assertEqual(results['hits'], 3)
+
     def test_more_like_this(self):
         self.sb.update(self.msi, self.sample_objs)
         self.assertEqual(len(self.xapian_search('')), 3)
