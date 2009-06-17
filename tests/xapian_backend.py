@@ -163,8 +163,9 @@ class XapianSearchBackendTestCase(TestCase):
         self.sb.update(self.msi, self.sample_objs)
         self.assertEqual(len(self.xapian_search('')), 3)
 
-        self.assertEqual(self.sb.more_like_this(self.sample_objs[0])['hits'], 3)
-        self.assertEqual([dict(doc) for doc in self.xapian_search('')], [{'name': u'david1', 'text': u'Indexed!\n1', 'pub_date': u'2009-02-24T00:00:00', 'id': u'tests.mockmodel.1'}, {'name': u'david2', 'text': u'Indexed!\n2', 'pub_date': u'2009-02-23T00:00:00', 'id': u'tests.mockmodel.2'}, {'name': u'david3', 'text': u'Indexed!\n3', 'pub_date': u'2009-02-22T00:00:00', 'id': u'tests.mockmodel.3'}])
+        results = self.sb.more_like_this(self.sample_objs[0])
+        self.assertEqual(results['hits'], 2)
+        self.assertEqual([result.pk for result in results['results']], [u'2', u'3'])
 
     def test_document_count(self):
         self.sb.update(self.msi, self.sample_objs)
