@@ -104,7 +104,7 @@ class SearchBackend(BaseSearchBackend):
             enquire = xapian.Enquire(database)
             enquire.set_query(query)
             for match in enquire.get_mset(0, DEFAULT_MAX_RESULTS):
-                database.delete_document(match.get_document().get_docid())
+                database.delete_document(match.get_docid())
         else:
             for model in models:
                 database.delete_document(DOCUMENT_CT_TERM_PREFIX + '%s.%s' % (model._meta.app_label, model._meta.module_name))
@@ -170,7 +170,22 @@ class SearchBackend(BaseSearchBackend):
             return 0
         return database.get_doccount()
 
-    def _process_results(self, matches, facets, highlights=[]):
+    def more_like_this(self, model_instance):
+        database = xapian.Database(self.path)
+        query = xapian.Query(DOCUMENT_ID_TERM_PREFIX + self.get_identifier(model_instance))
+        enquire = xapian.Enquire(database)
+        enquire.set_query(query)
+        rset = xapian.RSet()
+        for match in enquire.get_mset(0, DEFAULT_MAX_RESULTS):
+            rset.add_document(match.get_docid())
+        query = xapian.Query(xapian.Query.OP_OR, 
+            [expand.term for expand in enquire.get_eset(DEFAULT_MAX_RESULTS, rset)]
+        )
+        enquire.set_query(query)
+        matches = enquire.get_mset(0, DEFAULT_MAX_RESULTS)
+        return self._process_results(matches)
+
+    def _process_results(self, matches, facets=None, highlights=[]):
         facets_dict = {
             'fields': {},
             'dates': {},
@@ -226,12 +241,6 @@ class SearchBackend(BaseSearchBackend):
         else:
             value = force_unicode(value)
         return value
-
-    def more_like_this(self, model_instance):
-        return {
-            'results': [],
-            'hits': 0,
-        }
 
 
 class SearchQuery(BaseSearchQuery):
