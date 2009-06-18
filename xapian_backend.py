@@ -262,7 +262,7 @@ class SearchBackend(BaseSearchBackend):
         if sort_by is not None:
             warnings.warn("Sorting has not been implemented yet.", Warning, stacklevel=2)
 
-        if highlight is not None:
+        if highlight is not False:
             warnings.warn("Highlight has not been implemented yet.", Warning, stacklevel=2)
 
         database = xapian.Database(self.path)
