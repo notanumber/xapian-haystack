@@ -32,8 +32,6 @@ RESERVED_CHARACTERS = (
     '[', ']', '^', '"', '~', '*', '?', ':',
 )
 
-DATETIME_REGEX = re.compile('^(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})T(?P<hour>\d{2}):(?P<minute>\d{2}):(?P<second>\d{2})(\.\d{3,6}Z?)?$')
-
 DEFAULT_MAX_RESULTS = 100000
 
 DOCUMENT_ID_TERM_PREFIX = 'Q'
@@ -41,8 +39,39 @@ DOCUMENT_CUSTOM_TERM_PREFIX = 'X'
 DOCUMENT_CT_TERM_PREFIX = DOCUMENT_CUSTOM_TERM_PREFIX + 'CONTENTTYPE'
 
 
+field_re = re.compile(r'(?<=(?<!Z)X)([A-Z_]+)(\w+)')
+
+
 class SearchBackend(BaseSearchBackend):
+    """
+    `SearchBackend` defines the Xapian search backend for use with the Haystack
+    API for Django search.
+
+    It uses the Xapian Python bindings to interface with Xapian, and as
+    such is subject to this bug: <http://trac.xapian.org/ticket/364> when
+    Django is running with mod_python or mod_wsgi under Apache.
+
+    Until this issue has been fixed by Xapian, it is neccessary to set
+    `WSGIApplicationGroup to %{GLOBAL}` when using mod_wsgi, or
+    `PythonInterpreter main_interpreter` when using mod_python.
+
+    In order to use this backend, `HAYSTACK_XAPIAN_PATH` must be set in
+    your settings.  This should point to a location where you would your
+    indexes to reside.
+    """
     def __init__(self, site=None, stem_lang='en'):
+        """
+        Instantiates an instance of `SearchBackend`.
+
+        Optional arguments:
+            `site` -- The site to associate the backend with (default = None)
+            `stem_lang` -- The stemming language (default = 'en')
+
+        Verifies `HAYSTACK_XAPIAN_PATH` has been properly set and that the path
+        specified is readable.  If it is not, tries to create the folder.
+
+        Also sets the stemming language to be used to `stem_lang`.
+        """
         super(SearchBackend, self).__init__(site)
         if not hasattr(settings, 'HAYSTACK_XAPIAN_PATH'):
             raise ImproperlyConfigured('You must specify a HAYSTACK_XAPIAN_PATH in your settings.')
@@ -54,6 +83,47 @@ class SearchBackend(BaseSearchBackend):
             os.makedirs(self.path)
 
     def update(self, index, iterable):
+        """
+        Updates the `index` with any objects in `iterable` by adding/updating
+        the database as needed.
+
+        Required arguments:
+            `index` -- The `SearchIndex` to process
+            `iterable` -- An iterable of model instances to index
+
+        For each object in `iterable`, a document is created containing all
+        of the terms extracted from `index.prepare(obj)` with stemming prefixes,
+        field prefixes, and 'as-is'.
+
+        eg. `content:Testing` ==> `testing, Ztest, ZXCONTENTtest`
+
+        Each document also contains two extra terms; a term in the format:
+        
+        `XCONTENTTYPE<app_name>.<model_name>`
+        
+        As well as a unique identifier in the the format:
+
+        `Q<app_name>.<model_name>.<pk>`
+
+        eg.: foo.bar (pk=1) ==> `Qfoo.bar.1`, `XCONTENTTYPEfoo.bar`
+        
+        This is useful for querying for a specific document corresponding to
+        an model instance and is also stored in the document value field at
+        position 0 for easy extraction.
+
+        The document also contains a pickled version of the object itself in 
+        the document data field.
+
+        Finally, the database itself maintains a list of all index field names
+        in use through the database meta data field.  This is a pickled set
+        of strings that can be loaded on demand and used to assign prefixes
+        to query parsers so that a user can perform field name filtering by
+        simply querying as follow: 
+
+        `<field_name>:<value>`
+
+        eg.: `'foo:bar'` will filter based on the `foo` field for `bar`.
+        """
         database = xapian.WritableDatabase(self.path, xapian.DB_CREATE_OR_OPEN)
         indexer = xapian.TermGenerator()
         indexer.set_database(database)
@@ -83,7 +153,10 @@ class SearchBackend(BaseSearchBackend):
 
                 document.set_data(pickle.dumps(document_data, pickle.HIGHEST_PROTOCOL))
                 document.add_term(DOCUMENT_ID_TERM_PREFIX + document_id)
-                document.add_term(DOCUMENT_CT_TERM_PREFIX + u'%s.%s' % (obj._meta.app_label, obj._meta.module_name))
+                document.add_term(
+                    DOCUMENT_CT_TERM_PREFIX + u'%s.%s' % 
+                    (obj._meta.app_label, obj._meta.module_name)
+                )
 
                 database.replace_document(document_id, document)
 
@@ -94,10 +167,30 @@ class SearchBackend(BaseSearchBackend):
             pass
 
     def remove(self, obj):
+        """
+        Remove indexes for `obj` from the database.
+
+        We delete all instances of `Q<app_name>.<model_name>.<pk>` which
+        should be unique to this object.
+        """
         database = xapian.WritableDatabase(self.path, xapian.DB_CREATE_OR_OPEN)
         database.delete_document(DOCUMENT_ID_TERM_PREFIX + self.get_identifier(obj))
 
     def clear(self, models=[]):
+        """
+        Clear all instances of `models` from the database or all models, if
+        not specified.
+
+        Optional Arguments:
+            `models` -- Models to clear from the database (default = [])
+
+        If `models` is empty, an empty query is executed which matches all
+        documents in the database.  Afterwards, each match is deleted.
+        
+        Otherwise, for each model, a `delete_document` call is issued with
+        the term `XCONTENTTYPE<app_name>.<model_name>`.  This will delete
+        all documents with the specified model type.
+        """
         database = xapian.WritableDatabase(self.path, xapian.DB_CREATE_OR_OPEN)
         if not models:
             query = xapian.Query('') # Empty query matches all
@@ -107,11 +200,53 @@ class SearchBackend(BaseSearchBackend):
                 database.delete_document(match.get_docid())
         else:
             for model in models:
-                database.delete_document(DOCUMENT_CT_TERM_PREFIX + '%s.%s' % (model._meta.app_label, model._meta.module_name))
+                database.delete_document(
+                    DOCUMENT_CT_TERM_PREFIX + '%s.%s' % 
+                    (model._meta.app_label, model._meta.module_name)
+                )
 
     def search(self, query_string, sort_by=None, start_offset=0, end_offset=DEFAULT_MAX_RESULTS,
                fields='', highlight=False, facets=None, date_facets=None, query_facets=None,
                narrow_queries=None, **kwargs):
+        """
+        Executes the search as defined in `query_string`.
+
+        Required arguments:
+            `query_string` -- Search query to execute
+
+        Optional arguments:
+            `sort_by` -- Sort results by specified field (default = None)
+            `start_offset` -- Slice results from `start_offset` (default = 0)
+            `end_offset` -- Slice results at `end_offset` (default = 10,000)
+            `fields` -- Filter results on `fields` (default = '')
+            `highlight` -- Highlight terms in results (default = False)
+            `facets` -- Facet results on fields (default = None)
+            `date_facets` -- Facet results on date ranges (default = None)
+            `query_facets` -- Facet results on queries (default = None)
+            `narrow_queries` -- Narrow queries (default = None)
+
+        Returns:
+            A dictionary with the following keys:
+                `results` -- A list of `SearchResult`
+                `hits` -- The total available results
+                `facets` - A dictionary of facets with the following keys:
+                    `fields` -- A list of field facets
+                    `dates` -- A list of date facets
+                    `queries` -- A list of query facets
+            If faceting was not used, the `facets` key will not be present
+
+        If `query_string` is empty, returns no results.
+        
+        Otherwise, loads the available fields from the database meta data
+        and sets up prefixes for each one along with a prefix for `django_ct`,
+        used to filter by model, and loads the current stemmer instance.
+
+        Afterwards, executes the Xapian query parser to create a query from
+        `query_string` that is then passed to a new `enquire` instance.
+        
+        The resulting match set is passed to :method:`_process_results` for
+        further processing prior to returning a dictionary with the results.
+        """
         if not query_string:
             return {
                 'results': [],
@@ -155,6 +290,11 @@ class SearchBackend(BaseSearchBackend):
         return self._process_results(matches, facets)
 
     def delete_index(self):
+        """
+        Delete the index.
+        
+        This removes all indexes files and the `HAYSTACK_XAPIAN_PATH` folder.
+        """
         if os.path.exists(self.path):
             index_files = os.listdir(self.path)
 
@@ -164,6 +304,9 @@ class SearchBackend(BaseSearchBackend):
             os.removedirs(self.path)
 
     def document_count(self):
+        """
+        Retrieves the total document count for the search index.
+        """
         try:
             database = xapian.Database(self.path)
         except xapian.DatabaseOpeningError:
@@ -171,8 +314,33 @@ class SearchBackend(BaseSearchBackend):
         return database.get_doccount()
 
     def more_like_this(self, model_instance):
+        """
+        Given a model instance, returns a result set of similar documents.
+        
+        Required arguments:
+            `model_instance` -- The model instance to use as a basis for
+                                retrieving similar documents.
+
+        Returns:
+            A dictionary with the following keys:
+                `results` -- A list of `SearchResult`
+                `hits` -- The total available results
+
+        Opens a database connection, then builds a simple query using the
+        `model_instance` to build the unique identifier.
+
+        For each document retrieved(should always be one), adds an entry into
+        an RSet (relevance set) with the document id, then, uses the RSet
+        to query for an ESet (A set of terms that can be used to suggest
+        expansions to the original query), omitting any document that was in
+        the original query.
+
+        Finally, processes the resulting matches and returns.
+        """
         database = xapian.Database(self.path)
-        query = xapian.Query(DOCUMENT_ID_TERM_PREFIX + self.get_identifier(model_instance))
+        query = xapian.Query(
+            DOCUMENT_ID_TERM_PREFIX + self.get_identifier(model_instance)
+        )
         enquire = xapian.Enquire(database)
         enquire.set_query(query)
         rset = xapian.RSet()
@@ -188,7 +356,34 @@ class SearchBackend(BaseSearchBackend):
         matches = enquire.get_mset(0, DEFAULT_MAX_RESULTS)
         return self._process_results(matches)
 
-    def _process_results(self, matches, facets=None, highlights=[]):
+    def _process_results(self, matches, facets=None):
+        """
+        Private method for processing an MSet (match set).
+
+        Required arguments:
+            `matches` -- An MSet of matches
+
+        Optional arguments:
+            `facets` -- Fields to facet (default = None)
+
+        Returns:
+            A dictionary with the following keys:
+                `results` -- A list of `SearchResult`
+                `hits` -- The total available results
+                `facets` - A dictionary of facets with the following keys:
+                    `fields` -- A list of field facets
+                    `dates` -- A list of date facets
+                    `queries` -- A list of query facets
+            If faceting was not used, the `facets` key will not be present
+        
+        For each match in the `matches`, retrieves the corresponding document
+        and extracts the `app_name`, `model_name`, and `pk` from the information
+        at value position 0, and :method:pickle.loads the remaining model
+        values from the document data area.
+        
+        For each match, one `SearchResult` will be appended to the `results`
+        list.
+        """
         facets_dict = {
             'fields': {},
             'dates': {},
@@ -207,7 +402,9 @@ class SearchBackend(BaseSearchBackend):
             results.append(result)
 
             if facets:
-                facets_dict['fields'] = self._do_field_facets(document, facets, facets_dict['fields'])
+                facets_dict['fields'] = self._do_field_facets(
+                    document, facets, facets_dict['fields']
+                )
                 
         return {
             'results': results,
@@ -216,9 +413,22 @@ class SearchBackend(BaseSearchBackend):
         }
 
     def _do_field_facets(self, document, facets, fields):
-        field_re = re.compile(r'(?<=(?<!Z)X)([A-Z_]+)(\w+)')
-        term_list = [(term.term, term.termfreq) for term in document]
-        for term in term_list:
+        """
+        Private method that facets a document by field name.
+
+        Required arguments:
+            `document` -- The document to parse
+            `facets` -- A list of facets to use when faceting
+            `fields` -- A list of fields that have already been faceted. This
+                        will be extended with any new field names and counts
+                        found in the `document`.
+
+        For each term in the document, extract the field name and determine
+        if it is one of the `facets` we want.  If so, verify if it already in
+        the `fields` list.  If it is, update the count, otherwise, add it and
+        set the count to 1.
+        """
+        for term in [(term.term, term.termfreq) for term in document]:
             match = field_re.search(term[0])
             if match and match.group(1).lower() in facets:
                 if match.group(1).lower() in fields:
@@ -230,7 +440,8 @@ class SearchBackend(BaseSearchBackend):
     def _from_python(self, value):
         """
         Converts Python values to a string for Xapian.
-        Code courtesy of pysolr.
+
+        Original code courtesy of pysolr.
         """
         if isinstance(value, datetime.datetime):
             value = force_unicode('%s' % value.isoformat())
@@ -247,11 +458,31 @@ class SearchBackend(BaseSearchBackend):
 
 
 class SearchQuery(BaseSearchQuery):
+    """
+    `SearchQuery` is responsible for converting search queries into a format
+    that Xapian can understand.
+
+    Most of the work is done by the :method:`build_query`.
+    """
     def __init__(self, backend=None):
+        """
+        Create a new instance of the SearchQuery setting the backend as
+        specified.  If no backend is set, will use the Xapian `SearchBackend`.
+
+        Optional arguments:
+            `backend` -- The `SearchBackend` to use (default = None)
+        """
         super(SearchQuery, self).__init__(backend=backend)
         self.backend = backend or SearchBackend()
 
     def build_query(self):
+        """
+        Builds a search query from previously set values, returning a query
+        string in a format ready for use by the Xapian `SearchBackend`.
+
+        Returns:
+            A query string suitable for parsing by Xapian.
+        """
         query = ''
 
         if not self.query_filters:
@@ -331,6 +562,13 @@ class SearchQuery(BaseSearchQuery):
         return final_query
     
     def clean(self, query_fragment):
+        """
+        Cleans `query_fragment` by removing any reserved words and
+        escaping and reserved characters.
+
+        Returns:
+            A clean query fragment as a string
+        """
         words = query_fragment.split()
         cleaned_words = []
         
