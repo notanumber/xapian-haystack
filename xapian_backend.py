@@ -158,7 +158,7 @@ class SearchBackend(BaseSearchBackend):
                     (obj._meta.app_label, obj._meta.module_name)
                 )
 
-                database.replace_document(document_id, document)
+                database.replace_document(DOCUMENT_ID_TERM_PREFIX + document_id, document)
 
             database.set_metadata('fields', pickle.dumps(set(fields)))
 

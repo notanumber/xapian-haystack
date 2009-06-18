@@ -84,6 +84,7 @@ class XapianSearchBackendTestCase(TestCase):
     
     def test_update(self):
         self.sb.update(self.msi, self.sample_objs)
+        self.sb.update(self.msi, self.sample_objs) # Duplicates should be updated, not appended -- http://github.com/notanumber/xapian-haystack/issues/#issue/6
 
         self.assertEqual(len(self.xapian_search('')), 3)
         self.assertEqual([dict(doc) for doc in self.xapian_search('')], [{'name': u'david1', 'text': u'Indexed!\n1', 'pub_date': u'2009-02-24T00:00:00', 'id': u'tests.mockmodel.1'}, {'name': u'david2', 'text': u'Indexed!\n2', 'pub_date': u'2009-02-23T00:00:00', 'id': u'tests.mockmodel.2'}, {'name': u'david3', 'text': u'Indexed!\n3', 'pub_date': u'2009-02-22T00:00:00', 'id': u'tests.mockmodel.3'}])
