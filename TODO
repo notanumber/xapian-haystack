@@ -1,0 +1,10 @@
+Future
+======
+
+* Search ordering by field (override the weight)
+* `highlight` on SearchBackend.search
+* `date_facets` on SearchBackend.search
+* `query_facets` on SearchBackend.search
+* `narrow_queries` on SearchBackend.search
+* Language stemming (needs to be implemented by Haystack first)
+* Spelling correction (needs to be implemented by Haystack first)

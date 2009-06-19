@@ -1,0 +1,34 @@
+Overview
+--------
+xapian-haystack is backend for use with the Django Haystack search API.
+
+More information on Haystack can be found here: http://haystacksearch.org/
+
+xapian-haystack is licensed under the GPL, please see the included LICENSE
+file for more information.
+
+Installation
+------------
+
+1. Copy or symlink `xapian_backend.py` into `haystack/backends/`
+2. Add `HAYSTACK_XAPIAN_PATH` to `settings.py`
+3. Set `HAYSTACK_SEARCH_ENGINE` to `xapian`
+
+Source
+------
+
+The latest source code can always be found here: http://github.com/notanumber/xapian-haystack/
+
+Testing
+-------
+
+Provided that Django, Haystack, and xapian-haystack are all in your Python 
+path, simply change to the xapian-haystack folder and execute:
+
+    django-admin.py test tests --settings=tests.settings
+
+
+Questions, Comments, Concerns:
+------------------------------
+
+Feel free to open an issue here: http://github.com/notanumber/xapian-haystack/issues
