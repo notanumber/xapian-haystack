@@ -271,9 +271,7 @@ class SearchBackend(BaseSearchBackend):
             warnings.warn("Highlight has not been implemented yet.", Warning, stacklevel=2)
 
         database = xapian.Database(self.path)
-
-        if getattr(settings, 'HAYSTACK_INCLUDE_SPELLING', False) is True:
-            spelling_suggestion = ''
+        spelling_suggestion = None
 
         if query_string == '*':
             query = xapian.Query('') # Make '*' match everything
@@ -301,7 +299,7 @@ class SearchBackend(BaseSearchBackend):
         matches = enquire.get_mset(start_offset, end_offset)
         results = self._process_results(matches, facets)
 
-        if getattr(settings, 'HAYSTACK_INCLUDE_SPELLING', False) is True:
+        if spelling_suggestion:
             results['spelling_suggestion'] = spelling_suggestion
 
         return results
