@@ -150,6 +150,10 @@ class XapianSearchBackendTestCase(TestCase):
     #     # results = self.sb.search('Index*', narrow_queries=['name:david1'])
     #     # self.assertEqual(results['hits'], 1)
 
+    def test_spelling_suggestiong(self):
+        self.sb.update(self.msi, self.sample_objs)
+        self.assertEqual(len(self.xapian_search('')), 3)
+
         # Xapian' spell correction is different from Solr's.  It doesn't catch
         # missing letters, but does catch jumbled letters within (a default) of 2 positions.
         # This can be increased to 3, but should be good enough for most uses.
