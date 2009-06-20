@@ -246,6 +246,11 @@ class SearchBackend(BaseSearchBackend):
         
         The resulting match set is passed to :method:`_process_results` for
         further processing prior to returning a dictionary with the results.
+        
+        If `HAYSTACK_INCLUDE_SPELLING` was enabled in `settings.py`, the
+        extra flag `FLAG_SPELLING_CORRECTION` will be passed to the query parser
+        and any suggestions for spell correction will be returned as well as
+        the results.
         """
         if not query_string:
             return {
@@ -266,6 +271,10 @@ class SearchBackend(BaseSearchBackend):
             warnings.warn("Highlight has not been implemented yet.", Warning, stacklevel=2)
 
         database = xapian.Database(self.path)
+
+        if getattr(settings, 'HAYSTACK_INCLUDE_SPELLING', False) is True:
+            spelling_suggestion = ''
+
         if query_string == '*':
             query = xapian.Query('') # Make '*' match everything
         else:
@@ -276,18 +285,26 @@ class SearchBackend(BaseSearchBackend):
             qp.add_boolean_prefix('django_ct', DOCUMENT_CT_TERM_PREFIX)
             for field in pickle.loads(database.get_metadata('fields')):
                 qp.add_prefix(field, DOCUMENT_CUSTOM_TERM_PREFIX + field.upper())
-            query = qp.parse_query(
-                query_string, 
-                xapian.QueryParser.FLAG_PARTIAL | xapian.QueryParser.FLAG_PHRASE |
-                xapian.QueryParser.FLAG_BOOLEAN | xapian.QueryParser.FLAG_LOVEHATE |
-                xapian.QueryParser.FLAG_WILDCARD
-            )
+            flags = xapian.QueryParser.FLAG_PARTIAL \
+                  | xapian.QueryParser.FLAG_PHRASE \
+                  | xapian.QueryParser.FLAG_BOOLEAN \
+                  | xapian.QueryParser.FLAG_LOVEHATE \
+                  | xapian.QueryParser.FLAG_WILDCARD
+            if getattr(settings, 'HAYSTACK_INCLUDE_SPELLING', False) is True:
+                flags = flags | xapian.QueryParser.FLAG_SPELLING_CORRECTION
+            query = qp.parse_query(query_string, flags)
+            if getattr(settings, 'HAYSTACK_INCLUDE_SPELLING', False) is True:
+                spelling_suggestion = qp.get_corrected_query_string()
 
         enquire = xapian.Enquire(database)
         enquire.set_query(query)
         matches = enquire.get_mset(start_offset, end_offset)
+        results = self._process_results(matches, facets)
 
-        return self._process_results(matches, facets)
+        if getattr(settings, 'HAYSTACK_INCLUDE_SPELLING', False) is True:
+            results['spelling_suggestion'] = spelling_suggestion
+
+        return results
 
     def delete_index(self):
         """
@@ -405,7 +422,7 @@ class SearchBackend(BaseSearchBackend):
                 facets_dict['fields'] = self._do_field_facets(
                     document, facets, facets_dict['fields']
                 )
-                
+
         return {
             'results': results,
             'hits': hits,
