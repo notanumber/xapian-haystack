@@ -7,4 +7,8 @@ Future
 * `query_facets` on SearchBackend.search
 * `narrow_queries` on SearchBackend.search
 * Language stemming (needs to be implemented by Haystack first)
+
+Complete
+========
+
 * Spelling correction (needs to be implemented by Haystack first)
