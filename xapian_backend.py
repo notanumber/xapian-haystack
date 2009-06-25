@@ -18,20 +18,6 @@ except ImportError:
     raise MissingDependency("The 'xapian' backend requires the installation of 'xapian'. Please refer to the documentation.")
 
 
-RESERVED_WORDS = (
-    'AND',
-    'NOT',
-    'OR',
-    'XOR',
-    'NEAR',
-    'ADJ',
-)
-
-RESERVED_CHARACTERS = (
-    '\\', '+', '-', '&&', '||', '!', '(', ')', '{', '}', 
-    '[', ']', '^', '"', '~', '*', '?', ':',
-)
-
 DEFAULT_MAX_RESULTS = 100000
 
 DOCUMENT_ID_TERM_PREFIX = 'Q'
@@ -59,6 +45,20 @@ class SearchBackend(BaseSearchBackend):
     your settings.  This should point to a location where you would your
     indexes to reside.
     """
+    RESERVED_WORDS = (
+        'AND',
+        'NOT',
+        'OR',
+        'XOR',
+        'NEAR',
+        'ADJ',
+    )
+
+    RESERVED_CHARACTERS = (
+        '\\', '+', '-', '&&', '||', '!', '(', ')', '{', '}', 
+        '[', ']', '^', '"', '~', '*', '?', ':',
+    )
+
     def __init__(self, site=None, stem_lang='en'):
         """
         Instantiates an instance of `SearchBackend`.
@@ -575,25 +575,3 @@ class SearchQuery(BaseSearchQuery):
         #     final_query = "%s %s" % (final_query, " ".join(boost_list))
 
         return final_query
-    
-    def clean(self, query_fragment):
-        """
-        Cleans `query_fragment` by removing any reserved words and
-        escaping and reserved characters.
-
-        Returns:
-            A clean query fragment as a string
-        """
-        words = query_fragment.split()
-        cleaned_words = []
-        
-        for word in words:
-            if word in RESERVED_WORDS:
-                word = word.replace(word, word.lower())
-        
-            for char in RESERVED_CHARACTERS:
-                word = word.replace(char, '\\%s' % char)
-            
-            cleaned_words.append(word)
-        
-        return ' '.join(cleaned_words)
