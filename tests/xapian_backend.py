@@ -33,7 +33,7 @@ class XapianSearchBackendTestCase(TestCase):
         settings.HAYSTACK_XAPIAN_PATH = temp_path
 
         self.site = XapianSearchSite()
-        self.sb = SearchBackend()
+        self.sb = SearchBackend(site=self.site)
         self.msi = XapianMockSearchIndex(MockModel, backend=self.sb)
         self.site.register(MockModel, XapianMockSearchIndex)
 
@@ -190,14 +190,14 @@ class XapianSearchBackendTestCase(TestCase):
         self.assertEqual(self.sb.document_count(), 0)
 
     # def test_order_by(self):
-    #     self.sb.update(self.smmi, self.sample_objs)
+    #     self.sb.update(self.msi, self.sample_objs)
     #     
     #     results = self.sb.search('*', sort_by=['pub_date'])
     #     self.assertEqual([result.pk for result in results['results']], [u'1', u'2', u'3'])
     #     
     #     results = self.sb.search('*', sort_by=['-pub_date'])
     #     self.assertEqual([result.pk for result in results['results']], [u'3', u'2', u'1'])
-    # 
+    
     def test__from_python(self):
         self.assertEqual(self.sb._from_python('abc'), u'abc')
         self.assertEqual(self.sb._from_python(1), u'1')

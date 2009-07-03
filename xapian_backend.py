@@ -115,26 +115,22 @@ class SearchBackend(BaseSearchBackend):
         the document data field.
 
         Finally, the database itself maintains a list of all index field names
-        in use through the database meta data field.  This is a pickled set
-        of strings that can be loaded on demand and used to assign prefixes
-        to query parsers so that a user can perform field name filtering by
-        simply querying as follow: 
+        in use through the database meta data field with the name `schema`.
+        This is a pickled data that can be loaded on demand and used to assign 
+        prefixes to query parsers so that a user can perform field name 
+        filtering by simply querying as follow: 
 
         `<field_name>:<value>`
 
         eg.: `'foo:bar'` will filter based on the `foo` field for `bar`.
         """
         database = xapian.WritableDatabase(self.path, xapian.DB_CREATE_OR_OPEN)
+        database.set_metadata('schema', pickle.dumps(self.site.build_unified_schema()))
+
         indexer = xapian.TermGenerator()
         indexer.set_database(database)
         indexer.set_stemmer(self.stemmer)
         indexer.set_flags(xapian.TermGenerator.FLAG_SPELLING)
-
-        fields_data = database.get_metadata('fields')
-        if fields_data:
-            fields = list(pickle.loads(fields_data))
-        else:
-            fields = []
 
         try:
             for obj in iterable:
@@ -149,7 +145,6 @@ class SearchBackend(BaseSearchBackend):
                     data = self._from_python(value)
                     indexer.index_text(data)
                     indexer.index_text(data, 1, prefix)
-                    fields.append(key)
 
                 document.set_data(pickle.dumps(document_data, pickle.HIGHEST_PROTOCOL))
                 document.add_term(DOCUMENT_ID_TERM_PREFIX + document_id)
@@ -159,8 +154,6 @@ class SearchBackend(BaseSearchBackend):
                 )
 
                 database.replace_document(DOCUMENT_ID_TERM_PREFIX + document_id, document)
-
-            database.set_metadata('fields', pickle.dumps(set(fields)))
 
         except UnicodeDecodeError:
             sys.stderr.write('Chunk failed.\n')
@@ -271,6 +264,7 @@ class SearchBackend(BaseSearchBackend):
             warnings.warn("Highlight has not been implemented yet.", Warning, stacklevel=2)
 
         database = xapian.Database(self.path)
+        schema = pickle.loads(database.get_metadata('schema'))
         spelling_suggestion = None
 
         if query_string == '*':
@@ -281,8 +275,9 @@ class SearchBackend(BaseSearchBackend):
             qp.set_stemmer(self.stemmer)
             qp.set_stemming_strategy(xapian.QueryParser.STEM_SOME)
             qp.add_boolean_prefix('django_ct', DOCUMENT_CT_TERM_PREFIX)
-            for field in pickle.loads(database.get_metadata('fields')):
-                qp.add_prefix(field, DOCUMENT_CUSTOM_TERM_PREFIX + field.upper())
+            for field in schema[1]:
+                if field['indexed']:
+                    qp.add_prefix(field['field_name'], DOCUMENT_CUSTOM_TERM_PREFIX + field['field_name'].upper())
             flags = xapian.QueryParser.FLAG_PARTIAL \
                   | xapian.QueryParser.FLAG_PHRASE \
                   | xapian.QueryParser.FLAG_BOOLEAN \
