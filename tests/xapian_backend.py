@@ -150,7 +150,7 @@ class XapianSearchBackendTestCase(TestCase):
     #     # results = self.sb.search('Index*', narrow_queries=['name:david1'])
     #     # self.assertEqual(results['hits'], 1)
 
-    def test_spelling_suggestiong(self):
+    def test_spelling_suggestion(self):
         self.sb.update(self.msi, self.sample_objs)
         self.assertEqual(len(self.xapian_search('')), 3)
 
