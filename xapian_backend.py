@@ -125,7 +125,8 @@ class SearchBackend(BaseSearchBackend):
         eg.: `'foo:bar'` will filter based on the `foo` field for `bar`.
         """
         database = xapian.WritableDatabase(self.path, xapian.DB_CREATE_OR_OPEN)
-        schema = self.site.build_unified_schema()
+        content_field_name, fields = self.site.build_unified_schema()
+        schema = self._build_schema(fields)
         database.set_metadata('schema', pickle.dumps(schema))
 
         indexer = xapian.TermGenerator()
@@ -142,8 +143,7 @@ class SearchBackend(BaseSearchBackend):
                 document_data = index.prepare(obj)
 
                 for i, (key, value) in enumerate(document_data.iteritems()):
-                    field = self._field_from_schema(schema, key)
-                    if (field['field_name'] == key) and (field['indexed'] == 'true'):
+                    if key in schema:
                         prefix = DOCUMENT_CUSTOM_TERM_PREFIX + self._from_python(key).upper()
                         data = self._from_python(value)
                         indexer.index_text(data)
@@ -161,6 +161,13 @@ class SearchBackend(BaseSearchBackend):
         except UnicodeDecodeError:
             sys.stderr.write('Chunk failed.\n')
             pass
+
+    def _build_schema(self, fields):
+        schema_fields = {}
+        for i, field in enumerate(fields):
+            if field['indexed']:
+                schema_fields[field['field_name']] = i
+        return schema_fields
 
     def remove(self, obj):
         """
@@ -233,7 +240,7 @@ class SearchBackend(BaseSearchBackend):
 
         If `query_string` is empty, returns no results.
         
-        Otherwise, loads the available fields from the database meta data
+        Otherwise, loads the available fields from the database meta data schema
         and sets up prefixes for each one along with a prefix for `django_ct`,
         used to filter by model, and loads the current stemmer instance.
 
@@ -278,9 +285,8 @@ class SearchBackend(BaseSearchBackend):
             qp.set_stemmer(self.stemmer)
             qp.set_stemming_strategy(xapian.QueryParser.STEM_SOME)
             qp.add_boolean_prefix('django_ct', DOCUMENT_CT_TERM_PREFIX)
-            for field in schema[1]:
-                if field['indexed']:
-                    qp.add_prefix(field['field_name'], DOCUMENT_CUSTOM_TERM_PREFIX + field['field_name'].upper())
+            for field in schema.keys():
+                qp.add_prefix(field, DOCUMENT_CUSTOM_TERM_PREFIX + field.upper())
             flags = xapian.QueryParser.FLAG_PARTIAL \
                   | xapian.QueryParser.FLAG_PHRASE \
                   | xapian.QueryParser.FLAG_BOOLEAN \
