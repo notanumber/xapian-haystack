@@ -145,10 +145,10 @@ class XapianSearchBackendTestCase(TestCase):
     #     results = self.sb.search('Index*', query_facets={'name': '[* TO e]'})
     #     self.assertEqual(results['hits'], 3)
     #     self.assertEqual(results['facets'], {})
-    #     
-    #     # self.assertEqual(self.sb.search('', narrow_queries=['name:david1']), [])
-    #     # results = self.sb.search('Index*', narrow_queries=['name:david1'])
-    #     # self.assertEqual(results['hits'], 1)
+
+        self.assertEqual(self.sb.search('', narrow_queries=['name:david1']), {'hits': 0, 'results': []})
+        results = self.sb.search('index*', narrow_queries=['name:david1'])
+        self.assertEqual(results['hits'], 1)
 
     def test_spelling_suggestion(self):
         self.sb.update(self.msi, self.sample_objs)

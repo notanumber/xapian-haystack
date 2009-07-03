@@ -294,6 +294,10 @@ class SearchBackend(BaseSearchBackend):
             if getattr(settings, 'HAYSTACK_INCLUDE_SPELLING', False) is True:
                 spelling_suggestion = qp.get_corrected_query_string()
 
+        if narrow_queries:
+            for narrow_query in narrow_queries:
+                query = xapian.Query(xapian.Query.OP_AND, [query, qp.parse_query(narrow_query, flags)])
+
         enquire = xapian.Enquire(database)
         enquire.set_query(query)
         matches = enquire.get_mset(start_offset, end_offset)
