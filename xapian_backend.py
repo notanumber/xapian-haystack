@@ -481,7 +481,7 @@ class SearchBackend(BaseSearchBackend):
         content_field_name, fields = self.site.build_unified_schema()
         schema_fields = {}
         for i, field in enumerate(fields):
-            if field['indexed']:
+            if field['indexed'] == 'true':
                 schema_fields[field['field_name']] = i
         return schema_fields
 
