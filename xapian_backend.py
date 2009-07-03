@@ -125,7 +125,8 @@ class SearchBackend(BaseSearchBackend):
         eg.: `'foo:bar'` will filter based on the `foo` field for `bar`.
         """
         database = xapian.WritableDatabase(self.path, xapian.DB_CREATE_OR_OPEN)
-        database.set_metadata('schema', pickle.dumps(self.site.build_unified_schema()))
+        schema = self.site.build_unified_schema()
+        database.set_metadata('schema', pickle.dumps(schema))
 
         indexer = xapian.TermGenerator()
         indexer.set_database(database)
@@ -141,10 +142,12 @@ class SearchBackend(BaseSearchBackend):
                 document_data = index.prepare(obj)
 
                 for i, (key, value) in enumerate(document_data.iteritems()):
-                    prefix = DOCUMENT_CUSTOM_TERM_PREFIX + self._from_python(key).upper()
-                    data = self._from_python(value)
-                    indexer.index_text(data)
-                    indexer.index_text(data, 1, prefix)
+                    field = self._field_from_schema(schema, key)
+                    if (field['field_name'] == key) and (field['indexed'] == 'true'):
+                        prefix = DOCUMENT_CUSTOM_TERM_PREFIX + self._from_python(key).upper()
+                        data = self._from_python(value)
+                        indexer.index_text(data)
+                        indexer.index_text(data, 1, prefix)
 
                 document.set_data(pickle.dumps(document_data, pickle.HIGHEST_PROTOCOL))
                 document.add_term(DOCUMENT_ID_TERM_PREFIX + document_id)
@@ -469,6 +472,20 @@ class SearchBackend(BaseSearchBackend):
         else:
             value = force_unicode(value)
         return value
+
+    def _field_from_schema(self, schema, field_name):
+        """
+        Locate and return field named `field_name` in the given `schema`
+
+        Required Arguments:
+            `schema` -- Schema to search
+            `field_name` -- Field to locate
+        """
+        for field in schema[1]:
+            if (field['field_name'] == field_name):
+                return field
+        return None
+
 
 
 class SearchQuery(BaseSearchQuery):
