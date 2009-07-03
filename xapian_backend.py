@@ -124,9 +124,9 @@ class SearchBackend(BaseSearchBackend):
 
         eg.: `'foo:bar'` will filter based on the `foo` field for `bar`.
         """
+        schema = self._build_schema()
+
         database = xapian.WritableDatabase(self.path, xapian.DB_CREATE_OR_OPEN)
-        content_field_name, fields = self.site.build_unified_schema()
-        schema = self._build_schema(fields)
         database.set_metadata('schema', pickle.dumps(schema))
 
         indexer = xapian.TermGenerator()
@@ -161,13 +161,6 @@ class SearchBackend(BaseSearchBackend):
         except UnicodeDecodeError:
             sys.stderr.write('Chunk failed.\n')
             pass
-
-    def _build_schema(self, fields):
-        schema_fields = {}
-        for i, field in enumerate(fields):
-            if field['indexed']:
-                schema_fields[field['field_name']] = i
-        return schema_fields
 
     def remove(self, obj):
         """
@@ -479,19 +472,18 @@ class SearchBackend(BaseSearchBackend):
             value = force_unicode(value)
         return value
 
-    def _field_from_schema(self, schema, field_name):
+    def _build_schema(self):
         """
-        Locate and return field named `field_name` in the given `schema`
+        Builds a Xapian backend specific schema
 
-        Required Arguments:
-            `schema` -- Schema to search
-            `field_name` -- Field to locate
+        Returns a dictionary that can be stored in the database ('schema') metdata.
         """
-        for field in schema[1]:
-            if (field['field_name'] == field_name):
-                return field
-        return None
-
+        content_field_name, fields = self.site.build_unified_schema()
+        schema_fields = {}
+        for i, field in enumerate(fields):
+            if field['indexed']:
+                schema_fields[field['field_name']] = i
+        return schema_fields
 
 
 class SearchQuery(BaseSearchQuery):
