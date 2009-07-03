@@ -295,8 +295,10 @@ class SearchBackend(BaseSearchBackend):
                 spelling_suggestion = qp.get_corrected_query_string()
 
         if narrow_queries:
+            subqueries = []
             for narrow_query in narrow_queries:
-                query = xapian.Query(xapian.Query.OP_AND, [query, qp.parse_query(narrow_query, flags)])
+                subqueries.append(qp.parse_query(narrow_query, flags))
+            query = xapian.Query(xapian.Query.OP_FILTER, query, xapian.Query(xapian.Query.OP_AND, subqueries))
 
         enquire = xapian.Enquire(database)
         enquire.set_query(query)
