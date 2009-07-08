@@ -260,9 +260,6 @@ class SearchBackend(BaseSearchBackend):
         if query_facets is not None:
             warnings.warn("Query faceting has not been implemented yet.", Warning, stacklevel=2)
 
-        if sort_by is not None:
-            warnings.warn("Sorting has not been implemented yet.", Warning, stacklevel=2)
-
         if highlight is not False:
             warnings.warn("Highlight has not been implemented yet.", Warning, stacklevel=2)
 
@@ -297,6 +294,12 @@ class SearchBackend(BaseSearchBackend):
 
         enquire = xapian.Enquire(database)
         enquire.set_query(query)
+
+        if sort_by is not None:
+            reverse = False
+            field_pos = 0 # TODO: Get field pos
+            enquire.set_sort_by_value_then_relevance(field_pos, reverse)
+
         matches = enquire.get_mset(start_offset, end_offset)
         results = self._process_results(matches, facets)
 

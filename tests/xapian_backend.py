@@ -189,14 +189,14 @@ class XapianSearchBackendTestCase(TestCase):
         self.sb.delete_index()
         self.assertEqual(self.sb.document_count(), 0)
 
-    # def test_order_by(self):
-    #     self.sb.update(self.msi, self.sample_objs)
-    #     
-    #     results = self.sb.search('*', sort_by=['pub_date'])
-    #     self.assertEqual([result.pk for result in results['results']], [u'1', u'2', u'3'])
-    #     
-    #     results = self.sb.search('*', sort_by=['-pub_date'])
-    #     self.assertEqual([result.pk for result in results['results']], [u'3', u'2', u'1'])
+    def test_order_by(self):
+        self.sb.update(self.msi, self.sample_objs)
+        
+        results = self.sb.search('*', sort_by=['pub_date'])
+        self.assertEqual([result.pk for result in results['results']], [u'1', u'2', u'3'])
+        
+        results = self.sb.search('*', sort_by=['-pub_date'])
+        self.assertEqual([result.pk for result in results['results']], [u'3', u'2', u'1'])
     
     def test__from_python(self):
         self.assertEqual(self.sb._from_python('abc'), u'abc')
