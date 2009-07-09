@@ -8,6 +8,7 @@ class MockModel(models.Model):
     foo = models.CharField(max_length=255, blank=True)
     pub_date = models.DateTimeField(default=datetime.datetime.now)
     value = models.IntegerField()
+    flag = models.BooleanField()
     
     def __unicode__(self):
         return self.user

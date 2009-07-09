@@ -19,6 +19,7 @@ class XapianMockSearchIndex(indexes.SearchIndex):
     name = indexes.CharField(model_attr='author')
     pub_date = indexes.DateField(model_attr='pub_date')
     value = indexes.IntegerField(model_attr='value')
+    flag = indexes.BooleanField(model_attr='flag')
 
 
 class XapianSearchSite(sites.SearchSite):
@@ -46,6 +47,7 @@ class XapianSearchBackendTestCase(TestCase):
             mock.author = 'david%s' % i
             mock.pub_date = datetime.date(2009, 2, 25) - datetime.timedelta(days=i)
             mock.value = i * 5
+            mock.flag = bool(i % 2)
             self.sample_objs.append(mock)
 
     def tearDown(self):
@@ -89,7 +91,7 @@ class XapianSearchBackendTestCase(TestCase):
         self.sb.update(self.msi, self.sample_objs) # Duplicates should be updated, not appended -- http://github.com/notanumber/xapian-haystack/issues/#issue/6
 
         self.assertEqual(len(self.xapian_search('')), 3)
-        self.assertEqual([dict(doc) for doc in self.xapian_search('')], [{'name': u'david1', 'text': u'Indexed!\n1', 'pub_date': u'2009-02-24T00:00:00', 'value': u'5', 'id': u'tests.mockmodel.1'}, {'name': u'david2', 'text': u'Indexed!\n2', 'pub_date': u'2009-02-23T00:00:00', 'value': u'10', 'id': u'tests.mockmodel.2'}, {'name': u'david3', 'text': u'Indexed!\n3', 'pub_date': u'2009-02-22T00:00:00', 'value': u'15', 'id': u'tests.mockmodel.3'}])
+        self.assertEqual([dict(doc) for doc in self.xapian_search('')], [{'flag': u'true', 'name': u'david1', 'text': u'Indexed!\n1', 'pub_date': u'2009-02-24T00:00:00', 'value': u'5', 'id': u'tests.mockmodel.1'}, {'flag': u'false', 'name': u'david2', 'text': u'Indexed!\n2', 'pub_date': u'2009-02-23T00:00:00', 'value': u'10', 'id': u'tests.mockmodel.2'}, {'flag': u'true', 'name': u'david3', 'text': u'Indexed!\n3', 'pub_date': u'2009-02-22T00:00:00', 'value': u'15', 'id': u'tests.mockmodel.3'}])
 
     def test_remove(self):
         self.sb.update(self.msi, self.sample_objs)
@@ -97,7 +99,7 @@ class XapianSearchBackendTestCase(TestCase):
 
         self.sb.remove(self.sample_objs[0])
         self.assertEqual(len(self.xapian_search('')), 2)
-        self.assertEqual([dict(doc) for doc in self.xapian_search('')], [{'name': u'david2', 'text': u'Indexed!\n2', 'pub_date': u'2009-02-23T00:00:00', 'value': u'10', 'id': u'tests.mockmodel.2'}, {'name': u'david3', 'text': u'Indexed!\n3', 'pub_date': u'2009-02-22T00:00:00', 'value': u'15', 'id': u'tests.mockmodel.3'}])
+        self.assertEqual([dict(doc) for doc in self.xapian_search('')], [{'flag': u'false', 'name': u'david2', 'text': u'Indexed!\n2', 'pub_date': u'2009-02-23T00:00:00', 'value': u'10', 'id': u'tests.mockmodel.2'}, {'flag': u'true', 'name': u'david3', 'text': u'Indexed!\n3', 'pub_date': u'2009-02-22T00:00:00', 'value': u'15', 'id': u'tests.mockmodel.3'}])
 
     def test_clear(self):
         self.sb.update(self.msi, self.sample_objs)
@@ -178,7 +180,7 @@ class XapianSearchBackendTestCase(TestCase):
 
         results = self.sb.more_like_this(self.sample_objs[0])
         self.assertEqual(results['hits'], 2)
-        self.assertEqual([result.pk for result in results['results']], [u'2', u'3'])
+        self.assertEqual([result.pk for result in results['results']], [u'3', u'2'])
 
     def test_document_count(self):
         self.sb.update(self.msi, self.sample_objs)
@@ -193,10 +195,10 @@ class XapianSearchBackendTestCase(TestCase):
 
     def test_order_by(self):
         self.sb.update(self.msi, self.sample_objs)
-        
+
         results = self.sb.search('*', sort_by=['pub_date'])
         self.assertEqual([result.pk for result in results['results']], [u'1', u'2', u'3'])
-        
+
         results = self.sb.search('*', sort_by=['-pub_date'])
         self.assertEqual([result.pk for result in results['results']], [u'3', u'2', u'1'])
 
@@ -205,13 +207,19 @@ class XapianSearchBackendTestCase(TestCase):
 
         results = self.sb.search('*', sort_by=['-id'])
         self.assertEqual([result.pk for result in results['results']], [u'1', u'2', u'3'])
-    
+
         results = self.sb.search('*', sort_by=['value'])
         self.assertEqual([result.pk for result in results['results']], [u'3', u'2', u'1'])
 
         results = self.sb.search('*', sort_by=['-value'])
         self.assertEqual([result.pk for result in results['results']], [u'1', u'2', u'3'])
-    
+
+        results = self.sb.search('*', sort_by=['flag', 'id'])
+        self.assertEqual([result.pk for result in results['results']], [u'3', u'1', u'2'])
+
+        results = self.sb.search('*', sort_by=['flag', '-id'])
+        self.assertEqual([result.pk for result in results['results']], [u'1', u'3', u'2'])
+
     def test__from_python(self):
         self.assertEqual(self.sb._from_python('abc'), u'abc')
         self.assertEqual(self.sb._from_python(1), u'1')

@@ -305,16 +305,18 @@ class SearchBackend(BaseSearchBackend):
 
         enquire = xapian.Enquire(database)
         enquire.set_query(query)
+        enquire.set_docid_order(enquire.ASCENDING)
 
         if sort_by:
-            if len(sort_by) > 1:
-                raise SearchBackendError("Xapian does not handle more than one field for ordering.")
-            if sort_by[0].startswith('-'):
-                reverse = True
-                sort_by[0] = sort_by[0][1:] # Strip the '-'
-            else:
-                reverse = False
-            enquire.set_sort_by_relevance_then_value(schema.get(sort_by[0], -1) + 1, reverse)
+            sorter = xapian.MultiValueSorter()
+            for sort_field in sort_by:
+                if sort_field.startswith('-'):
+                    reverse = False
+                    sort_field = sort_field[1:] # Strip the '-'
+                else:
+                    reverse = True # Reverse is inverted in Xapian -- http://trac.xapian.org/ticket/311
+                sorter.add(schema.get(sort_field, -1) + 1, reverse)
+            enquire.set_sort_by_key_then_relevance(sorter, True)
 
         matches = enquire.get_mset(start_offset, end_offset)
         results = self._process_results(matches, facets)
@@ -378,6 +380,7 @@ class SearchBackend(BaseSearchBackend):
         )
         enquire = xapian.Enquire(database)
         enquire.set_query(query)
+        enquire.set_docid_order(enquire.DONT_CARE)
         rset = xapian.RSet()
         for match in enquire.get_mset(0, DEFAULT_MAX_RESULTS):
             rset.add_document(match.get_docid())
