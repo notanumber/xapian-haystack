@@ -148,6 +148,7 @@ class SearchBackend(BaseSearchBackend):
                         data = self._from_python(value)
                         indexer.index_text(data)
                         indexer.index_text(data, 1, prefix)
+                        document.add_value(i + 1, data)
 
                 document.set_data(pickle.dumps(document_data, pickle.HIGHEST_PROTOCOL))
                 document.add_term(DOCUMENT_ID_TERM_PREFIX + document_id)
@@ -295,10 +296,15 @@ class SearchBackend(BaseSearchBackend):
         enquire = xapian.Enquire(database)
         enquire.set_query(query)
 
-        if sort_by is not None:
-            reverse = False
-            field_pos = 0 # TODO: Get field pos
-            enquire.set_sort_by_value_then_relevance(field_pos, reverse)
+        if sort_by:
+            if len(sort_by) > 1:
+                raise SearchBackendError("Xapian does not handle more than one field for ordering.")
+            if sort_by[0].startswith('-'):
+                reverse = True
+                sort_by[0] = sort_by[0][1:] # Strip the '-'
+            else:
+                reverse = False
+            enquire.set_sort_by_relevance_then_value(schema.get(sort_by[0], -1) + 1, reverse)
 
         matches = enquire.get_mset(start_offset, end_offset)
         results = self._process_results(matches, facets)
