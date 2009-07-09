@@ -114,7 +114,7 @@ class SearchBackend(BaseSearchBackend):
         The document also contains a pickled version of the object itself in 
         the document data field.
 
-        Finally, the database itself maintains a list of all index field names
+        Also, the database itself maintains a list of all index field names
         in use through the database meta data field with the name `schema`.
         This is a pickled data that can be loaded on demand and used to assign 
         prefixes to query parsers so that a user can perform field name 
@@ -123,6 +123,12 @@ class SearchBackend(BaseSearchBackend):
         `<field_name>:<value>`
 
         eg.: `'foo:bar'` will filter based on the `foo` field for `bar`.
+        
+        Finally, we also store field values to be used for sorting data.  We
+        store these in the document value slots (position zero is reserver
+        for the document ID).  All values are stored as unicode strings with
+        conversion of float, int, double, values being done by Xapian itself
+        through the use of the :method:xapian.sortable_serialise method.
         """
         schema = self._build_schema()
 
@@ -148,7 +154,11 @@ class SearchBackend(BaseSearchBackend):
                         data = self._from_python(value)
                         indexer.index_text(data)
                         indexer.index_text(data, 1, prefix)
-                        document.add_value(i + 1, data)
+
+                        if isinstance(value, (int, long, float)):
+                            document.add_value(i + 1, xapian.sortable_serialise(value))
+                        else:
+                            document.add_value(i + 1, data)
 
                 document.set_data(pickle.dumps(document_data, pickle.HIGHEST_PROTOCOL))
                 document.add_term(DOCUMENT_ID_TERM_PREFIX + document_id)
