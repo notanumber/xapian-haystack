@@ -5,7 +5,6 @@ Future
 * `date_facets` on SearchBackend.search
 * `query_facets` on SearchBackend.search
 * Language stemming (needs to be implemented by Haystack first)
-* Multi field sorting
 
 Complete
 ========
@@ -13,3 +12,4 @@ Complete
 * Spelling correction
 * `narrow_queries` on SearchBackend.search
 * Search ordering by field
+* Multi field sorting
