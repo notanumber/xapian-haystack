@@ -132,20 +132,13 @@ class SearchBackend(BaseSearchBackend):
         through the use of the :method:xapian.sortable_serialise method.
         """
         schema = self._build_schema()
-
-        database = self._open_database(readwrite=True)
-        database.set_metadata('schema', pickle.dumps(schema))
-
-        indexer = xapian.TermGenerator()
-        indexer.set_database(database)
-        indexer.set_stemmer(self.stemmer)
-        indexer.set_flags(xapian.TermGenerator.FLAG_SPELLING)
+        database = self._open_database(schema=schema, readwrite=True)
 
         try:
             for obj in iterable:
                 document_id = self.get_identifier(obj)
                 document = xapian.Document()
-                indexer.set_document(document)
+                indexer = self._get_indexer(database, document)
                 document.add_value(0, force_unicode(document_id))
                 document_data = index.prepare(obj)
 
@@ -509,17 +502,37 @@ class SearchBackend(BaseSearchBackend):
     def _open_database(self, id=None, schema=None, readwrite=False):
         """
         Open a Xapian database for use.
-        
+
         Optional Arguments:
             `readwrite` -- If true, the database will be opened with read/write permission
-        
+
         Returns a Xapian database instance
         """
         if readwrite:
             database = xapian.WritableDatabase(self.path, xapian.DB_CREATE_OR_OPEN)
+            if schema:
+                database.set_metadata('schema', pickle.dumps(schema))
         else:
             database = xapian.Database(self.path)
         return database
+
+    def _get_indexer(self, database, document):
+        """
+        Given a database and document, returns an indexer
+
+        Required Argument:
+            `database` -- The database to store the index
+            `document` -- The document to be indexed
+
+        Returns a Xapian indexer instance
+        """
+        indexer = xapian.TermGenerator()
+        indexer.set_database(database)
+        indexer.set_stemmer(self.stemmer)
+        indexer.set_flags(xapian.TermGenerator.FLAG_SPELLING)
+        indexer.set_document(document)
+
+        return indexer
 
 
 class SearchQuery(BaseSearchQuery):
