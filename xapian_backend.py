@@ -133,7 +133,7 @@ class SearchBackend(BaseSearchBackend):
         """
         schema = self._build_schema()
 
-        database = xapian.WritableDatabase(self.path, xapian.DB_CREATE_OR_OPEN)
+        database = self._open_database(readwrite=True)
         database.set_metadata('schema', pickle.dumps(schema))
 
         indexer = xapian.TermGenerator()
@@ -181,7 +181,7 @@ class SearchBackend(BaseSearchBackend):
         We delete all instances of `Q<app_name>.<model_name>.<pk>` which
         should be unique to this object.
         """
-        database = xapian.WritableDatabase(self.path, xapian.DB_CREATE_OR_OPEN)
+        database = self._open_database(readwrite=True)
         database.delete_document(DOCUMENT_ID_TERM_PREFIX + self.get_identifier(obj))
 
     def clear(self, models=[]):
@@ -199,7 +199,7 @@ class SearchBackend(BaseSearchBackend):
         the term `XCONTENTTYPE<app_name>.<model_name>`.  This will delete
         all documents with the specified model type.
         """
-        database = xapian.WritableDatabase(self.path, xapian.DB_CREATE_OR_OPEN)
+        database = self._open_database(readwrite=True)
         if not models:
             query = xapian.Query('') # Empty query matches all
             enquire = xapian.Enquire(database)
@@ -275,7 +275,7 @@ class SearchBackend(BaseSearchBackend):
         if highlight is not False:
             warnings.warn("Highlight has not been implemented yet.", Warning, stacklevel=2)
 
-        database = xapian.Database(self.path)
+        database = self._open_database()
         schema = pickle.loads(database.get_metadata('schema'))
         spelling_suggestion = None
 
@@ -346,7 +346,7 @@ class SearchBackend(BaseSearchBackend):
         Retrieves the total document count for the search index.
         """
         try:
-            database = xapian.Database(self.path)
+            database = self._open_database()
         except xapian.DatabaseOpeningError:
             return 0
         return database.get_doccount()
@@ -375,7 +375,7 @@ class SearchBackend(BaseSearchBackend):
 
         Finally, processes the resulting matches and returns.
         """
-        database = xapian.Database(self.path)
+        database = self._open_database()
         query = xapian.Query(
             DOCUMENT_ID_TERM_PREFIX + self.get_identifier(model_instance)
         )
@@ -505,6 +505,21 @@ class SearchBackend(BaseSearchBackend):
             if field['indexed'] == 'true':
                 schema_fields[field['field_name']] = i
         return schema_fields
+
+    def _open_database(self, id=None, schema=None, readwrite=False):
+        """
+        Open a Xapian database for use.
+        
+        Optional Arguments:
+            `readwrite` -- If true, the database will be opened with read/write permission
+        
+        Returns a Xapian database instance
+        """
+        if readwrite:
+            database = xapian.WritableDatabase(self.path, xapian.DB_CREATE_OR_OPEN)
+        else:
+            database = xapian.Database(self.path)
+        return database
 
 
 class SearchQuery(BaseSearchQuery):
