@@ -73,6 +73,7 @@ class SearchBackend(BaseSearchBackend):
         Also sets the stemming language to be used to `stem_lang`.
         """
         super(SearchBackend, self).__init__(site)
+
         if not hasattr(settings, 'HAYSTACK_XAPIAN_PATH'):
             raise ImproperlyConfigured('You must specify a HAYSTACK_XAPIAN_PATH in your settings.')
 
@@ -478,8 +479,6 @@ class SearchBackend(BaseSearchBackend):
     def _from_python(self, value):
         """
         Converts Python values to a string for Xapian.
-
-        Original code courtesy of pysolr.
         """
         if isinstance(value, datetime.datetime):
             value = force_unicode('%s' % value.isoformat())
