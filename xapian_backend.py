@@ -479,9 +479,9 @@ class SearchBackend(BaseSearchBackend):
             value = force_unicode('%sT00:00:00' % value.isoformat())
         elif isinstance(value, bool):
             if value:
-                value = u't'
+                value = u'true'
             else:
-                value = u'f'
+                value = u'false'
         else:
             value = force_unicode(value)
         return value
