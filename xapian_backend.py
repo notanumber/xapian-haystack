@@ -474,9 +474,18 @@ class SearchBackend(BaseSearchBackend):
         Converts Python values to a string for Xapian.
         """
         if isinstance(value, datetime.datetime):
-            value = force_unicode('%s' % value.isoformat())
+            if value.microsecond:
+                value = u'%04d%02d%02d%02d%02d%02d%06d' % (
+                    value.year, value.month, value.day, value.hour, 
+                    value.minute, value.second, value.microsecond
+                )
+            else:
+                value = u'%04d%02d%02d%02d%02d%02d' % (
+                    value.year, value.month, value.day, value.hour, 
+                    value.minute, value.second
+                )
         elif isinstance(value, datetime.date):
-            value = force_unicode('%sT00:00:00' % value.isoformat())
+            value = u'%04d%02d%02d000000' % (value.year, value.month, value.day)
         elif isinstance(value, bool):
             if value:
                 value = u't'

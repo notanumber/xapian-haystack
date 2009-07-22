@@ -91,7 +91,7 @@ class XapianSearchBackendTestCase(TestCase):
         self.sb.update(self.msi, self.sample_objs) # Duplicates should be updated, not appended -- http://github.com/notanumber/xapian-haystack/issues/#issue/6
 
         self.assertEqual(len(self.xapian_search('')), 3)
-        self.assertEqual([dict(doc) for doc in self.xapian_search('')], [{'flag': u't', 'name': u'david1', 'text': u'Indexed!\n1', 'pub_date': u'2009-02-24T00:00:00', 'value': u'5', 'id': u'tests.mockmodel.1'}, {'flag': u'f', 'name': u'david2', 'text': u'Indexed!\n2', 'pub_date': u'2009-02-23T00:00:00', 'value': u'10', 'id': u'tests.mockmodel.2'}, {'flag': u't', 'name': u'david3', 'text': u'Indexed!\n3', 'pub_date': u'2009-02-22T00:00:00', 'value': u'15', 'id': u'tests.mockmodel.3'}])
+        self.assertEqual([dict(doc) for doc in self.xapian_search('')], [{'flag': u't', 'name': u'david1', 'text': u'Indexed!\n1', 'pub_date': u'20090224000000', 'value': u'5', 'id': u'tests.mockmodel.1'}, {'flag': u'f', 'name': u'david2', 'text': u'Indexed!\n2', 'pub_date': u'20090223000000', 'value': u'10', 'id': u'tests.mockmodel.2'}, {'flag': u't', 'name': u'david3', 'text': u'Indexed!\n3', 'pub_date': u'20090222000000', 'value': u'15', 'id': u'tests.mockmodel.3'}])
 
     def test_remove(self):
         self.sb.update(self.msi, self.sample_objs)
@@ -99,7 +99,7 @@ class XapianSearchBackendTestCase(TestCase):
 
         self.sb.remove(self.sample_objs[0])
         self.assertEqual(len(self.xapian_search('')), 2)
-        self.assertEqual([dict(doc) for doc in self.xapian_search('')], [{'flag': u'f', 'name': u'david2', 'text': u'Indexed!\n2', 'pub_date': u'2009-02-23T00:00:00', 'value': u'10', 'id': u'tests.mockmodel.2'}, {'flag': u't', 'name': u'david3', 'text': u'Indexed!\n3', 'pub_date': u'2009-02-22T00:00:00', 'value': u'15', 'id': u'tests.mockmodel.3'}])
+        self.assertEqual([dict(doc) for doc in self.xapian_search('')], [{'flag': u'f', 'name': u'david2', 'text': u'Indexed!\n2', 'pub_date': u'20090223000000', 'value': u'10', 'id': u'tests.mockmodel.2'}, {'flag': u't', 'name': u'david3', 'text': u'Indexed!\n3', 'pub_date': u'20090222000000', 'value': u'15', 'id': u'tests.mockmodel.3'}])
 
     def test_clear(self):
         self.sb.update(self.msi, self.sample_objs)
@@ -228,7 +228,7 @@ class XapianSearchBackendTestCase(TestCase):
         self.assertEqual(self.sb._from_python([1, 2, 3]), u'[1, 2, 3]')
         self.assertEqual(self.sb._from_python((1, 2, 3)), u'(1, 2, 3)')
         self.assertEqual(self.sb._from_python({'a': 1, 'c': 3, 'b': 2}), u"{'a': 1, 'c': 3, 'b': 2}")
-        self.assertEqual(self.sb._from_python(datetime.datetime(2009, 5, 9, 16, 14)), u'2009-05-09T16:14:00')
-        self.assertEqual(self.sb._from_python(datetime.datetime(2009, 5, 9, 0, 0)), u'2009-05-09T00:00:00')
-        self.assertEqual(self.sb._from_python(datetime.datetime(1899, 5, 18, 0, 0)), u'1899-05-18T00:00:00')
-        self.assertEqual(self.sb._from_python(datetime.datetime(2009, 5, 18, 1, 16, 30, 250)), u'2009-05-18T01:16:30.000250')
+        self.assertEqual(self.sb._from_python(datetime.datetime(2009, 5, 9, 16, 14)), u'20090509161400')
+        self.assertEqual(self.sb._from_python(datetime.datetime(2009, 5, 9, 0, 0)), u'20090509000000')
+        self.assertEqual(self.sb._from_python(datetime.datetime(1899, 5, 18, 0, 0)), u'18990518000000')
+        self.assertEqual(self.sb._from_python(datetime.datetime(2009, 5, 18, 1, 16, 30, 250)), u'20090518011630000250')
