@@ -275,6 +275,7 @@ class SearchBackend(BaseSearchBackend):
         if query_string == '*':
             query = xapian.Query('') # Make '*' match everything
         else:
+            flags = self._get_flags()
             qp = xapian.QueryParser()
             qp.set_database(database)
             qp.set_stemmer(self.stemmer)
@@ -282,13 +283,6 @@ class SearchBackend(BaseSearchBackend):
             qp.add_boolean_prefix('django_ct', DOCUMENT_CT_TERM_PREFIX)
             for field in schema.keys():
                 qp.add_prefix(field, DOCUMENT_CUSTOM_TERM_PREFIX + field.upper())
-            flags = xapian.QueryParser.FLAG_PARTIAL \
-                  | xapian.QueryParser.FLAG_PHRASE \
-                  | xapian.QueryParser.FLAG_BOOLEAN \
-                  | xapian.QueryParser.FLAG_LOVEHATE \
-                  | xapian.QueryParser.FLAG_WILDCARD
-            if getattr(settings, 'HAYSTACK_INCLUDE_SPELLING', False) is True:
-                flags = flags | xapian.QueryParser.FLAG_SPELLING_CORRECTION
             query = qp.parse_query(query_string, flags)
             if getattr(settings, 'HAYSTACK_INCLUDE_SPELLING', False) is True:
                 spelling_suggestion = qp.get_corrected_query_string()
@@ -302,14 +296,7 @@ class SearchBackend(BaseSearchBackend):
         enquire.set_docid_order(enquire.ASCENDING)
 
         if sort_by:
-            sorter = xapian.MultiValueSorter()
-            for sort_field in sort_by:
-                if sort_field.startswith('-'):
-                    reverse = False
-                    sort_field = sort_field[1:] # Strip the '-'
-                else:
-                    reverse = True # Reverse is inverted in Xapian -- http://trac.xapian.org/ticket/311
-                sorter.add(schema.get(sort_field, -1) + 1, reverse)
+            sorter = self._get_sorter(sort_by, schema)
             enquire.set_sort_by_key_then_relevance(sorter, True)
 
         matches = enquire.get_mset(start_offset, end_offset)
@@ -540,8 +527,37 @@ class SearchBackend(BaseSearchBackend):
         indexer.set_stemmer(self.stemmer)
         indexer.set_flags(xapian.TermGenerator.FLAG_SPELLING)
         indexer.set_document(document)
-
         return indexer
+
+    def _get_sorter(self, sort_by, schema):
+        """
+        Given a list of fields to sort by and a schema, returns a xapian.MultiValueSorter
+
+        Required Arguments:
+            `sort_by` -- A list of fields to sort by
+            `schema` -- The schema for mapping fields to value slots
+
+        Returns a xapian.MultiValueSorter instance
+        """
+        sorter = xapian.MultiValueSorter()
+        for sort_field in sort_by:
+            if sort_field.startswith('-'):
+                reverse = False
+                sort_field = sort_field[1:] # Strip the '-'
+            else:
+                reverse = True # Reverse is inverted in Xapian -- http://trac.xapian.org/ticket/311
+            sorter.add(schema.get(sort_field, -1) + 1, reverse)
+        return sorter
+
+    def _get_flags(self):
+        flags = xapian.QueryParser.FLAG_PARTIAL \
+              | xapian.QueryParser.FLAG_PHRASE \
+              | xapian.QueryParser.FLAG_BOOLEAN \
+              | xapian.QueryParser.FLAG_LOVEHATE \
+              | xapian.QueryParser.FLAG_WILDCARD
+        if getattr(settings, 'HAYSTACK_INCLUDE_SPELLING', False) is True:
+            flags = flags | xapian.QueryParser.FLAG_SPELLING_CORRECTION
+        return flags
 
 
 class SearchQuery(BaseSearchQuery):
