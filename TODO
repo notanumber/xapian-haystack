@@ -5,7 +5,6 @@ Future
 * `date_facets` on SearchBackend.search
 * `query_facets` on SearchBackend.search
 * Language stemming (needs to be implemented by Haystack first)
-* Refactor to use one index per model
 
 Complete
 ========
