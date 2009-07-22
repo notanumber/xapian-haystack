@@ -1,6 +1,6 @@
+import cPickle as pickle
 import datetime
 import os
-import cPickle as pickle
 import xapian
 
 from django.conf import settings
