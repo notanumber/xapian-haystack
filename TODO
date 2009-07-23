@@ -5,6 +5,7 @@ Future
 * `date_facets` on SearchBackend.search
 * `query_facets` on SearchBackend.search
 * Language stemming (needs to be implemented by Haystack first)
+* Figure out how to deal with accents? (eg., resume vs résumé).
 
 Complete
 ========
