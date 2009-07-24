@@ -276,13 +276,7 @@ class SearchBackend(BaseSearchBackend):
             query = xapian.Query('') # Make '*' match everything
         else:
             flags = self._get_flags()
-            qp = xapian.QueryParser()
-            qp.set_database(database)
-            qp.set_stemmer(self.stemmer)
-            qp.set_stemming_strategy(xapian.QueryParser.STEM_SOME)
-            qp.add_boolean_prefix('django_ct', DOCUMENT_CT_TERM_PREFIX)
-            for field in schema.keys():
-                qp.add_prefix(field, DOCUMENT_CUSTOM_TERM_PREFIX + field.upper())
+            qp = self._get_query_parser(database, schema)
             query = qp.parse_query(query_string, flags)
             if getattr(settings, 'HAYSTACK_INCLUDE_SPELLING', False) is True:
                 spelling_suggestion = qp.get_corrected_query_string()
@@ -559,6 +553,24 @@ class SearchBackend(BaseSearchBackend):
             flags = flags | xapian.QueryParser.FLAG_SPELLING_CORRECTION
         return flags
 
+    def _get_query_parser(self, database, schema=[]):
+        """
+        Given a database, returns a query parser.
+        
+        The query parser returned will have stemming enabled, a boolean prefix
+        for `django_ct`, and prefixes for all of the fields in the designated
+        `schema`.
+        
+        Returns a xapian.QueryParser instance
+        """
+        qp = xapian.QueryParser()
+        qp.set_database(database)
+        qp.set_stemmer(self.stemmer)
+        qp.set_stemming_strategy(xapian.QueryParser.STEM_SOME)
+        qp.add_boolean_prefix('django_ct', DOCUMENT_CT_TERM_PREFIX)
+        for field in schema.keys():
+            qp.add_prefix(field, DOCUMENT_CUSTOM_TERM_PREFIX + field.upper())
+        return qp
 
 class SearchQuery(BaseSearchQuery):
     """
