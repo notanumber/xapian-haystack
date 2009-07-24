@@ -195,8 +195,7 @@ class SearchBackend(BaseSearchBackend):
         database = self._open_database(readwrite=True)
         if not models:
             query = xapian.Query('') # Empty query matches all
-            enquire = xapian.Enquire(database)
-            enquire.set_query(query)
+            enquire = self._get_enquire(database, query)
             for match in enquire.get_mset(0, DEFAULT_MAX_RESULTS):
                 database.delete_document(match.get_docid())
         else:
