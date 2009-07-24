@@ -285,12 +285,7 @@ class SearchBackend(BaseSearchBackend):
             subqueries = [qp.parse_query(narrow_query, flags) for narrow_query in narrow_queries]
             query = xapian.Query(xapian.Query.OP_FILTER, query, xapian.Query(xapian.Query.OP_AND, subqueries))
 
-        enquire = self._get_enquire(database, query)
-
-        if sort_by:
-            sorter = self._get_sorter(sort_by, schema)
-            enquire.set_sort_by_key_then_relevance(sorter, True)
-
+        enquire = self._get_enquire(database, query, sort_by)
         matches = enquire.get_mset(start_offset, end_offset)
         results = self._process_results(matches, facets)
 
@@ -540,6 +535,9 @@ class SearchBackend(BaseSearchBackend):
         return sorter
 
     def _get_flags(self):
+        """
+        Returns the flags to use for the Xapian query parser
+        """
         flags = xapian.QueryParser.FLAG_PARTIAL \
               | xapian.QueryParser.FLAG_PHRASE \
               | xapian.QueryParser.FLAG_BOOLEAN \
@@ -549,7 +547,7 @@ class SearchBackend(BaseSearchBackend):
             flags = flags | xapian.QueryParser.FLAG_SPELLING_CORRECTION
         return flags
 
-    def _get_query_parser(self, database, schema=[]):
+    def _get_query_parser(self, database, schema):
         """
         Given a database, returns a query parser.
 
@@ -572,7 +570,7 @@ class SearchBackend(BaseSearchBackend):
             qp.add_prefix(field, DOCUMENT_CUSTOM_TERM_PREFIX + field.upper())
         return qp
 
-    def _get_enquire(self, database, query):
+    def _get_enquire(self, database, query, schema=None, sort_by=None):
         """
         Given a database and query, returns an enquire instance.
 
@@ -580,11 +578,19 @@ class SearchBackend(BaseSearchBackend):
             `database` -- The database to be queried
             `query` -- The query to run
 
+        Optional Arguments:
+            `sort_by` -- Fields to order results by
+
         Returns a xapian.Enquire instance
         """
         enquire = xapian.Enquire(database)
         enquire.set_query(query)
         enquire.set_docid_order(enquire.ASCENDING)
+
+        if sort_by and schema:
+            sorter = self._get_sorter(sort_by, schema)
+            enquire.set_sort_by_key_then_relevance(sorter, True)
+
         return enquire
 
 class SearchQuery(BaseSearchQuery):
