@@ -285,9 +285,7 @@ class SearchBackend(BaseSearchBackend):
             subqueries = [qp.parse_query(narrow_query, flags) for narrow_query in narrow_queries]
             query = xapian.Query(xapian.Query.OP_FILTER, query, xapian.Query(xapian.Query.OP_AND, subqueries))
 
-        enquire = xapian.Enquire(database)
-        enquire.set_query(query)
-        enquire.set_docid_order(enquire.ASCENDING)
+        enquire = self._get_enquire(database, query)
 
         if sort_by:
             sorter = self._get_sorter(sort_by, schema)
@@ -353,9 +351,7 @@ class SearchBackend(BaseSearchBackend):
         query = xapian.Query(
             DOCUMENT_ID_TERM_PREFIX + self.get_identifier(model_instance)
         )
-        enquire = xapian.Enquire(database)
-        enquire.set_query(query)
-        enquire.set_docid_order(enquire.DONT_CARE)
+        enquire = self._get_enquire(database, query)
         rset = xapian.RSet()
         for match in enquire.get_mset(0, DEFAULT_MAX_RESULTS):
             rset.add_document(match.get_docid())
@@ -556,11 +552,15 @@ class SearchBackend(BaseSearchBackend):
     def _get_query_parser(self, database, schema=[]):
         """
         Given a database, returns a query parser.
-        
+
         The query parser returned will have stemming enabled, a boolean prefix
         for `django_ct`, and prefixes for all of the fields in the designated
         `schema`.
-        
+
+        Required Arguments:
+            `database` -- The database to be queried
+            `schema` -- The schema for the document fields
+
         Returns a xapian.QueryParser instance
         """
         qp = xapian.QueryParser()
@@ -571,6 +571,21 @@ class SearchBackend(BaseSearchBackend):
         for field in schema.keys():
             qp.add_prefix(field, DOCUMENT_CUSTOM_TERM_PREFIX + field.upper())
         return qp
+
+    def _get_enquire(self, database, query):
+        """
+        Given a database and query, returns an enquire instance.
+
+        Required Arguments:
+            `database` -- The database to be queried
+            `query` -- The query to run
+
+        Returns a xapian.Enquire instance
+        """
+        enquire = xapian.Enquire(database)
+        enquire.set_query(query)
+        enquire.set_docid_order(enquire.ASCENDING)
+        return enquire
 
 class SearchQuery(BaseSearchQuery):
     """
