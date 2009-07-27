@@ -78,7 +78,7 @@ class SearchBackend(BaseSearchBackend):
             raise ImproperlyConfigured('You must specify a HAYSTACK_XAPIAN_PATH in your settings.')
 
         self.path = settings.HAYSTACK_XAPIAN_PATH
-        self.stemmer = xapian.Stem('english')
+        self.stemmer = xapian.Stem(stem_lang)
 
         if not os.path.exists(self.path):
             os.makedirs(self.path)
@@ -264,9 +264,6 @@ class SearchBackend(BaseSearchBackend):
         if query_facets is not None:
             warnings.warn("Query faceting has not been implemented yet.", Warning, stacklevel=2)
 
-        if highlight is not False:
-            warnings.warn("Highlight has not been implemented yet.", Warning, stacklevel=2)
-
         database = self._open_database()
         schema = pickle.loads(database.get_metadata('schema'))
         spelling_suggestion = None
@@ -291,7 +288,9 @@ class SearchBackend(BaseSearchBackend):
             enquire.set_sort_by_key_then_relevance(sorter, True)
 
         matches = enquire.get_mset(start_offset, end_offset)
-        results = self._process_results(matches, facets)
+        results = self._process_results(
+            matches, query_string=query_string, highlight=highlight, facets=facets
+        )
 
         if spelling_suggestion:
             results['spelling_suggestion'] = spelling_suggestion
@@ -364,7 +363,7 @@ class SearchBackend(BaseSearchBackend):
         matches = enquire.get_mset(0, DEFAULT_MAX_RESULTS)
         return self._process_results(matches)
 
-    def _process_results(self, matches, facets=None):
+    def _process_results(self, matches, query_string='', highlight=False, facets=None):
         """
         Private method for processing an MSet (match set).
 
@@ -372,6 +371,8 @@ class SearchBackend(BaseSearchBackend):
             `matches` -- An MSet of matches
 
         Optional arguments:
+            `query_string` -- The query string that generated the matches
+            `highlight` -- Add highlighting to results? (default=False)
             `facets` -- Fields to facet (default = None)
 
         Returns:
@@ -404,6 +405,12 @@ class SearchBackend(BaseSearchBackend):
             document = match.get_document()
             app_label, module_name, pk = document.get_value(0).split('.')
             additional_fields = pickle.loads(document.get_data())
+            if highlight and (len(query_string) > 0):
+                additional_fields['highlighted'] = {
+                    self.content_field_name: self._do_highlight(
+                        additional_fields.get(self.content_field_name), query_string
+                    )
+                }
             result = SearchResult(
                 app_label, module_name, pk, match.weight, **additional_fields
             )
@@ -419,6 +426,23 @@ class SearchBackend(BaseSearchBackend):
             'hits': hits,
             'facets': facets_dict,
         }
+
+    def _do_highlight(self, content, text, tag='em'):
+        """
+        Highlight `text` in `content` with html `tag`.
+        
+        This method assumes that the input text (`content`) does not contain
+        any special formatting.  That is, it does not contain any html tags
+        or similar markup that could be screwed up by the highlighting.
+        
+        Required arguments:
+            `content` -- Content to search for instances of `text`
+            `text` -- The text to be highlighted
+        """
+        for term in [term.replace('*', '') for term in text.split()]:
+            term_re = re.compile(re.escape(term), re.IGNORECASE)
+            content = term_re.sub('<%s>%s</%s>' % (tag, term, tag), content)
+        return content
 
     def _do_field_facets(self, document, facets, fields):
         """
@@ -477,7 +501,7 @@ class SearchBackend(BaseSearchBackend):
 
         Returns a dictionary that can be stored in the database ('schema') metdata.
         """
-        content_field_name, fields = self.site.build_unified_schema()
+        self.content_field_name, fields = self.site.build_unified_schema()
         schema_fields = {}
         for i, field in enumerate(fields):
             if field['indexed'] == 'true':
@@ -585,6 +609,7 @@ class SearchBackend(BaseSearchBackend):
         enquire.set_query(query)
         enquire.set_docid_order(enquire.ASCENDING)
         return enquire
+
 
 class SearchQuery(BaseSearchQuery):
     """

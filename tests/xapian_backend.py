@@ -85,7 +85,7 @@ class XapianSearchBackendTestCase(TestCase):
             document_list.append(object_data)
 
         return document_list
-    
+
     def test_update(self):
         self.sb.update(self.msi, self.sample_objs)
         self.sb.update(self.msi, self.sample_objs) # Duplicates should be updated, not appended -- http://github.com/notanumber/xapian-haystack/issues/#issue/6
@@ -104,37 +104,37 @@ class XapianSearchBackendTestCase(TestCase):
     def test_clear(self):
         self.sb.update(self.msi, self.sample_objs)
         self.assertEqual(len(self.xapian_search('')), 3)
-        
+
         self.sb.clear()
         self.assertEqual(len(self.xapian_search('')), 0)
-        
+
         self.sb.update(self.msi, self.sample_objs)
         self.assertEqual(len(self.xapian_search('')), 3)
-        
+
         self.sb.clear([AnotherMockModel])
         self.assertEqual(len(self.xapian_search('')), 3)
-        
+
         self.sb.clear([MockModel])
         self.assertEqual(len(self.xapian_search('')), 0)
-        
+
         self.sb.update(self.msi, self.sample_objs)
         self.assertEqual(len(self.xapian_search('')), 3)
-        
+
         self.sb.clear([AnotherMockModel, MockModel])
         self.assertEqual(len(self.xapian_search('')), 0)
     
     def test_search(self):
         self.sb.update(self.msi, self.sample_objs)
         self.assertEqual(len(self.xapian_search('')), 3)
-        
+
         self.assertEqual(self.sb.search(''), {'hits': 0, 'results': []})
         self.assertEqual(self.sb.search('*')['hits'], 3)
         self.assertEqual([result.pk for result in self.sb.search('*')['results']], [u'1', u'2', u'3'])
-        
-        # self.assertEqual(self.sb.search('', highlight=True), {'hits': 0, 'results': []})
-        # self.assertEqual(self.sb.search('Index*', highlight=True)['hits'], 3)
-        # self.assertEqual([result.highlighted['text'][0] for result in self.sb.search('Index*', highlight=True)['results']], ['<em>Indexed</em>!\n3', '<em>Indexed</em>!\n2', '<em>Indexed</em>!\n1'])
-        # 
+
+    def test_field_facets(self):
+        self.sb.update(self.msi, self.sample_objs)
+        self.assertEqual(len(self.xapian_search('')), 3)
+
         self.assertEqual(self.sb.search('', facets=['name']), {'hits': 0, 'results': []})
         results = self.sb.search('index', facets=['name'])
         self.assertEqual(results['hits'], 3)
@@ -150,9 +150,21 @@ class XapianSearchBackendTestCase(TestCase):
     #     self.assertEqual(results['hits'], 3)
     #     self.assertEqual(results['facets'], {})
 
+    def test_narrow_queries(self):
+        self.sb.update(self.msi, self.sample_objs)
+        self.assertEqual(len(self.xapian_search('')), 3)
+
         self.assertEqual(self.sb.search('', narrow_queries=['name:david1']), {'hits': 0, 'results': []})
-        results = self.sb.search('index*', narrow_queries=['name:david1'])
+        results = self.sb.search('index', narrow_queries=['name:david1'])
         self.assertEqual(results['hits'], 1)
+
+    def test_highlight(self):
+        self.sb.update(self.msi, self.sample_objs)
+        self.assertEqual(len(self.xapian_search('')), 3)
+
+        self.assertEqual(self.sb.search('', highlight=True), {'hits': 0, 'results': []})
+        self.assertEqual(self.sb.search('Index', highlight=True)['hits'], 3)
+        self.assertEqual([result.highlighted['text'] for result in self.sb.search('Index', highlight=True)['results']], ['<em>Index</em>ed!\n1', '<em>Index</em>ed!\n2', '<em>Index</em>ed!\n3'])
 
     def test_spelling_suggestion(self):
         self.sb.update(self.msi, self.sample_objs)
@@ -168,10 +180,10 @@ class XapianSearchBackendTestCase(TestCase):
         self.sb.update(self.msi, self.sample_objs)
         self.assertEqual(len(self.xapian_search('')), 3)
 
-        results = self.sb.search('index', facets=['name'])
+        results = self.sb.search('index')
         self.assertEqual(results['hits'], 3)
 
-        results = self.sb.search('indexing', facets=['name'])
+        results = self.sb.search('indexing')
         self.assertEqual(results['hits'], 3)
 
     def test_more_like_this(self):
