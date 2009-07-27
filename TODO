@@ -1,7 +1,6 @@
 Future
 ======
 
-* `highlight` on SearchBackend.search
 * `date_facets` on SearchBackend.search
 * `query_facets` on SearchBackend.search
 * Language stemming (needs to be implemented by Haystack first)
@@ -14,3 +13,4 @@ Complete
 * `narrow_queries` on SearchBackend.search
 * Search ordering by field
 * Multi field sorting
+* `highlight` on SearchBackend.search
