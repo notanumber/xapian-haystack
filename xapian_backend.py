@@ -75,29 +75,54 @@ class SearchBackend(BaseSearchBackend):
         '[', ']', '^', '"', '~', '*', '?', ':',
     )
 
-    def __init__(self, site=None, stem_lang='en'):
+    def __init__(self, site=None, stemming_language='english'):
         """
         Instantiates an instance of `SearchBackend`.
 
         Optional arguments:
             `site` -- The site to associate the backend with (default = None)
-            `stem_lang` -- The stemming language (default = 'en')
+            `stemming_language` -- The stemming language (default = 'english')
 
-        Verifies `HAYSTACK_XAPIAN_PATH` has been properly set and that the path
-        specified is readable.  If it is not, tries to create the folder.
-
-        Also sets the stemming language to be used to `stem_lang`.
+        Also sets the stemming language to be used to `stemming_language`.
         """
         super(SearchBackend, self).__init__(site)
 
         if not hasattr(settings, 'HAYSTACK_XAPIAN_PATH'):
             raise ImproperlyConfigured('You must specify a HAYSTACK_XAPIAN_PATH in your settings.')
 
-        self.path = settings.HAYSTACK_XAPIAN_PATH
-        self.stemmer = xapian.Stem(stem_lang)
+        self.stemming_language = stemming_language
+        self.ready = False
 
-        if not os.path.exists(self.path):
-            os.makedirs(self.path)
+    def _prepare(self, rw=False):
+        """
+        Prepare the required Xapian components for use.
+
+        Optional arguments:
+            `rw` -- Open the indexes in read/write mode (default=False)
+
+        Verifies `HAYSTACK_XAPIAN_PATH` has been properly set and that the path
+        specified is readable.  If it is not, tries to create the folder.
+        """
+        if self.ready:
+            return
+
+        if not os.path.exists(settings.HAYSTACK_XAPIAN_PATH):
+            os.makedirs(settings.HAYSTACK_XAPIAN_PATH)
+
+        if rw:
+            self.database = xapian.WritableDatabase(settings.HAYSTACK_XAPIAN_PATH, xapian.DB_CREATE_OR_OPEN)
+            self.content_field_name, fields = self.site.build_unified_schema()
+            self.schema = self._build_schema(fields)
+            self.database.set_metadata('schema', pickle.dumps(self.schema))
+            self.database.set_metadata('cf', pickle.dumps(self.content_field_name))
+            print self.schema
+        else:
+            self.database = xapian.Database(settings.HAYSTACK_XAPIAN_PATH)
+            self.schema = pickle.loads(self.database.get_metadata('schema'))
+            self.content_field_name = pickle.loads(self.database.get_metadata('cf'))
+
+        self.stemmer = xapian.Stem(self.stemming_language)
+        self.loaded = True
 
     def update(self, index, iterable):
         """
@@ -147,19 +172,17 @@ class SearchBackend(BaseSearchBackend):
         conversion of float, int, double, values being done by Xapian itself
         through the use of the :method:xapian.sortable_serialise method.
         """
-        schema = self._build_schema()
-        database = self._open_database(schema=schema, readwrite=True)
-
+        self._prepare(rw=True)
         try:
             for obj in iterable:
                 document_id = self.get_identifier(obj)
                 document = xapian.Document()
-                indexer = self._get_indexer(database, document)
+                indexer = self._get_indexer(document)
                 document.add_value(0, force_unicode(document_id))
                 document_data = index.prepare(obj)
 
                 for i, (key, value) in enumerate(document_data.iteritems()):
-                    if key in schema:
+                    if key in self.schema:
                         prefix = DOCUMENT_CUSTOM_TERM_PREFIX + self._from_python(key).upper()
                         data = self._from_python(value)
                         indexer.index_text(data)
@@ -177,7 +200,7 @@ class SearchBackend(BaseSearchBackend):
                     (obj._meta.app_label, obj._meta.module_name)
                 )
 
-                database.replace_document(DOCUMENT_ID_TERM_PREFIX + document_id, document)
+                self.database.replace_document(DOCUMENT_ID_TERM_PREFIX + document_id, document)
 
         except UnicodeDecodeError:
             sys.stderr.write('Chunk failed.\n')
@@ -190,8 +213,8 @@ class SearchBackend(BaseSearchBackend):
         We delete all instances of `Q<app_name>.<model_name>.<pk>` which
         should be unique to this object.
         """
-        database = self._open_database(readwrite=True)
-        database.delete_document(DOCUMENT_ID_TERM_PREFIX + self.get_identifier(obj))
+        self._prepare(rw=True)
+        self.database.delete_document(DOCUMENT_ID_TERM_PREFIX + self.get_identifier(obj))
 
     def clear(self, models=[]):
         """
@@ -208,10 +231,10 @@ class SearchBackend(BaseSearchBackend):
         the term `XCONTENTTYPE<app_name>.<model_name>`.  This will delete
         all documents with the specified model type.
         """
-        database = self._open_database(readwrite=True)
+        self._prepare(rw=True)
         if not models:
             query = xapian.Query('') # Empty query matches all
-            enquire = self._get_enquire(database, query)
+            enquire = self._get_enquire(query)
             for match in enquire.get_mset(0, DEFAULT_MAX_RESULTS):
                 database.delete_document(match.get_docid())
         else:
@@ -280,15 +303,15 @@ class SearchBackend(BaseSearchBackend):
         if query_facets is not None:
             warnings.warn("Query faceting has not been implemented yet.", Warning, stacklevel=2)
 
-        database = self._open_database()
-        schema = pickle.loads(database.get_metadata('schema'))
         spelling_suggestion = None
+
+        self._prepare()
 
         if query_string == '*':
             query = xapian.Query('') # Make '*' match everything
         else:
             flags = self._get_flags()
-            qp = self._get_query_parser(database, schema)
+            qp = self._get_query_parser()
             query = qp.parse_query(query_string, flags)
             if getattr(settings, 'HAYSTACK_INCLUDE_SPELLING', False) is True:
                 spelling_suggestion = qp.get_corrected_query_string()
@@ -297,10 +320,10 @@ class SearchBackend(BaseSearchBackend):
             subqueries = [qp.parse_query(narrow_query, flags) for narrow_query in narrow_queries]
             query = xapian.Query(xapian.Query.OP_FILTER, query, xapian.Query(xapian.Query.OP_AND, subqueries))
 
-        enquire = self._get_enquire(database, query)
+        enquire = self._get_enquire(query)
 
         if sort_by:
-            sorter = self._get_sorter(sort_by, schema)
+            sorter = self._get_sorter(sort_by)
             enquire.set_sort_by_key_then_relevance(sorter, True)
 
         matches = enquire.get_mset(start_offset, end_offset)
@@ -319,23 +342,24 @@ class SearchBackend(BaseSearchBackend):
         
         This removes all indexes files and the `HAYSTACK_XAPIAN_PATH` folder.
         """
-        if os.path.exists(self.path):
-            index_files = os.listdir(self.path)
+        if os.path.exists(settings.HAYSTACK_XAPIAN_PATH):
+            index_files = os.listdir(settings.HAYSTACK_XAPIAN_PATH)
 
             for index_file in index_files:
-                os.remove(os.path.join(self.path, index_file))
+                os.remove(os.path.join(settings.HAYSTACK_XAPIAN_PATH, index_file))
 
-            os.removedirs(self.path)
+            os.removedirs(settings.HAYSTACK_XAPIAN_PATH)
 
     def document_count(self):
         """
         Retrieves the total document count for the search index.
         """
         try:
-            database = self._open_database()
+            if not self.loaded:
+                self._load()
         except xapian.DatabaseOpeningError:
             return 0
-        return database.get_doccount()
+        return self.database.get_doccount()
 
     def more_like_this(self, model_instance):
         """
@@ -361,11 +385,13 @@ class SearchBackend(BaseSearchBackend):
 
         Finally, processes the resulting matches and returns.
         """
-        database = self._open_database()
+        if not self.loaded:
+            self._load()
+
         query = xapian.Query(
             DOCUMENT_ID_TERM_PREFIX + self.get_identifier(model_instance)
         )
-        enquire = self._get_enquire(database, query)
+        enquire = self._get_enquire(query)
         rset = xapian.RSet()
         for match in enquire.get_mset(0, DEFAULT_MAX_RESULTS):
             rset.add_document(match.get_docid())
@@ -511,60 +537,28 @@ class SearchBackend(BaseSearchBackend):
             value = force_unicode(value)
         return value
 
-    def _build_schema(self):
+    def _get_indexer(self, document):
         """
-        Builds a Xapian backend specific schema
-
-        Returns a dictionary that can be stored in the database ('schema') metdata.
-        """
-        self.content_field_name, fields = self.site.build_unified_schema()
-        schema_fields = {}
-        for i, field in enumerate(fields):
-            if field['indexed'] == 'true':
-                schema_fields[field['field_name']] = i
-        return schema_fields
-
-    def _open_database(self, id=None, schema=None, readwrite=False):
-        """
-        Open a Xapian database for use.
-
-        Optional Arguments:
-            `readwrite` -- If true, the database will be opened with read/write permission
-
-        Returns a Xapian database instance
-        """
-        if readwrite:
-            database = xapian.WritableDatabase(self.path, xapian.DB_CREATE_OR_OPEN)
-            if schema:
-                database.set_metadata('schema', pickle.dumps(schema))
-        else:
-            database = xapian.Database(self.path)
-        return database
-
-    def _get_indexer(self, database, document):
-        """
-        Given a database and document, returns an indexer
+        Given a document, returns an Xapian.TermGenerator
 
         Required Argument:
-            `database` -- The database to store the index
             `document` -- The document to be indexed
 
-        Returns a Xapian indexer instance
+        Returns a Xapian.TermGenerator instance
         """
         indexer = xapian.TermGenerator()
-        indexer.set_database(database)
+        indexer.set_database(self.database)
         indexer.set_stemmer(self.stemmer)
         indexer.set_flags(xapian.TermGenerator.FLAG_SPELLING)
         indexer.set_document(document)
         return indexer
 
-    def _get_sorter(self, sort_by, schema):
+    def _get_sorter(self, sort_by):
         """
-        Given a list of fields to sort by and a schema, returns a xapian.MultiValueSorter
+        Given a list of fields to sort by, returns a xapian.MultiValueSorter
 
         Required Arguments:
             `sort_by` -- A list of fields to sort by
-            `schema` -- The schema for mapping fields to value slots
 
         Returns a xapian.MultiValueSorter instance
         """
@@ -575,10 +569,13 @@ class SearchBackend(BaseSearchBackend):
                 sort_field = sort_field[1:] # Strip the '-'
             else:
                 reverse = True # Reverse is inverted in Xapian -- http://trac.xapian.org/ticket/311
-            sorter.add(schema.get(sort_field, -1) + 1, reverse)
+            sorter.add(self.schema.get(sort_field, -1) + 1, reverse)
         return sorter
 
     def _get_flags(self):
+        """
+        Returns the commonly used Xapian.QueryParser flags
+        """
         flags = xapian.QueryParser.FLAG_PARTIAL \
               | xapian.QueryParser.FLAG_PHRASE \
               | xapian.QueryParser.FLAG_BOOLEAN \
@@ -589,43 +586,53 @@ class SearchBackend(BaseSearchBackend):
             flags = flags | xapian.QueryParser.FLAG_SPELLING_CORRECTION
         return flags
 
-    def _get_query_parser(self, database, schema=[]):
+    def _get_query_parser(self):
         """
-        Given a database, returns a query parser.
+        Returns a Xapian.QueryParser instance.
 
         The query parser returned will have stemming enabled, a boolean prefix
         for `django_ct`, and prefixes for all of the fields in the designated
         `schema`.
-
-        Required Arguments:
-            `database` -- The database to be queried
-            `schema` -- The schema for the document fields
-
-        Returns a xapian.QueryParser instance
         """
         qp = xapian.QueryParser()
-        qp.set_database(database)
+        qp.set_database(self.database)
         qp.set_stemmer(self.stemmer)
         qp.set_stemming_strategy(xapian.QueryParser.STEM_SOME)
         qp.add_boolean_prefix('django_ct', DOCUMENT_CT_TERM_PREFIX)
-        for field in schema.keys():
+        for field in self.schema.keys():
             qp.add_prefix(field, DOCUMENT_CUSTOM_TERM_PREFIX + field.upper())
         return qp
 
-    def _get_enquire(self, database, query):
+    def _get_enquire(self, query):
         """
-        Given a database and query, returns an enquire instance.
+        Given a query, returns an Xapian.Enquire instance.
 
         Required Arguments:
-            `database` -- The database to be queried
             `query` -- The query to run
 
         Returns a xapian.Enquire instance
         """
-        enquire = xapian.Enquire(database)
+        enquire = xapian.Enquire(self.database)
         enquire.set_query(query)
         enquire.set_docid_order(enquire.ASCENDING)
         return enquire
+
+    def _build_schema(self, fields):
+        """
+        Private method to build a schema.
+
+        Required arguments:
+            ``fields`` -- A list of fields in the index
+
+        Returns a list of fields in dictionary format ready for inclusion in
+        an indexe meta-data.
+        """
+        for i, field in enumerate(fields):
+            if field['indexed'] == 'true':
+                field['column'] = i
+            else:
+                del field
+        return fields
 
 
 class SearchQuery(BaseSearchQuery):
