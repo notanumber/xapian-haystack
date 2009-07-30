@@ -567,7 +567,8 @@ class SearchBackend(BaseSearchBackend):
               | xapian.QueryParser.FLAG_PHRASE \
               | xapian.QueryParser.FLAG_BOOLEAN \
               | xapian.QueryParser.FLAG_LOVEHATE \
-              | xapian.QueryParser.FLAG_WILDCARD
+              | xapian.QueryParser.FLAG_WILDCARD \
+              | xapian.QueryParser.FLAG_PURE_NOT
         if getattr(settings, 'HAYSTACK_INCLUDE_SPELLING', False) is True:
             flags = flags | xapian.QueryParser.FLAG_SPELLING_CORRECTION
         return flags

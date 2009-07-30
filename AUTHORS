@@ -3,9 +3,10 @@ Primary Authors:
     * David Sauve
 
 
-Thanks to
+Thanks to:
     * Daniel Lindsley for the awesome Haystack API and putting up with all
       of my questions.
     * Trapeze Media <http://www.trapeze.com/> for providing the time and 
       resources to complete this project as well as Q&A.
-    * Supreet Sethi for suggestions regarding morphologic date comparisons.
+    * Supreet Sethi for suggestions regarding morphologic date comparisons and
+      for fixing NOT query expressions.
