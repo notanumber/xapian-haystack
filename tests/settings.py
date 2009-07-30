@@ -1,4 +1,4 @@
-# Copyright (C) 2007 David Sauve
+# Copyright (C) 2009 David Sauve
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
