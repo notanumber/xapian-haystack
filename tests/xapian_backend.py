@@ -94,12 +94,12 @@ class XapianSearchBackendTestCase(TestCase):
         
         for match in matches:
             document = match.get_document()
-            object_data = pickle.loads(document.get_data())
-            for key, value in object_data.iteritems():
-                object_data[key] = self.sb._from_python(value)
-            object_data['id'] = force_unicode(document.get_value(0))
-            document_list.append(object_data)
-        
+            app_label, module_name, pk, model_data = pickle.loads(document.get_data())
+            for key, value in model_data.iteritems():
+                model_data[key] = self.sb._from_python(value)
+            model_data['id'] = u'%s.%s.%d' % (app_label, module_name, pk)
+            document_list.append(model_data)
+
         return document_list
     
     def test_update(self):
@@ -148,10 +148,10 @@ class XapianSearchBackendTestCase(TestCase):
         
         # Wildcard -- All
         self.assertEqual(self.sb.search('*')['hits'], 3)
-        self.assertEqual([result.pk for result in self.sb.search('*')['results']], [u'1', u'2', u'3'])
+        self.assertEqual([result.pk for result in self.sb.search('*')['results']], [1, 2, 3])
         
         # NOT operator
-        self.assertEqual([result.pk for result in self.sb.search('NOT author:david1')['results']], [u'1', u'2', u'3'])
+        self.assertEqual([result.pk for result in self.sb.search('NOT author:david1')['results']], [1, 2, 3])
     
     def test_field_facets(self):
         self.sb.update(self.msi, self.sample_objs)
@@ -231,29 +231,29 @@ class XapianSearchBackendTestCase(TestCase):
         self.sb.update(self.msi, self.sample_objs)
         
         results = self.sb.search('*', sort_by=['pub_date'])
-        self.assertEqual([result.pk for result in results['results']], [u'1', u'2', u'3'])
-        
+        self.assertEqual([result.pk for result in results['results']], [1, 2, 3])
+
         results = self.sb.search('*', sort_by=['-pub_date'])
-        self.assertEqual([result.pk for result in results['results']], [u'3', u'2', u'1'])
-        
+        self.assertEqual([result.pk for result in results['results']], [3, 2, 1])
+
         results = self.sb.search('*', sort_by=['id'])
-        self.assertEqual([result.pk for result in results['results']], [u'3', u'2', u'1'])
-        
+        self.assertEqual([result.pk for result in results['results']], [3, 2, 1])
+
         results = self.sb.search('*', sort_by=['-id'])
-        self.assertEqual([result.pk for result in results['results']], [u'1', u'2', u'3'])
-        
+        self.assertEqual([result.pk for result in results['results']], [1, 2, 3])
+
         results = self.sb.search('*', sort_by=['value'])
-        self.assertEqual([result.pk for result in results['results']], [u'3', u'2', u'1'])
-        
+        self.assertEqual([result.pk for result in results['results']], [3, 2, 1])
+
         results = self.sb.search('*', sort_by=['-value'])
-        self.assertEqual([result.pk for result in results['results']], [u'1', u'2', u'3'])
-        
+        self.assertEqual([result.pk for result in results['results']], [1, 2, 3])
+
         results = self.sb.search('*', sort_by=['flag', 'id'])
-        self.assertEqual([result.pk for result in results['results']], [u'3', u'1', u'2'])
-        
+        self.assertEqual([result.pk for result in results['results']], [3, 1, 2])
+
         results = self.sb.search('*', sort_by=['flag', '-id'])
-        self.assertEqual([result.pk for result in results['results']], [u'1', u'3', u'2'])
-    
+        self.assertEqual([result.pk for result in results['results']], [1, 3, 2])
+
     def test__from_python(self):
         self.assertEqual(self.sb._from_python('abc'), u'abc')
         self.assertEqual(self.sb._from_python(1), u'1')

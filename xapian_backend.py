@@ -40,7 +40,6 @@ DOCUMENT_ID_TERM_PREFIX = 'Q'
 DOCUMENT_CUSTOM_TERM_PREFIX = 'X'
 DOCUMENT_CT_TERM_PREFIX = DOCUMENT_CUSTOM_TERM_PREFIX + 'CONTENTTYPE'
 
-
 field_re = re.compile(r'(?<=(?<!Z)X)([A-Z_]+)(\w+)')
 
 
@@ -94,7 +93,9 @@ class SearchBackend(BaseSearchBackend):
             os.makedirs(settings.HAYSTACK_XAPIAN_PATH)
 
         self.stemmer = xapian.Stem(stemming_language)
-        self.open = False
+
+    def get_identifier(self, obj_or_string):
+        return DOCUMENT_ID_TERM_PREFIX + super(SearchBackend, self).get_identifier(obj_or_string)
 
     def update(self, index, iterable):
         """
@@ -153,13 +154,16 @@ class SearchBackend(BaseSearchBackend):
                         else:
                             document.add_value(field['column'], data)
 
-                document.set_data(self._dump_document_data(document_id, model_data))
-                document.add_term(DOCUMENT_ID_TERM_PREFIX + document_id)
+                document.set_data(pickle.dumps(
+                    (obj._meta.app_label, obj._meta.module_name, obj.pk, model_data), 
+                    pickle.HIGHEST_PROTOCOL
+                ))
+                document.add_term(document_id)
                 document.add_term(
                     DOCUMENT_CT_TERM_PREFIX + u'%s.%s' % 
                     (obj._meta.app_label, obj._meta.module_name)
                 )
-                database.replace_document(DOCUMENT_ID_TERM_PREFIX + document_id, document)
+                database.replace_document(document_id, document)
 
         except UnicodeDecodeError:
             sys.stderr.write('Chunk failed.\n')
@@ -172,8 +176,8 @@ class SearchBackend(BaseSearchBackend):
         We delete all instances of `Q<app_name>.<model_name>.<pk>` which
         should be unique to this object.
         """
-        database = self._open_database(writable=True)
-        database.delete_document(DOCUMENT_ID_TERM_PREFIX + self.get_identifier(obj))
+        database = self._database(writable=True)
+        database.delete_document(self.get_identifier(obj))
 
     def clear(self, models=[]):
         """
@@ -190,15 +194,15 @@ class SearchBackend(BaseSearchBackend):
         the term `XCONTENTTYPE<app_name>.<model_name>`.  This will delete
         all documents with the specified model type.
         """
-        self._prepare(rw=True)
+        database = self._database(writable=True)
         if not models:
-            query = xapian.Query('') # Empty query matches all
-            enquire = self._get_enquire(query)
+            query, __unused__ = self._query(database, '*')
+            enquire = self._enquire(database, query)
             for match in enquire.get_mset(0, DEFAULT_MAX_RESULTS):
-                self.database.delete_document(match.get_docid())
+                database.delete_document(match.get_docid())
         else:
             for model in models:
-                self.database.delete_document(
+                database.delete_document(
                     DOCUMENT_CT_TERM_PREFIX + '%s.%s' % 
                     (model._meta.app_label, model._meta.module_name)
                 )
@@ -262,38 +266,45 @@ class SearchBackend(BaseSearchBackend):
         if query_facets is not None:
             warnings.warn("Query faceting has not been implemented yet.", Warning, stacklevel=2)
 
-        spelling_suggestion = None
-
-        self._prepare()
-
-        if query_string == '*':
-            query = xapian.Query('') # Make '*' match everything
-        else:
-            flags = self._get_flags()
-            qp = self._get_query_parser()
-            query = qp.parse_query(query_string, flags)
-            if getattr(settings, 'HAYSTACK_INCLUDE_SPELLING', False) is True:
-                spelling_suggestion = qp.get_corrected_query_string()
-
-        if narrow_queries:
-            subqueries = [qp.parse_query(narrow_query, flags) for narrow_query in narrow_queries]
-            query = xapian.Query(xapian.Query.OP_FILTER, query, xapian.Query(xapian.Query.OP_AND, subqueries))
-
-        enquire = self._get_enquire(query)
+        database = self._database()
+        query, spelling_suggestion = self._query(database, query_string, narrow_queries)
+        enquire = self._enquire(database, query)
 
         if sort_by:
-            sorter = self._get_sorter(sort_by)
+            sorter = self._sorter(sort_by)
             enquire.set_sort_by_key_then_relevance(sorter, True)
 
+        results = []
+        facets_dict = {
+            'fields': {},
+            'dates': {},
+            'queries': {},
+        }
         matches = enquire.get_mset(start_offset, end_offset)
-        results = self._process_results(
-            matches, query_string=query_string, highlight=highlight, facets=facets
-        )
 
-        if spelling_suggestion:
-            results['spelling_suggestion'] = spelling_suggestion
+        for match in matches:
+            document = match.get_document()
+            app_label, module_name, pk, model_data = pickle.loads(document.get_data())
+            results.append(
+                SearchResult(app_label, module_name, pk, match.weight, **model_data)
+            )
+            if facets:
+                facets_dict['fields'] = self._do_field_facets(
+                    document, facets, facets_dict['fields']
+                )
+            if highlight and (len(query_string) > 0):
+                model_data['highlighted'] = {
+                    self.content_field_name: self._do_highlight(
+                        model_data.get(self.content_field_name), query_string
+                    )
+                }
 
-        return results
+        return {
+            'results': results,
+            'hits': matches.get_matches_estimated(),
+            'facets': facets_dict,
+            'spelling_suggestion': spelling_suggestion,
+        }
 
     def delete_index(self):
         """
@@ -303,10 +314,8 @@ class SearchBackend(BaseSearchBackend):
         """
         if os.path.exists(settings.HAYSTACK_XAPIAN_PATH):
             index_files = os.listdir(settings.HAYSTACK_XAPIAN_PATH)
-
             for index_file in index_files:
                 os.remove(os.path.join(settings.HAYSTACK_XAPIAN_PATH, index_file))
-
             os.removedirs(settings.HAYSTACK_XAPIAN_PATH)
 
     def document_count(self):
@@ -314,11 +323,10 @@ class SearchBackend(BaseSearchBackend):
         Retrieves the total document count for the search index.
         """
         try:
-            if not self.loaded:
-                self._load()
+            database = self._database()
         except xapian.DatabaseOpeningError:
             return 0
-        return self.database.get_doccount()
+        return database.get_doccount()
 
     def more_like_this(self, model_instance):
         """
@@ -344,13 +352,11 @@ class SearchBackend(BaseSearchBackend):
 
         Finally, processes the resulting matches and returns.
         """
-        if not self.loaded:
-            self._load()
-
+        database = self._database()
         query = xapian.Query(
             DOCUMENT_ID_TERM_PREFIX + self.get_identifier(model_instance)
         )
-        enquire = self._get_enquire(query)
+        enquire = self._enquire(database, query)
         rset = xapian.RSet()
         for match in enquire.get_mset(0, DEFAULT_MAX_RESULTS):
             rset.add_document(match.get_docid())
@@ -472,7 +478,7 @@ class SearchBackend(BaseSearchBackend):
 
     def _from_python(self, value):
         """
-        Converts Python values to a string for Xapian.
+        Private method that converts Python values to a string for Xapian.
         """
         if isinstance(value, datetime.datetime):
             if value.microsecond:
@@ -495,9 +501,6 @@ class SearchBackend(BaseSearchBackend):
         else:
             value = force_unicode(value)
         return value
-
-    def _dump_document_data(self, document_id, model_data):
-        return pickle.dumps((document_id, model_data), pickle.HIGHEST_PROTOCOL)
 
     def _database(self, writable=False):
         """
@@ -531,9 +534,8 @@ class SearchBackend(BaseSearchBackend):
         Required Argument:
             `document` -- The document to be indexed
 
-        Returns a Xapian.TermGenerator instance ready for use.  If
-        `HAYSTACK_INCLUDE_SPELLING` is True, then the term generator
-        will have spell-checking enabled.
+        Returns a Xapian.TermGenerator instance.  If `HAYSTACK_INCLUDE_SPELLING`
+        is True, then the term generator will have spell-checking enabled.
         """
         term_generator = xapian.TermGenerator()
         term_generator.set_database(database)
@@ -543,9 +545,39 @@ class SearchBackend(BaseSearchBackend):
         term_generator.set_document(document)
         return term_generator
 
-    def _get_sorter(self, sort_by):
+    def _query(self, database, query_string, narrow_queries=None):
         """
-        Given a list of fields to sort by, returns a xapian.MultiValueSorter
+        Private method that takes a query string and returns a xapian.Query
+        
+        Required arguments:
+            `query_string` -- The query string to parse
+        
+        Optional arguments:
+            `narrow_queries` -- A list of queries to narrow the query with
+        
+        Returns a xapian.Query instance
+        """
+        spelling_suggestion = None
+
+        if query_string == '*':
+            query = xapian.Query('') # Make '*' match everything
+        else:
+            flags = self._flags()
+            qp = self._query_parser(database)
+            query = qp.parse_query(query_string, flags)
+            if getattr(settings, 'HAYSTACK_INCLUDE_SPELLING', False) is True:
+                spelling_suggestion = qp.get_corrected_query_string()
+                
+        if narrow_queries:
+            subqueries = [qp.parse_query(narrow_query, flags) for narrow_query in narrow_queries]
+            query = xapian.Query(xapian.Query.OP_FILTER, query, xapian.Query(xapian.Query.OP_AND, subqueries))
+            
+        return query, spelling_suggestion
+
+    def _sorter(self, sort_by):
+        """
+        Private methos that takes a list of fields to sort by and returns a 
+        xapian.MultiValueSorter
 
         Required Arguments:
             `sort_by` -- A list of fields to sort by
@@ -553,22 +585,18 @@ class SearchBackend(BaseSearchBackend):
         Returns a xapian.MultiValueSorter instance
         """
         sorter = xapian.MultiValueSorter()
+        
         for sort_field in sort_by:
             if sort_field.startswith('-'):
                 reverse = False
                 sort_field = sort_field[1:] # Strip the '-'
             else:
                 reverse = True # Reverse is inverted in Xapian -- http://trac.xapian.org/ticket/311
-            sorter.add(self._get_value_column(sort_field), reverse)
+            sorter.add(self._value_column(sort_field), reverse)
+            
         return sorter
 
-    def _get_value_column(self, field):
-        for field_dict in self.schema:
-            if field_dict['field_name'] == field:
-                return field_dict['column']
-        return 0
-
-    def _get_flags(self):
+    def _flags(self):
         """
         Returns the commonly used Xapian.QueryParser flags
         """
@@ -582,16 +610,18 @@ class SearchBackend(BaseSearchBackend):
             flags = flags | xapian.QueryParser.FLAG_SPELLING_CORRECTION
         return flags
 
-    def _get_query_parser(self):
+    def _query_parser(self, database):
         """
-        Returns a Xapian.QueryParser instance.
+        Private method that returns a Xapian.QueryParser instance.
+
+        Required arguments:
+            `database` -- The database to be queried
 
         The query parser returned will have stemming enabled, a boolean prefix
-        for `django_ct`, and prefixes for all of the fields in the designated
-        `schema`.
+        for `django_ct`, and prefixes for all of the fields in the `self.schema`.
         """
         qp = xapian.QueryParser()
-        qp.set_database(self.database)
+        qp.set_database(database)
         qp.set_stemmer(self.stemmer)
         qp.set_stemming_strategy(xapian.QueryParser.STEM_SOME)
         qp.add_boolean_prefix('django_ct', DOCUMENT_CT_TERM_PREFIX)
@@ -599,18 +629,20 @@ class SearchBackend(BaseSearchBackend):
             qp.add_prefix(field_dict['field_name'], DOCUMENT_CUSTOM_TERM_PREFIX + field_dict['field_name'].upper())
         return qp
 
-    def _get_enquire(self, query):
+    def _enquire(self, database, query):
         """
-        Given a query, returns an Xapian.Enquire instance.
+        Private method that that returns a Xapian.Enquire instance for use with
+        the specifed `query`.
 
         Required Arguments:
             `query` -- The query to run
 
         Returns a xapian.Enquire instance
         """
-        enquire = xapian.Enquire(self.database)
+        enquire = xapian.Enquire(database)
         enquire.set_query(query)
         enquire.set_docid_order(enquire.ASCENDING)
+        
         return enquire
 
     def _build_schema(self, fields):
@@ -629,6 +661,22 @@ class SearchBackend(BaseSearchBackend):
             else:
                 del field
         return fields
+
+    def _value_column(self, field):
+        """
+        Private method that returns the column value slot in the database
+        for a given field.
+
+        Required arguemnts:
+            `field` -- The field to lookup
+
+        Returns an integer with the column location (0 indexed).
+        """
+        for field_dict in self.schema:
+            if field_dict['field_name'] == field:
+                return field_dict['column']
+        return 0
+
 
 
 class SearchQuery(BaseSearchQuery):
