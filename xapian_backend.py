@@ -298,7 +298,6 @@ class SearchBackend(BaseSearchBackend):
                         model_data.get(self.content_field_name), query_string
                     )
                 }
-                print model_data['highlighted']
 
         return {
             'results': results,
