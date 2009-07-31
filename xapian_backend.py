@@ -90,39 +90,11 @@ class SearchBackend(BaseSearchBackend):
         if not hasattr(settings, 'HAYSTACK_XAPIAN_PATH'):
             raise ImproperlyConfigured('You must specify a HAYSTACK_XAPIAN_PATH in your settings.')
 
-        self.stemming_language = stemming_language
-        self.ready = False
-
-    def _prepare(self, rw=False):
-        """
-        Prepare the required Xapian components for use.
-
-        Optional arguments:
-            `rw` -- Open the indexes in read/write mode (default=False)
-
-        Verifies `HAYSTACK_XAPIAN_PATH` has been properly set and that the path
-        specified is readable.  If it is not, tries to create the folder.
-        """
-        if self.ready:
-            return
-
         if not os.path.exists(settings.HAYSTACK_XAPIAN_PATH):
             os.makedirs(settings.HAYSTACK_XAPIAN_PATH)
 
-        if rw:
-            self.database = xapian.WritableDatabase(settings.HAYSTACK_XAPIAN_PATH, xapian.DB_CREATE_OR_OPEN)
-            self.content_field_name, fields = self.site.build_unified_schema()
-            self.schema = self._build_schema(fields)
-            self.database.set_metadata('schema', pickle.dumps(self.schema))
-            self.database.set_metadata('cf', pickle.dumps(self.content_field_name))
-            print self.schema
-        else:
-            self.database = xapian.Database(settings.HAYSTACK_XAPIAN_PATH)
-            self.schema = pickle.loads(self.database.get_metadata('schema'))
-            self.content_field_name = pickle.loads(self.database.get_metadata('cf'))
-
-        self.stemmer = xapian.Stem(self.stemming_language)
-        self.loaded = True
+        self.stemmer = xapian.Stem(stemming_language)
+        self.open = False
 
     def update(self, index, iterable):
         """
@@ -139,7 +111,7 @@ class SearchBackend(BaseSearchBackend):
 
         eg. `content:Testing` ==> `testing, Ztest, ZXCONTENTtest`
 
-        Each document also contains two extra terms; a term in the format:
+        Each document also contains an extra term in the format:
         
         `XCONTENTTYPE<app_name>.<model_name>`
         
@@ -150,57 +122,44 @@ class SearchBackend(BaseSearchBackend):
         eg.: foo.bar (pk=1) ==> `Qfoo.bar.1`, `XCONTENTTYPEfoo.bar`
         
         This is useful for querying for a specific document corresponding to
-        an model instance and is also stored in the document value field at
-        position 0 for easy extraction.
+        a model instance.
 
-        The document also contains a pickled version of the object itself in 
-        the document data field.
+        The document also contains a pickled version of the object itself and
+        the document ID in the document data field.
 
-        Also, the database itself maintains a list of all index field names
-        in use through the database meta data field with the name `schema`.
-        This is a pickled data that can be loaded on demand and used to assign 
-        prefixes to query parsers so that a user can perform field name 
-        filtering by simply querying as follow: 
-
-        `<field_name>:<value>`
-
-        eg.: `'foo:bar'` will filter based on the `foo` field for `bar`.
-        
         Finally, we also store field values to be used for sorting data.  We
         store these in the document value slots (position zero is reserver
         for the document ID).  All values are stored as unicode strings with
         conversion of float, int, double, values being done by Xapian itself
         through the use of the :method:xapian.sortable_serialise method.
         """
-        self._prepare(rw=True)
+        database = self._database(writable=True)
         try:
             for obj in iterable:
-                document_id = self.get_identifier(obj)
                 document = xapian.Document()
-                indexer = self._get_indexer(document)
-                document.add_value(0, force_unicode(document_id))
-                document_data = index.prepare(obj)
+                term_generator = self._term_generator(database, document)
+                document_id = self.get_identifier(obj)
+                model_data = index.prepare(obj)
 
-                for i, (key, value) in enumerate(document_data.iteritems()):
-                    if key in self.schema:
-                        prefix = DOCUMENT_CUSTOM_TERM_PREFIX + self._from_python(key).upper()
+                for field in self.schema:
+                    if field['field_name'] in model_data.keys():
+                        prefix = DOCUMENT_CUSTOM_TERM_PREFIX + field['field_name']
+                        value = model_data[field['field_name']]
                         data = self._from_python(value)
-                        indexer.index_text(data)
-                        indexer.index_text(data, 1, prefix)
-
+                        term_generator.index_text(data)
+                        term_generator.index_text(data, 1, prefix)
                         if isinstance(value, (int, long, float)):
-                            document.add_value(i + 1, xapian.sortable_serialise(value))
+                            document.add_value(field['column'], xapian.sortable_serialise(value))
                         else:
-                            document.add_value(i + 1, data)
+                            document.add_value(field['column'], data)
 
-                document.set_data(pickle.dumps(document_data, pickle.HIGHEST_PROTOCOL))
+                document.set_data(self._dump_document_data(document_id, model_data))
                 document.add_term(DOCUMENT_ID_TERM_PREFIX + document_id)
                 document.add_term(
                     DOCUMENT_CT_TERM_PREFIX + u'%s.%s' % 
                     (obj._meta.app_label, obj._meta.module_name)
                 )
-
-                self.database.replace_document(DOCUMENT_ID_TERM_PREFIX + document_id, document)
+                database.replace_document(DOCUMENT_ID_TERM_PREFIX + document_id, document)
 
         except UnicodeDecodeError:
             sys.stderr.write('Chunk failed.\n')
@@ -213,8 +172,8 @@ class SearchBackend(BaseSearchBackend):
         We delete all instances of `Q<app_name>.<model_name>.<pk>` which
         should be unique to this object.
         """
-        self._prepare(rw=True)
-        self.database.delete_document(DOCUMENT_ID_TERM_PREFIX + self.get_identifier(obj))
+        database = self._open_database(writable=True)
+        database.delete_document(DOCUMENT_ID_TERM_PREFIX + self.get_identifier(obj))
 
     def clear(self, models=[]):
         """
@@ -236,10 +195,10 @@ class SearchBackend(BaseSearchBackend):
             query = xapian.Query('') # Empty query matches all
             enquire = self._get_enquire(query)
             for match in enquire.get_mset(0, DEFAULT_MAX_RESULTS):
-                database.delete_document(match.get_docid())
+                self.database.delete_document(match.get_docid())
         else:
             for model in models:
-                database.delete_document(
+                self.database.delete_document(
                     DOCUMENT_CT_TERM_PREFIX + '%s.%s' % 
                     (model._meta.app_label, model._meta.module_name)
                 )
@@ -537,21 +496,52 @@ class SearchBackend(BaseSearchBackend):
             value = force_unicode(value)
         return value
 
-    def _get_indexer(self, document):
+    def _dump_document_data(self, document_id, model_data):
+        return pickle.dumps((document_id, model_data), pickle.HIGHEST_PROTOCOL)
+
+    def _database(self, writable=False):
         """
-        Given a document, returns an Xapian.TermGenerator
+        Private method that returns a xapian.Database for use and sets up
+        schema and content_field definitions.
+
+        Optional arguments:
+            ``writable`` -- Open the database in read/write mode (default=False)
+
+        Returns an instance of a xapian.Database or xapian.WritableDatabase
+        """
+        if writable:
+            self.content_field_name, fields = self.site.build_unified_schema()
+            self.schema = self._build_schema(fields)
+
+            database = xapian.WritableDatabase(settings.HAYSTACK_XAPIAN_PATH, xapian.DB_CREATE_OR_OPEN)
+            database.set_metadata('schema', pickle.dumps(self.schema, pickle.HIGHEST_PROTOCOL))
+            database.set_metadata('content', pickle.dumps(self.content_field_name, pickle.HIGHEST_PROTOCOL))
+        else:
+            database = xapian.Database(settings.HAYSTACK_XAPIAN_PATH)
+
+            self.schema = pickle.loads(database.get_metadata('schema'))
+            self.content_field_name = pickle.loads(database.get_metadata('content'))
+
+        return database
+
+    def _term_generator(self, database, document):
+        """
+        Private method that returns a Xapian.TermGenerator
 
         Required Argument:
             `document` -- The document to be indexed
 
-        Returns a Xapian.TermGenerator instance
+        Returns a Xapian.TermGenerator instance ready for use.  If
+        `HAYSTACK_INCLUDE_SPELLING` is True, then the term generator
+        will have spell-checking enabled.
         """
-        indexer = xapian.TermGenerator()
-        indexer.set_database(self.database)
-        indexer.set_stemmer(self.stemmer)
-        indexer.set_flags(xapian.TermGenerator.FLAG_SPELLING)
-        indexer.set_document(document)
-        return indexer
+        term_generator = xapian.TermGenerator()
+        term_generator.set_database(database)
+        term_generator.set_stemmer(self.stemmer)
+        if getattr(settings, 'HAYSTACK_INCLUDE_SPELLING', False) is True:
+            term_generator.set_flags(xapian.TermGenerator.FLAG_SPELLING)
+        term_generator.set_document(document)
+        return term_generator
 
     def _get_sorter(self, sort_by):
         """
@@ -569,8 +559,14 @@ class SearchBackend(BaseSearchBackend):
                 sort_field = sort_field[1:] # Strip the '-'
             else:
                 reverse = True # Reverse is inverted in Xapian -- http://trac.xapian.org/ticket/311
-            sorter.add(self.schema.get(sort_field, -1) + 1, reverse)
+            sorter.add(self._get_value_column(sort_field), reverse)
         return sorter
+
+    def _get_value_column(self, field):
+        for field_dict in self.schema:
+            if field_dict['field_name'] == field:
+                return field_dict['column']
+        return 0
 
     def _get_flags(self):
         """
@@ -599,8 +595,8 @@ class SearchBackend(BaseSearchBackend):
         qp.set_stemmer(self.stemmer)
         qp.set_stemming_strategy(xapian.QueryParser.STEM_SOME)
         qp.add_boolean_prefix('django_ct', DOCUMENT_CT_TERM_PREFIX)
-        for field in self.schema.keys():
-            qp.add_prefix(field, DOCUMENT_CUSTOM_TERM_PREFIX + field.upper())
+        for field_dict in self.schema:
+            qp.add_prefix(field_dict['field_name'], DOCUMENT_CUSTOM_TERM_PREFIX + field_dict['field_name'].upper())
         return qp
 
     def _get_enquire(self, query):
