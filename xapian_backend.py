@@ -353,9 +353,7 @@ class SearchBackend(BaseSearchBackend):
         Finally, processes the resulting matches and returns.
         """
         database = self._database()
-        query = xapian.Query(
-            DOCUMENT_ID_TERM_PREFIX + self.get_identifier(model_instance)
-        )
+        query = xapian.Query(self.get_identifier(model_instance))
         enquire = self._enquire(database, query)
         rset = xapian.RSet()
         for match in enquire.get_mset(0, DEFAULT_MAX_RESULTS):
@@ -363,75 +361,30 @@ class SearchBackend(BaseSearchBackend):
         query = xapian.Query(xapian.Query.OP_OR,
             [expand.term for expand in enquire.get_eset(DEFAULT_MAX_RESULTS, rset)]
         )
-        query = xapian.Query(xapian.Query.OP_AND_NOT,
-            [query, DOCUMENT_ID_TERM_PREFIX + self.get_identifier(model_instance)]
+        query = xapian.Query(
+            xapian.Query.OP_AND_NOT, [query, self.get_identifier(model_instance)]
         )
         enquire.set_query(query)
-        matches = enquire.get_mset(0, DEFAULT_MAX_RESULTS)
-        return self._process_results(matches)
 
-    def _process_results(self, matches, query_string='', highlight=False, facets=None):
-        """
-        Private method for processing an MSet (match set).
-
-        Required arguments:
-            `matches` -- An MSet of matches
-
-        Optional arguments:
-            `query_string` -- The query string that generated the matches
-            `highlight` -- Add highlighting to results? (default=False)
-            `facets` -- Fields to facet (default = None)
-
-        Returns:
-            A dictionary with the following keys:
-                `results` -- A list of `SearchResult`
-                `hits` -- The total available results
-                `facets` - A dictionary of facets with the following keys:
-                    `fields` -- A list of field facets
-                    `dates` -- A list of date facets
-                    `queries` -- A list of query facets
-            If faceting was not used, the `facets` key will not be present
-        
-        For each match in the `matches`, retrieves the corresponding document
-        and extracts the `app_name`, `model_name`, and `pk` from the information
-        at value position 0, and :method:pickle.loads the remaining model
-        values from the document data area.
-        
-        For each match, one `SearchResult` will be appended to the `results`
-        list.
-        """
-        facets_dict = {
-            'fields': {},
-            'dates': {},
-            'queries': {},
-        }
         results = []
-        hits = matches.get_matches_estimated()
-
+        matches = enquire.get_mset(0, DEFAULT_MAX_RESULTS)
+        
         for match in matches:
             document = match.get_document()
-            app_label, module_name, pk = document.get_value(0).split('.')
-            additional_fields = pickle.loads(document.get_data())
-            if highlight and (len(query_string) > 0):
-                additional_fields['highlighted'] = {
-                    self.content_field_name: self._do_highlight(
-                        additional_fields.get(self.content_field_name), query_string
-                    )
-                }
-            result = SearchResult(
-                app_label, module_name, pk, match.weight, **additional_fields
+            app_label, module_name, pk, model_data = pickle.loads(document.get_data())
+            results.append(
+                SearchResult(app_label, module_name, pk, match.weight, **model_data)
             )
-            results.append(result)
-
-            if facets:
-                facets_dict['fields'] = self._do_field_facets(
-                    document, facets, facets_dict['fields']
-                )
 
         return {
             'results': results,
-            'hits': hits,
-            'facets': facets_dict,
+            'hits': matches.get_matches_estimated(),
+            'facets': {
+                'fields': {},
+                'dates': {},
+                'queries': {},
+            },
+            'spelling_suggestion': None,
         }
 
     def _do_highlight(self, content, text, tag='em'):
