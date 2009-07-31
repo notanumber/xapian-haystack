@@ -144,7 +144,7 @@ class SearchBackend(BaseSearchBackend):
 
                 for field in self.schema:
                     if field['field_name'] in model_data.keys():
-                        prefix = DOCUMENT_CUSTOM_TERM_PREFIX + field['field_name']
+                        prefix = DOCUMENT_CUSTOM_TERM_PREFIX + field['field_name'].upper()
                         value = model_data[field['field_name']]
                         data = self._from_python(value)
                         term_generator.index_text(data)
