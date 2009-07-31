@@ -285,9 +285,6 @@ class SearchBackend(BaseSearchBackend):
         for match in matches:
             document = match.get_document()
             app_label, module_name, pk, model_data = pickle.loads(document.get_data())
-            results.append(
-                SearchResult(app_label, module_name, pk, match.weight, **model_data)
-            )
             if facets:
                 facets_dict['fields'] = self._do_field_facets(
                     document, facets, facets_dict['fields']
@@ -298,6 +295,9 @@ class SearchBackend(BaseSearchBackend):
                         model_data.get(self.content_field_name), query_string
                     )
                 }
+            results.append(
+                SearchResult(app_label, module_name, pk, match.weight, **model_data)
+            )
 
         return {
             'results': results,
