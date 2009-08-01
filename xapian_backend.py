@@ -149,10 +149,7 @@ class SearchBackend(BaseSearchBackend):
                         data = self._from_python(value)
                         term_generator.index_text(data)
                         term_generator.index_text(data, 1, prefix)
-                        if isinstance(value, (int, long, float)):
-                            document.add_value(field['column'], xapian.sortable_serialise(value))
-                        else:
-                            document.add_value(field['column'], data)
+                        document.add_value(field['column'], data)
 
                 document.set_data(pickle.dumps(
                     (obj._meta.app_label, obj._meta.module_name, obj.pk, model_data), 
@@ -451,6 +448,10 @@ class SearchBackend(BaseSearchBackend):
                 value = u't'
             else:
                 value = u'f'
+        elif isinstance(value, (int, long)):
+            value = u'%012d' % value
+        elif isinstance(value, (float)):
+            value = xapian.sortable_serialise(value)
         else:
             value = force_unicode(value)
         return value
