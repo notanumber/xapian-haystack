@@ -593,7 +593,6 @@ class SearchBackend(BaseSearchBackend):
             vrp = xapian.StringValueRangeProcessor(field_dict['column'])
         elif field_dict['type'] == 'long' or field_dict['type'] == 'float':
             vrp = xapian.NumberValueRangeProcessor(field_dict['column'])
-            print field_dict['field_name'], field_dict['column']
         elif field_dict['type'] == 'date' or field_dict['type'] == 'datetime':
             vrp = xapian.DateValueRangeProcessor(field_dict['column'])
         else:
