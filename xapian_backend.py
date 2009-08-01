@@ -146,10 +146,9 @@ class SearchBackend(BaseSearchBackend):
                     if field['field_name'] in model_data.keys():
                         prefix = DOCUMENT_CUSTOM_TERM_PREFIX + field['field_name'].upper()
                         value = model_data[field['field_name']]
-                        data = self._from_python(value)
-                        term_generator.index_text(data)
-                        term_generator.index_text(data, 1, prefix)
-                        document.add_value(field['column'], data)
+                        term_generator.index_text(force_unicode(value))
+                        term_generator.index_text(force_unicode(value), 1, prefix)
+                        document.add_value(field['column'], self._from_python(value))
 
                 document.set_data(pickle.dumps(
                     (obj._meta.app_label, obj._meta.module_name, obj.pk, model_data), 
