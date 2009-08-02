@@ -151,10 +151,10 @@ class XapianSearchBackendTestCase(TestCase):
         self.assertEqual([result.pk for result in self.sb.search('*')['results']], [1, 2, 3])
         
         # NOT operator
-        self.assertEqual([result.pk for result in self.sb.search('NOT author:david1')['results']], [1, 2, 3])
+        self.assertEqual([result.pk for result in self.sb.search('NOT name:david1')['results']], [2, 3])
 
         # Ranges
-        self.assertEqual([result.pk for result in self.sb.search('index author:david1..david2')['results']], [1, 2, 3])
+        self.assertEqual([result.pk for result in self.sb.search('index name:david1..david2')['results']], [1, 2])
         self.assertEqual([result.pk for result in self.sb.search('index pub_date:23/02/2009..24/02/2009')['results']], [2])        
         self.assertEqual([result.pk for result in self.sb.search('index value:6..10')['results']], [2])
 

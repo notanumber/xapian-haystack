@@ -506,7 +506,8 @@ class SearchBackend(BaseSearchBackend):
         Optional arguments:
             `narrow_queries` -- A list of queries to narrow the query with
         
-        Returns a xapian.Query instance
+        Returns a xapian.Query instance with prefixes and ranges properly
+        setup as pulled from the `query_string`.
         """
         spelling_suggestion = None
 
@@ -540,7 +541,6 @@ class SearchBackend(BaseSearchBackend):
                                 qp.add_valuerangeprocessor(vrp)
                         
             query = qp.parse_query(query_string, flags)
-            print query.get_description()
             if getattr(settings, 'HAYSTACK_INCLUDE_SPELLING', False) is True:
                 spelling_suggestion = qp.get_corrected_query_string()
     
