@@ -498,7 +498,7 @@ class SearchBackend(BaseSearchBackend):
 
     def _query(self, database, query_string, narrow_queries=None):
         """
-        Private method that takes a query string and returns a xapian.Query
+        Private method that takes a query string and returns a xapian.Query.
         
         Required arguments:
             `query_string` -- The query string to parse
@@ -515,32 +515,47 @@ class SearchBackend(BaseSearchBackend):
         else:
             flags = self._flags()
             qp = self._query_parser(database)
-    
-            if '..' in query_string:
+            qp.add_boolean_prefix('django_ct', DOCUMENT_CT_TERM_PREFIX)
+            
+            if ':' in query_string:
                 for bit in query_string.split():
-                    if '..' in bit:
-                        field_name, value_range = bit.split(':')
-                        query_string = query_string.replace('%s:' % field_name, '')
-                        field_type, column = self._value_type_column(field_name)
-
-                        if field_type == 'text':
-                            vrp = xapian.StringValueRangeProcessor(column)
-                        elif field_type == 'long' or field_type == 'float':
-                            vrp = xapian.NumberValueRangeProcessor(column)
-                        elif field_type == 'date' or field_type == 'datetime':
-                            vrp = xapian.DateValueRangeProcessor(column)
-                        if vrp:
-                            qp.add_valuerangeprocessor(vrp)
-                            print field_name, field_type, column
-
+                    if ':' in bit:
+                        field_name, term = bit.split(':')
+                        if not '..' in term:
+                            qp.add_prefix(
+                                field_name,
+                                DOCUMENT_CUSTOM_TERM_PREFIX + field_name.upper()
+                            )
+                        else:
+                            query_string = query_string.replace('%s:' % field_name, '')
+                            field_type, column = self._value_type_column(field_name)
+                            vrp = None
+                            if field_type == 'text':
+                                vrp = xapian.StringValueRangeProcessor(column)
+                            elif field_type == 'long' or field_type == 'float':
+                                vrp = xapian.NumberValueRangeProcessor(column)
+                            elif field_type == 'date' or field_type == 'datetime':
+                                vrp = xapian.DateValueRangeProcessor(column)
+                            if vrp:
+                                qp.add_valuerangeprocessor(vrp)
+                        
             query = qp.parse_query(query_string, flags)
             print query.get_description()
             if getattr(settings, 'HAYSTACK_INCLUDE_SPELLING', False) is True:
                 spelling_suggestion = qp.get_corrected_query_string()
     
         if narrow_queries:
-            subqueries = [qp.parse_query(narrow_query, flags) for narrow_query in narrow_queries]
-            query = xapian.Query(xapian.Query.OP_FILTER, query, xapian.Query(xapian.Query.OP_AND, subqueries))
+            subqueries = []
+            for narrow_query in narrow_queries:
+                field_name, term = narrow_query.split(':')
+                qp.add_prefix(
+                    field_name, DOCUMENT_CUSTOM_TERM_PREFIX + field_name.upper()
+                )
+                subqueries.append(qp.parse_query(narrow_query, flags))
+            query = xapian.Query(
+                xapian.Query.OP_FILTER, query, 
+                xapian.Query(xapian.Query.OP_AND, subqueries)
+            )
             
         return query, spelling_suggestion
 
@@ -594,13 +609,18 @@ class SearchBackend(BaseSearchBackend):
         qp.set_database(database)
         qp.set_stemmer(self.stemmer)
         qp.set_stemming_strategy(xapian.QueryParser.STEM_SOME)
-        qp.add_boolean_prefix('django_ct', DOCUMENT_CT_TERM_PREFIX)
-        for field_dict in self.schema:
-            qp.add_prefix(
-                field_dict['field_name'], 
-                DOCUMENT_CUSTOM_TERM_PREFIX + field_dict['field_name'].upper()
-            )
         return qp
+
+    # def _value_range_processor(self, field_dict):
+    #     if field_dict['type'] == 'text':
+    #         vrp = xapian.StringValueRangeProcessor(field_dict['column'])
+    #     elif field_dict['type'] == 'long' or field_dict['type'] == 'float':
+    #         vrp = xapian.NumberValueRangeProcessor(field_dict['column'])
+    #     elif field_dict['type'] == 'date' or field_dict['type'] == 'datetime':
+    #         vrp = xapian.DateValueRangeProcessor(field_dict['column'])
+    #     else:
+    #         vrp = None
+    #     return vrp
 
     def _enquire(self, database, query):
         """
@@ -664,7 +684,7 @@ class SearchBackend(BaseSearchBackend):
         for field_dict in self.schema:
             if field_dict['field_name'] == field:
                 return field_dict['type'], field_dict['column']
-        return 0
+        return None, None
 
 
 class SearchQuery(BaseSearchQuery):

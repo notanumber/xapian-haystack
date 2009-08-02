@@ -152,11 +152,11 @@ class XapianSearchBackendTestCase(TestCase):
         
         # NOT operator
         self.assertEqual([result.pk for result in self.sb.search('NOT author:david1')['results']], [1, 2, 3])
-    
+
         # Ranges
-        # self.assertEqual([result.pk for result in self.sb.search('author:david1..david2')['results']], [1, 2, 3])
-        # self.assertEqual([result.pk for result in self.sb.search('pub_date:20090223000000..20090224000000')['results']], [1, 2, 3])        
-        self.assertEqual([result.pk for result in self.sb.search('david value:0..10')['results']], [1, 2, 3])
+        # self.assertEqual([result.pk for result in self.sb.search('index author:david1..david2')['results']], [1, 2, 3])
+        # self.assertEqual([result.pk for result in self.sb.search('index pub_date:20090223000000..20090224000000')['results']], [1, 2, 3])        
+        self.assertEqual([result.pk for result in self.sb.search('index value:0..10')['results']], [1, 2])
 
     def test_field_facets(self):
         self.sb.update(self.msi, self.sample_objs)
