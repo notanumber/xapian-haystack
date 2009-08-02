@@ -657,22 +657,6 @@ class SearchBackend(BaseSearchBackend):
         return 0
 
 
-    def _value_type_column(self, field):
-        """
-        Private method that returns the column value slot and type in the 
-        database for a given field.
-
-        Required arguemnts:
-            `field` -- The field to lookup
-
-        Returns an tuple with the column location (0 indexed) and type.
-        """
-        for field_dict in self.schema:
-            if field_dict['field_name'] == field:
-                return field_dict['type'], field_dict['column']
-        return None, None
-
-
 class SearchQuery(BaseSearchQuery):
     """
     `SearchQuery` is responsible for converting search queries into a format
