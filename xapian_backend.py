@@ -43,6 +43,20 @@ DOCUMENT_CT_TERM_PREFIX = DOCUMENT_CUSTOM_TERM_PREFIX + 'CONTENTTYPE'
 field_re = re.compile(r'(?<=(?<!Z)X)([A-Z_]+)(\w+)')
 
 
+class XHValueRangeProcessor(xapian.ValueRangeProcessor):
+    def __init__(self, sb):
+        self.sb = sb
+        xapian.ValueRangeProcessor.__init__(self)
+
+    def __call__(self, begin, end):
+        colon = begin.find(':')
+        field_name = begin[:colon]
+        begin = begin[colon + 1:len(begin)]
+        for field_dict in self.sb.schema:
+            if field_dict['field_name'] == field_name:
+                return field_dict['column'], begin, end
+
+
 class SearchBackend(BaseSearchBackend):
     """
     `SearchBackend` defines the Xapian search backend for use with the Haystack
@@ -516,45 +530,19 @@ class SearchBackend(BaseSearchBackend):
         else:
             flags = self._flags()
             qp = self._query_parser(database)
-            qp.add_boolean_prefix('django_ct', DOCUMENT_CT_TERM_PREFIX)
-            
-            if ':' in query_string:
-                for bit in query_string.split():
-                    if ':' in bit:
-                        field_name, term = bit.split(':')
-                        if not '..' in term:
-                            qp.add_prefix(
-                                field_name,
-                                DOCUMENT_CUSTOM_TERM_PREFIX + field_name.upper()
-                            )
-                        else:
-                            query_string = query_string.replace('%s:' % field_name, '')
-                            field_type, column = self._value_type_column(field_name)
-                            vrp = None
-                            if field_type == 'text':
-                                vrp = xapian.StringValueRangeProcessor(column)
-                            elif field_type == 'long' or field_type == 'float':
-                                vrp = xapian.NumberValueRangeProcessor(column)
-                            elif field_type == 'date' or field_type == 'datetime':
-                                vrp = xapian.DateValueRangeProcessor(column)
-                            if vrp:
-                                qp.add_valuerangeprocessor(vrp)
-                        
+            vrp = XHValueRangeProcessor(self)
+            qp.add_valuerangeprocessor(vrp)
             query = qp.parse_query(query_string, flags)
             if getattr(settings, 'HAYSTACK_INCLUDE_SPELLING', False) is True:
                 spelling_suggestion = qp.get_corrected_query_string()
     
         if narrow_queries:
-            subqueries = []
-            for narrow_query in narrow_queries:
-                field_name, term = narrow_query.split(':')
-                qp.add_prefix(
-                    field_name, DOCUMENT_CUSTOM_TERM_PREFIX + field_name.upper()
-                )
-                subqueries.append(qp.parse_query(narrow_query, flags))
+            subqueries = [
+                qp.parse_query(narrow_query, flags) for narrow_query in narrow_queries
+            ]
             query = xapian.Query(
-                xapian.Query.OP_FILTER, query, 
-                xapian.Query(xapian.Query.OP_AND, subqueries)
+                xapian.Query.OP_FILTER, 
+                query, xapian.Query(xapian.Query.OP_AND, subqueries)
             )
             
         return query, spelling_suggestion
@@ -609,18 +597,13 @@ class SearchBackend(BaseSearchBackend):
         qp.set_database(database)
         qp.set_stemmer(self.stemmer)
         qp.set_stemming_strategy(xapian.QueryParser.STEM_SOME)
+        qp.add_boolean_prefix('django_ct', DOCUMENT_CT_TERM_PREFIX)
+        for field_dict in self.schema:
+            qp.add_prefix(
+                field_dict['field_name'], 
+                DOCUMENT_CUSTOM_TERM_PREFIX + field_dict['field_name'].upper()
+            )
         return qp
-
-    # def _value_range_processor(self, field_dict):
-    #     if field_dict['type'] == 'text':
-    #         vrp = xapian.StringValueRangeProcessor(field_dict['column'])
-    #     elif field_dict['type'] == 'long' or field_dict['type'] == 'float':
-    #         vrp = xapian.NumberValueRangeProcessor(field_dict['column'])
-    #     elif field_dict['type'] == 'date' or field_dict['type'] == 'datetime':
-    #         vrp = xapian.DateValueRangeProcessor(field_dict['column'])
-    #     else:
-    #         vrp = None
-    #     return vrp
 
     def _enquire(self, database, query):
         """
