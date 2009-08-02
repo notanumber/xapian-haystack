@@ -516,11 +516,30 @@ class SearchBackend(BaseSearchBackend):
             query = xapian.Query('') # Make '*' match everything
         else:
             flags = self._flags()
-            qp, vrps = self._query_parser(database)
+            qp = self._query_parser(database)
+    
+            if '..' in query_string:
+                for bit in query_string.split():
+                    if '..' in bit:
+                        field_name, value_range = bit.split(':')
+                        query_string = query_string.replace('%s:' % field_name, '')
+                        field_type, column = self._value_type_column(field_name)
+
+                        if field_type == 'text':
+                            vrp = xapian.StringValueRangeProcessor(column)
+                        elif field_type == 'long' or field_type == 'float':
+                            vrp = xapian.NumberValueRangeProcessor(column)
+                        elif field_type == 'date' or field_type == 'datetime':
+                            vrp = xapian.DateValueRangeProcessor(column)
+                        if vrp:
+                            qp.add_valuerangeprocessor(vrp)
+                            import pdb; pdb.set_trace()
+
             query = qp.parse_query(query_string, flags)
+            print query.get_description()
             if getattr(settings, 'HAYSTACK_INCLUDE_SPELLING', False) is True:
                 spelling_suggestion = qp.get_corrected_query_string()
-                
+    
         if narrow_queries:
             subqueries = [qp.parse_query(narrow_query, flags) for narrow_query in narrow_queries]
             query = xapian.Query(xapian.Query.OP_FILTER, query, xapian.Query(xapian.Query.OP_AND, subqueries))
@@ -565,8 +584,7 @@ class SearchBackend(BaseSearchBackend):
 
     def _query_parser(self, database):
         """
-        Private method that returns a Xapian.QueryParser instance and a list
-        of xapian.ValueRangeProcessors in use.
+        Private method that returns a Xapian.QueryParser instance.
 
         Required arguments:
             `database` -- The database to be queried
@@ -574,7 +592,6 @@ class SearchBackend(BaseSearchBackend):
         The query parser returned will have stemming enabled, a boolean prefix
         for `django_ct`, and prefixes for all of the fields in the `self.schema`.
         """
-        vrps = []
         qp = xapian.QueryParser()
         qp.set_database(database)
         qp.set_stemmer(self.stemmer)
@@ -585,22 +602,7 @@ class SearchBackend(BaseSearchBackend):
                 field_dict['field_name'], 
                 DOCUMENT_CUSTOM_TERM_PREFIX + field_dict['field_name'].upper()
             )
-            vrp = self._value_range_processor(field_dict)
-            if vrp:
-                qp.add_valuerangeprocessor(vrp)        
-                vrps.append(vrp)
-        return qp, vrps
-
-    def _value_range_processor(self, field_dict):
-        if field_dict['type'] == 'text':
-            vrp = xapian.StringValueRangeProcessor(field_dict['column'])
-        elif field_dict['type'] == 'long' or field_dict['type'] == 'float':
-            vrp = xapian.NumberValueRangeProcessor(field_dict['column'])
-        elif field_dict['type'] == 'date' or field_dict['type'] == 'datetime':
-            vrp = xapian.DateValueRangeProcessor(field_dict['column'])
-        else:
-            vrp = None
-        return vrp
+        return qp
 
     def _enquire(self, database, query):
         """
@@ -650,6 +652,21 @@ class SearchBackend(BaseSearchBackend):
                 return field_dict['column']
         return 0
 
+
+    def _value_type_column(self, field):
+        """
+        Private method that returns the column value slot and type in the 
+        database for a given field.
+
+        Required arguemnts:
+            `field` -- The field to lookup
+
+        Returns an tuple with the column location (0 indexed) and type.
+        """
+        for field_dict in self.schema:
+            if field_dict['field_name'] == field:
+                return field_dict['type'], field_dict['column']
+        return 0
 
 
 class SearchQuery(BaseSearchQuery):
