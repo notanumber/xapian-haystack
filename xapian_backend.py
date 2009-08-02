@@ -54,6 +54,9 @@ class XHValueRangeProcessor(xapian.ValueRangeProcessor):
         begin = begin[colon + 1:len(begin)]
         for field_dict in self.sb.schema:
             if field_dict['field_name'] == field_name:
+                if field_dict['type'] == 'long':
+                    begin = xapian.sortable_serialise(int(begin))
+                    end = xapian.sortable_serialise(int(end))
                 return field_dict['column'], begin, end
 
 
