@@ -581,7 +581,10 @@ class SearchBackend(BaseSearchBackend):
         qp.set_stemming_strategy(xapian.QueryParser.STEM_SOME)
         qp.add_boolean_prefix('django_ct', DOCUMENT_CT_TERM_PREFIX)
         for field_dict in self.schema:
-            qp.add_prefix(field_dict['field_name'], DOCUMENT_CUSTOM_TERM_PREFIX + field_dict['field_name'].upper())
+            qp.add_prefix(
+                field_dict['field_name'], 
+                DOCUMENT_CUSTOM_TERM_PREFIX + field_dict['field_name'].upper()
+            )
             vrp = self._value_range_processor(field_dict)
             if vrp:
                 qp.add_valuerangeprocessor(vrp)        
