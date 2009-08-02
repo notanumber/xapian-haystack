@@ -447,9 +447,7 @@ class SearchBackend(BaseSearchBackend):
                 value = u't'
             else:
                 value = u'f'
-        elif isinstance(value, (int, long)):
-            value = u'%012d' % value
-        elif isinstance(value, (float)):
+        elif isinstance(value, (int, long, float)):
             value = xapian.sortable_serialise(value)
         else:
             value = force_unicode(value)
@@ -533,7 +531,7 @@ class SearchBackend(BaseSearchBackend):
                             vrp = xapian.DateValueRangeProcessor(column)
                         if vrp:
                             qp.add_valuerangeprocessor(vrp)
-                            import pdb; pdb.set_trace()
+                            print field_name, field_type, column
 
             query = qp.parse_query(query_string, flags)
             print query.get_description()
