@@ -49,6 +49,16 @@ class XHValueRangeProcessor(xapian.ValueRangeProcessor):
         xapian.ValueRangeProcessor.__init__(self)
 
     def __call__(self, begin, end):
+        """
+        Construct a tuple for value range processing.
+        
+        `begin` -- a string in the format '<field_name>:[low_range]'
+                   If 'low_range' is omitted, assume the smallest possible value.
+        `end` -- a string in the the format '[high_range|*]'.  If '*', assume
+                 the highest possible value.
+        
+        Return a tuple of three strings: (column, low, high)
+        """
         colon = begin.find(':')
         field_name = begin[:colon]
         begin = begin[colon + 1:len(begin)]
@@ -56,11 +66,18 @@ class XHValueRangeProcessor(xapian.ValueRangeProcessor):
             if field_dict['field_name'] == field_name:
                 if not begin:
                     if field_dict['type'] == 'text':
-                        begin = u'a'
+                        begin = u'a' # TODO: A better way of getting a min text value?
                     elif field_dict['type'] == 'long' or field_dict['type'] == 'float':
                         begin = float('-inf')
                     elif field_dict['type'] == 'date' or field_dict['type'] == 'datetime':
                         begin = u'00010101000000'
+                elif end == '*':
+                    if field_dict['type'] == 'text':
+                        end = u'z' * 100 # TODO: A better way of getting a max text value?
+                    elif field_dict['type'] == 'long' or field_dict['type'] == 'float':
+                        end = float('inf')
+                    elif field_dict['type'] == 'date' or field_dict['type'] == 'datetime':
+                        end = u'99990101000000'
                 if field_dict['type'] == 'long' or field_dict['type'] == 'float':
                     begin = xapian.sortable_serialise(float(begin))
                     end = xapian.sortable_serialise(float(end))
