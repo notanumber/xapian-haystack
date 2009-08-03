@@ -742,8 +742,8 @@ class SearchQuery(BaseSearchQuery):
                     filter_types = {
                         'exact': "%s:%s",
                         'gt': "%s:%s..*",
-                        'gte': "NOT %s:*..%s",
-                        'lt': "%s:*..%s",
+                        'gte': "NOT %s:..%s",
+                        'lt': "%s:..%s",
                         'lte': "NOT %s:%s..*",
                         'startswith': "%s:%s*",
                     }
