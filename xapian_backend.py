@@ -54,10 +54,17 @@ class XHValueRangeProcessor(xapian.ValueRangeProcessor):
         begin = begin[colon + 1:len(begin)]
         for field_dict in self.sb.schema:
             if field_dict['field_name'] == field_name:
+                if not begin:
+                    if field_dict['type'] == 'text':
+                        begin = u'a'
+                    elif field_dict['type'] == 'long' or field_dict['type'] == 'float':
+                        begin = float('-inf')
+                    elif field_dict['type'] == 'date' or field_dict['type'] == 'datetime':
+                        begin = u'00010101000000'
                 if field_dict['type'] == 'long' or field_dict['type'] == 'float':
-                    begin = xapian.sortable_serialise(int(begin))
-                    end = xapian.sortable_serialise(int(end))
-                return field_dict['column'], begin, end
+                    begin = xapian.sortable_serialise(float(begin))
+                    end = xapian.sortable_serialise(float(end))
+                return field_dict['column'], str(begin), str(end)
 
 
 class SearchBackend(BaseSearchBackend):
