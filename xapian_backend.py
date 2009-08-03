@@ -656,13 +656,13 @@ class SearchBackend(BaseSearchBackend):
             ``fields`` -- A list of fields in the index
 
         Returns a list of fields in dictionary format ready for inclusion in
-        an indexe meta-data.
+        an indexed meta-data.
         """
         for i, field in enumerate(fields):
             if field['indexed'] == 'true':
                 field['column'] = i
             else:
-                del field
+                del fields[i]
         return fields
 
     def _value_column(self, field):

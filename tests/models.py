@@ -25,6 +25,7 @@ class MockModel(models.Model):
     pub_date = models.DateTimeField(default=datetime.datetime.now)
     value = models.IntegerField()
     flag = models.BooleanField()
+    slug = models.SlugField()
     
     def __unicode__(self):
         return self.user
