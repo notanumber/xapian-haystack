@@ -92,7 +92,7 @@ class XapianSearchQueryTestCase(TestCase):
         self.sq.add_filter('created__lt', datetime.datetime(2009, 2, 12, 12, 13))
         self.sq.add_filter('title__gte', 'B')
         self.sq.add_filter('id__in', [1, 2, 3])
-        self.assertEqual(self.sq.build_query(), 'why AND NOT pub_date:20090210015900..* AND author:david..* AND created:..20090212121300 AND NOT title:..B AND (id:1 OR id:2 OR id:3)')
+        self.assertEqual(self.sq.build_query(), 'why AND pub_date:..20090210015900 AND NOT author:..david AND NOT created:20090212121300..* AND title:B..* AND (id:1 OR id:2 OR id:3)')
 
     def test_build_query_wildcard_filter_types(self):
         self.sq.add_filter('content', 'why')
