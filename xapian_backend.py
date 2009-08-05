@@ -18,6 +18,7 @@ import datetime
 import cPickle as pickle
 import os
 import re
+import shutil
 import warnings
 
 from django.conf import settings
@@ -350,10 +351,7 @@ class SearchBackend(BaseSearchBackend):
         This removes all indexes files and the `HAYSTACK_XAPIAN_PATH` folder.
         """
         if os.path.exists(settings.HAYSTACK_XAPIAN_PATH):
-            index_files = os.listdir(settings.HAYSTACK_XAPIAN_PATH)
-            for index_file in index_files:
-                os.remove(os.path.join(settings.HAYSTACK_XAPIAN_PATH, index_file))
-            os.removedirs(settings.HAYSTACK_XAPIAN_PATH)
+            shutil.rmtree(settings.HAYSTACK_XAPIAN_PATH)
 
     def document_count(self):
         """

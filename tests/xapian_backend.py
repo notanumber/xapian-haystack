@@ -17,6 +17,7 @@
 import cPickle as pickle
 import datetime
 import os
+import shutil
 import xapian
 
 from django.conf import settings
@@ -70,13 +71,8 @@ class XapianSearchBackendTestCase(TestCase):
     
     def tearDown(self):
         if os.path.exists(settings.HAYSTACK_XAPIAN_PATH):
-            index_files = os.listdir(settings.HAYSTACK_XAPIAN_PATH)
-            
-            for index_file in index_files:
-                os.remove(os.path.join(settings.HAYSTACK_XAPIAN_PATH, index_file))
-            
-            os.removedirs(settings.HAYSTACK_XAPIAN_PATH)
-        
+            shutil.rmtree(settings.HAYSTACK_XAPIAN_PATH)
+
         settings.HAYSTACK_XAPIAN_PATH = self.old_xapian_path
         super(XapianSearchBackendTestCase, self).tearDown()
     
