@@ -658,12 +658,14 @@ class SearchBackend(BaseSearchBackend):
         Returns a list of fields in dictionary format ready for inclusion in
         an indexed meta-data.
         """
-        for i, field in enumerate(fields):
+        schema = []
+        n = 0
+        for field in fields:
             if field['indexed'] == 'true':
-                field['column'] = i
-            else:
-                del fields[i]
-        return fields
+                field['column'] = n
+                n += 1
+                schema.append(field)
+        return schema
 
     def _value_column(self, field):
         """
