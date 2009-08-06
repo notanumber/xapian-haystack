@@ -38,6 +38,7 @@ class XapianMockSearchIndex(indexes.SearchIndex):
     value = indexes.IntegerField(model_attr='value')
     flag = indexes.BooleanField(model_attr='flag')
     slug = indexes.CharField(indexed=False, model_attr='slug')
+    popularity = indexes.FloatField(indexed=True, model_attr='popularity')
 
 
 class XapianSearchSite(sites.SearchSite):
@@ -68,6 +69,10 @@ class XapianSearchBackendTestCase(TestCase):
             mock.flag = bool(i % 2)
             mock.slug = 'http://example.com/%d' % i
             self.sample_objs.append(mock)
+            
+        self.sample_objs[0].popularity = 834.0
+        self.sample_objs[1].popularity = 35.0
+        self.sample_objs[2].popularity = 972.0
     
     def tearDown(self):
         if os.path.exists(settings.HAYSTACK_XAPIAN_PATH):
@@ -94,7 +99,7 @@ class XapianSearchBackendTestCase(TestCase):
             document = match.get_document()
             app_label, module_name, pk, model_data = pickle.loads(document.get_data())
             for key, value in model_data.iteritems():
-                model_data[key] = self.sb._from_python(value)
+                model_data[key] = self.sb._marshal_value(value)
             model_data['id'] = u'%s.%s.%d' % (app_label, module_name, pk)
             document_list.append(model_data)
 
@@ -106,9 +111,9 @@ class XapianSearchBackendTestCase(TestCase):
         
         self.assertEqual(len(self.xapian_search('')), 3)
         self.assertEqual([dict(doc) for doc in self.xapian_search('')], [
-            {'flag': u't', 'name': u'david1', 'text': u'Indexed!\n1', 'pub_date': u'20090224000000', 'value': '\xa9', 'id': u'tests.mockmodel.1', 'slug': 'http://example.com/1'},
-            {'flag': u'f', 'name': u'david2', 'text': u'Indexed!\n2', 'pub_date': u'20090223000000', 'value': '\xad', 'id': u'tests.mockmodel.2', 'slug': 'http://example.com/2'},
-            {'flag': u't', 'name': u'david3', 'text': u'Indexed!\n3', 'pub_date': u'20090222000000', 'value': '\xaf\x80', 'id': u'tests.mockmodel.3', 'slug': 'http://example.com/3'}
+            {'flag': u't', 'name': u'david1', 'text': u'Indexed!\n1', 'pub_date': u'20090224000000', 'value': '\xa9', 'id': u'tests.mockmodel.1', 'slug': 'http://example.com/1', 'popularity': '\xca\x84'},
+            {'flag': u'f', 'name': u'david2', 'text': u'Indexed!\n2', 'pub_date': u'20090223000000', 'value': '\xad', 'id': u'tests.mockmodel.2', 'slug': 'http://example.com/2', 'popularity': '\xb4`'},
+            {'flag': u't', 'name': u'david3', 'text': u'Indexed!\n3', 'pub_date': u'20090222000000', 'value': '\xaf\x80', 'id': u'tests.mockmodel.3', 'slug': 'http://example.com/3', 'popularity': '\xcb\x98'}
         ])
     
     def test_remove(self):
@@ -118,8 +123,8 @@ class XapianSearchBackendTestCase(TestCase):
         self.sb.remove(self.sample_objs[0])
         self.assertEqual(len(self.xapian_search('')), 2)
         self.assertEqual([dict(doc) for doc in self.xapian_search('')], [
-            {'flag': u'f', 'name': u'david2', 'text': u'Indexed!\n2', 'pub_date': u'20090223000000', 'value': '\xad', 'id': u'tests.mockmodel.2', 'slug': 'http://example.com/2'},
-            {'flag': u't', 'name': u'david3', 'text': u'Indexed!\n3', 'pub_date': u'20090222000000', 'value': '\xaf\x80', 'id': u'tests.mockmodel.3', 'slug': 'http://example.com/3'}
+            {'flag': u'f', 'name': u'david2', 'text': u'Indexed!\n2', 'pub_date': u'20090223000000', 'value': '\xad', 'id': u'tests.mockmodel.2', 'slug': 'http://example.com/2', 'popularity': '\xb4`'},
+            {'flag': u't', 'name': u'david3', 'text': u'Indexed!\n3', 'pub_date': u'20090222000000', 'value': '\xaf\x80', 'id': u'tests.mockmodel.3', 'slug': 'http://example.com/3', 'popularity': '\xcb\x98'}
         ])
     
     def test_clear(self):
@@ -247,38 +252,44 @@ class XapianSearchBackendTestCase(TestCase):
         self.sb.update(self.msi, self.sample_objs)
         
         results = self.sb.search('*', sort_by=['pub_date'])
-        self.assertEqual([result.pk for result in results['results']], [1, 2, 3])
-
-        results = self.sb.search('*', sort_by=['-pub_date'])
         self.assertEqual([result.pk for result in results['results']], [3, 2, 1])
+        
+        results = self.sb.search('*', sort_by=['-pub_date'])
+        self.assertEqual([result.pk for result in results['results']], [1, 2, 3])
 
         results = self.sb.search('*', sort_by=['id'])
-        self.assertEqual([result.pk for result in results['results']], [3, 2, 1])
+        self.assertEqual([result.pk for result in results['results']], [1, 2, 3])
 
         results = self.sb.search('*', sort_by=['-id'])
-        self.assertEqual([result.pk for result in results['results']], [1, 2, 3])
-
-        results = self.sb.search('*', sort_by=['value'])
         self.assertEqual([result.pk for result in results['results']], [3, 2, 1])
 
-        results = self.sb.search('*', sort_by=['-value'])
+        results = self.sb.search('*', sort_by=['value'])
         self.assertEqual([result.pk for result in results['results']], [1, 2, 3])
 
-        results = self.sb.search('*', sort_by=['flag', 'id'])
+        results = self.sb.search('*', sort_by=['-value'])
+        self.assertEqual([result.pk for result in results['results']], [3, 2, 1])
+
+        results = self.sb.search('*', sort_by=['popularity'])
+        self.assertEqual([result.pk for result in results['results']], [2, 1, 3])
+
+        results = self.sb.search('*', sort_by=['-popularity'])
         self.assertEqual([result.pk for result in results['results']], [3, 1, 2])
 
-        results = self.sb.search('*', sort_by=['flag', '-id'])
-        self.assertEqual([result.pk for result in results['results']], [1, 3, 2])
+        results = self.sb.search('*', sort_by=['flag', 'id'])
+        self.assertEqual([result.pk for result in results['results']], [2, 1, 3])
 
-    def test__from_python(self):
-        self.assertEqual(self.sb._from_python('abc'), u'abc')
-        self.assertEqual(self.sb._from_python(1), '\xa0')
-        self.assertEqual(self.sb._from_python(2653), '\xd1.\x80')
-        self.assertEqual(self.sb._from_python(25.5), '\xb2`')
-        self.assertEqual(self.sb._from_python([1, 2, 3]), u'[1, 2, 3]')
-        self.assertEqual(self.sb._from_python((1, 2, 3)), u'(1, 2, 3)')
-        self.assertEqual(self.sb._from_python({'a': 1, 'c': 3, 'b': 2}), u"{'a': 1, 'c': 3, 'b': 2}")
-        self.assertEqual(self.sb._from_python(datetime.datetime(2009, 5, 9, 16, 14)), u'20090509161400')
-        self.assertEqual(self.sb._from_python(datetime.datetime(2009, 5, 9, 0, 0)), u'20090509000000')
-        self.assertEqual(self.sb._from_python(datetime.datetime(1899, 5, 18, 0, 0)), u'18990518000000')
-        self.assertEqual(self.sb._from_python(datetime.datetime(2009, 5, 18, 1, 16, 30, 250)), u'20090518011630000250')
+        results = self.sb.search('*', sort_by=['flag', '-id'])
+        self.assertEqual([result.pk for result in results['results']], [2, 3, 1])
+
+    def test__marshal_value(self):
+        self.assertEqual(self.sb._marshal_value('abc'), u'abc')
+        self.assertEqual(self.sb._marshal_value(1), '\xa0')
+        self.assertEqual(self.sb._marshal_value(2653), '\xd1.\x80')
+        self.assertEqual(self.sb._marshal_value(25.5), '\xb2`')
+        self.assertEqual(self.sb._marshal_value([1, 2, 3]), u'[1, 2, 3]')
+        self.assertEqual(self.sb._marshal_value((1, 2, 3)), u'(1, 2, 3)')
+        self.assertEqual(self.sb._marshal_value({'a': 1, 'c': 3, 'b': 2}), u"{'a': 1, 'c': 3, 'b': 2}")
+        self.assertEqual(self.sb._marshal_value(datetime.datetime(2009, 5, 9, 16, 14)), u'20090509161400')
+        self.assertEqual(self.sb._marshal_value(datetime.datetime(2009, 5, 9, 0, 0)), u'20090509000000')
+        self.assertEqual(self.sb._marshal_value(datetime.datetime(1899, 5, 18, 0, 0)), u'18990518000000')
+        self.assertEqual(self.sb._marshal_value(datetime.datetime(2009, 5, 18, 1, 16, 30, 250)), u'20090518011630000250')

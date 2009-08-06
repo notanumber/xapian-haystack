@@ -190,7 +190,7 @@ class SearchBackend(BaseSearchBackend):
                         value = model_data[field['field_name']]
                         term_generator.index_text(force_unicode(value))
                         term_generator.index_text(force_unicode(value), 1, prefix)
-                        document.add_value(field['column'], self._from_python(value))
+                        document.add_value(field['column'], self._marshal_value(value))
 
                 document.set_data(pickle.dumps(
                     (obj._meta.app_label, obj._meta.module_name, obj.pk, model_data), 
@@ -464,9 +464,9 @@ class SearchBackend(BaseSearchBackend):
                     fields[match.group(1).lower()] = [(match.group(2), term[1])]
         return fields
 
-    def _from_python(self, value):
+    def _marshal_value(self, value):
         """
-        Private method that converts Python values to a string for Xapian.
+        Private method that converts Python values to a string for Xapian values.
         """
         if isinstance(value, datetime.datetime):
             if value.microsecond:
@@ -586,10 +586,10 @@ class SearchBackend(BaseSearchBackend):
         
         for sort_field in sort_by:
             if sort_field.startswith('-'):
-                reverse = False
+                reverse = True
                 sort_field = sort_field[1:] # Strip the '-'
             else:
-                reverse = True # Reverse is inverted in Xapian -- http://trac.xapian.org/ticket/311
+                reverse = False # Reverse is inverted in Xapian -- http://trac.xapian.org/ticket/311
             sorter.add(self._value_column(sort_field), reverse)
             
         return sorter
@@ -728,7 +728,7 @@ class SearchQuery(BaseSearchQuery):
 
                 if not isinstance(value, (list, tuple)):
                     # Convert whatever we find to what xapian wants.
-                    value = self.backend._from_python(value)
+                    value = self.backend._marshal_value(value)
 
                 # Check to see if it's a phrase for an exact match.
                 if ' ' in value:

@@ -26,6 +26,7 @@ class MockModel(models.Model):
     value = models.IntegerField()
     flag = models.BooleanField()
     slug = models.SlugField()
+    popularity = models.FloatField()
     
     def __unicode__(self):
         return self.user
