@@ -80,11 +80,6 @@ class XapianSearchQueryTestCase(TestCase):
         self.sq.add_filter('content', 'hello world')
         self.assertEqual(self.sq.build_query(), '"hello world"')
 
-    # def test_build_query_boost(self):
-    #     self.sq.add_filter('content', 'hello')
-    #     self.sq.add_boost('world', 5)
-    #     self.assertEqual(self.sq.build_query(), "hello world^5")
-    # 
     def test_build_query_multiple_filter_types(self):
         self.sq.add_filter('content', 'why')
         self.sq.add_filter('pub_date__lte', datetime.datetime(2009, 2, 10, 1, 59))

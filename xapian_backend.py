@@ -247,7 +247,7 @@ class SearchBackend(BaseSearchBackend):
 
     def search(self, query_string, sort_by=None, start_offset=0, end_offset=DEFAULT_MAX_RESULTS,
                fields='', highlight=False, facets=None, date_facets=None, query_facets=None,
-               narrow_queries=None, **kwargs):
+               narrow_queries=None, boost=None, **kwargs):
         """
         Executes the search as defined in `query_string`.
 
@@ -264,6 +264,7 @@ class SearchBackend(BaseSearchBackend):
             `date_facets` -- Facet results on date ranges (default = None)
             `query_facets` -- Facet results on queries (default = None)
             `narrow_queries` -- Narrow queries (default = None)
+            `boost` -- Dictionary of terms and weights to boost results
 
         Returns:
             A dictionary with the following keys:
@@ -305,7 +306,9 @@ class SearchBackend(BaseSearchBackend):
             warnings.warn("Query faceting has not been implemented yet.", Warning, stacklevel=2)
 
         database = self._database()
-        query, spelling_suggestion = self._query(database, query_string, narrow_queries)
+        query, spelling_suggestion = self._query(
+            database, query_string, narrow_queries, boost
+        )
         enquire = self._enquire(database, query)
 
         if sort_by:
@@ -535,7 +538,7 @@ class SearchBackend(BaseSearchBackend):
         term_generator.set_document(document)
         return term_generator
 
-    def _query(self, database, query_string, narrow_queries=None):
+    def _query(self, database, query_string, narrow_queries=None, boost=None):
         """
         Private method that takes a query string and returns a xapian.Query.
         
@@ -544,6 +547,7 @@ class SearchBackend(BaseSearchBackend):
         
         Optional arguments:
             `narrow_queries` -- A list of queries to narrow the query with
+            `boost` -- A dictionary of terms to boost with values
         
         Returns a xapian.Query instance with prefixes and ranges properly
         setup as pulled from the `query_string`.
@@ -568,6 +572,16 @@ class SearchBackend(BaseSearchBackend):
             query = xapian.Query(
                 xapian.Query.OP_FILTER, 
                 query, xapian.Query(xapian.Query.OP_AND, subqueries)
+            )
+        if boost:
+            subqueries = [
+                xapian.Query(
+                    xapian.Query.OP_SCALE_WEIGHT, xapian.Query(term), value
+                ) for term, value in boost.iteritems()
+            ]
+            query = xapian.Query(
+                xapian.Query.OP_OR, query,
+                xapian.Query(xapian.Query.OP_AND, subqueries)
             )
             
         return query, spelling_suggestion
@@ -772,17 +786,6 @@ class SearchQuery(BaseSearchQuery):
         else:
             final_query = query
 
-        # print final_query
-
-        # TODO: Implement boost
-        # if self.boost:
-        #     boost_list = []
-        # 
-        #     for boost_word, boost_value in self.boost.items():
-        #         boost_list.append("%s^%s" % (boost_word, boost_value))
-        # 
-        #     final_query = "%s %s" % (final_query, " ".join(boost_list))
-
         return final_query
         
     def run(self):
@@ -814,6 +817,9 @@ class SearchQuery(BaseSearchQuery):
 
         if self.narrow_queries:
             kwargs['narrow_queries'] = self.narrow_queries
+        
+        if self.boost:
+            kwargs['boost'] = self.boost
 
         results = self.backend.search(final_query, **kwargs)
         self._results = results.get('results', [])

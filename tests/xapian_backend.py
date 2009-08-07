@@ -281,6 +281,16 @@ class XapianSearchBackendTestCase(TestCase):
         results = self.sb.search('*', sort_by=['flag', '-id'])
         self.assertEqual([result.pk for result in results['results']], [2, 3, 1])
 
+    def test_boost(self):
+        self.sb.update(self.msi, self.sample_objs)
+
+         # TODO: Need a better test case here.  Possibly better test data?
+        results = self.sb.search('*', boost={'true': 2})
+        self.assertEqual([result.pk for result in results['results']], [1, 3, 2])
+
+        results = self.sb.search('*', boost={'true': 1.5})
+        self.assertEqual([result.pk for result in results['results']], [1, 3, 2])
+
     def test__marshal_value(self):
         self.assertEqual(self.sb._marshal_value('abc'), u'abc')
         self.assertEqual(self.sb._marshal_value(1), '\xa0')
