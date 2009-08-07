@@ -42,6 +42,7 @@ DOCUMENT_CUSTOM_TERM_PREFIX = 'X'
 DOCUMENT_CT_TERM_PREFIX = DOCUMENT_CUSTOM_TERM_PREFIX + 'CONTENTTYPE'
 
 field_re = re.compile(r'(?<=(?<!Z)X)([A-Z_]+)(\w+)')
+gap_re = re.compile(r'(?P<type>year|month|day|hour|minute|second+)s?=?(?P<value>\d*)', re.IGNORECASE)
 
 
 class XHValueRangeProcessor(xapian.ValueRangeProcessor):
@@ -299,9 +300,6 @@ class SearchBackend(BaseSearchBackend):
                 'hits': 0,
             }
 
-        if date_facets is not None:
-            warnings.warn("Date faceting has not been implemented yet.", Warning, stacklevel=2)
-
         if query_facets is not None:
             warnings.warn("Query faceting has not been implemented yet.", Warning, stacklevel=2)
 
@@ -332,7 +330,7 @@ class SearchBackend(BaseSearchBackend):
                 )
             if date_facets:
                 facets_dict['dates'] = self._do_date_facets(
-                    document, schema, date_facets, facets_dict['dates']
+                    document, date_facets, facets_dict['dates']
                 )
             if highlight and (len(query_string) > 0):
                 model_data['highlighted'] = {
@@ -471,7 +469,7 @@ class SearchBackend(BaseSearchBackend):
                     fields[match.group(1).lower()] = [(match.group(2), term[1])]
         return fields
 
-    def _do_date_facets(self, document, schema, date_facets, dates):
+    def _do_date_facets(self, document, date_facets, dates):
         """
         Private method that facets a document by date ranges
         

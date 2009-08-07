@@ -187,12 +187,12 @@ class XapianSearchBackendTestCase(TestCase):
         self.sb.update(self.msi, self.sample_objs)
         self.assertEqual(len(self.xapian_search('')), 3)
 
-        self.assertEqual(self.sb.search('', date_facets={'pub_date': {'start_date': datetime.date(2008, 2, 26), 'end_date': datetime.date(2008, 2, 26), 'gap': '/MONTH'}}), [])
-        results = self.sb.search('Index*', date_facets={'pub_date': {'start_date': datetime.date(2008, 2, 26), 'end_date': datetime.date(2008, 2, 26), 'gap': '/MONTH'}})
+        self.assertEqual(self.sb.search('', date_facets={'pub_date': {'start_date': datetime.date(2008, 2, 26), 'end_date': datetime.date(2008, 2, 26), 'gap': 'month=1'}}), {'hits': 0, 'results': []})
+        results = self.sb.search('index', date_facets={'pub_date': {'start_date': datetime.date(2008, 2, 26), 'end_date': datetime.date(2008, 2, 26), 'gap': 'month=1'}})
         self.assertEqual(results['hits'], 3)
         self.assertEqual(results['facets'], {})
-    
 
+    # def test_query_facets(self):
     #     self.assertEqual(self.sb.search('', query_facets={'name': '[* TO e]'}), [])
     #     results = self.sb.search('Index*', query_facets={'name': '[* TO e]'})
     #     self.assertEqual(results['hits'], 3)
