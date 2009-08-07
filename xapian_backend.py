@@ -330,6 +330,10 @@ class SearchBackend(BaseSearchBackend):
                 facets_dict['fields'] = self._do_field_facets(
                     document, facets, facets_dict['fields']
                 )
+            if date_facets:
+                facets_dict['dates'] = self._do_date_facets(
+                    document, schema, date_facets, facets_dict['dates']
+                )
             if highlight and (len(query_string) > 0):
                 model_data['highlighted'] = {
                     self.content_field_name: self._do_highlight(
@@ -466,6 +470,38 @@ class SearchBackend(BaseSearchBackend):
                 else:
                     fields[match.group(1).lower()] = [(match.group(2), term[1])]
         return fields
+
+    def _do_date_facets(self, document, schema, date_facets, dates):
+        """
+        Private method that facets a document by date ranges
+        
+        Required arguments:
+            `document` -- The document to parse
+            `schema` -- The database schema
+            `date_facets` -- A dictionary of date fields to facet with
+                             keys for start_date, end_date, and gap:
+                             eg. {'pub_date': 'start_date': datetime.date(2008, 2, 26), 'end_date': datetime.date(2008, 2, 26), 'gap': '/MONTH'}}
+                `start_date` -- The start date to facet
+                `end_date` -- The end date to facet
+                `gap` -- The size of the gap to facet.  This is a string in
+                         the format '(year|month|day|hour|minute|second+)s?=?(\d*)'
+            `dates` -- A list of dates that have already been faceted.  This
+                       will be extended with any new dates and counts found
+                       in the `document`.
+        """
+        for date_facet, facet_params in date_facets.iteritems():
+            if not date_facet in schema.keys():
+                raise SearchBackendError('The field name [%s] does not exist in the database schema' % date_facet)
+            
+            match_dict = gap_re.search(facet_params['gap']).groupdict()
+            gap_type = match_dict['type']
+            gap_value = match_dict.get('value', 1)
+            date_value = self._to_date(document.get_value(schema.get(date_facet) + 1))
+            
+            dates[date_facet] = {
+                'end': match_date.isoformat(), 'gap': facet_params['gap']
+            }
+        return dates
 
     def _marshal_value(self, value):
         """
