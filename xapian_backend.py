@@ -503,7 +503,6 @@ class SearchBackend(BaseSearchBackend):
                 'gap': facet_params['gap'],
                 'count': 1,
             }
-            print dates
         return dates
 
     def _marshal_value(self, value):
