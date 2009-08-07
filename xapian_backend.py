@@ -488,17 +488,22 @@ class SearchBackend(BaseSearchBackend):
                        in the `document`.
         """
         for date_facet, facet_params in date_facets.iteritems():
-            if not date_facet in schema.keys():
-                raise SearchBackendError('The field name [%s] does not exist in the database schema' % date_facet)
-            
-            match_dict = gap_re.search(facet_params['gap']).groupdict()
-            gap_type = match_dict['type']
-            gap_value = match_dict.get('value', 1)
-            date_value = self._to_date(document.get_value(schema.get(date_facet) + 1))
-            
+            match = gap_re.search(facet_params['gap']).groupdict()
+            gap_type = match['type']
+            gap_value = match.get('value', 1)
+            date_value = datetime.datetime.strptime(
+                document.get_value(self._value_column(date_facet)), '%Y%m%d%H%M%S'
+            )
+
+            date_gap = datetime.timedelta(days=int(gap_value) * 31)
+
             dates[date_facet] = {
-                'end': match_date.isoformat(), 'gap': facet_params['gap']
+                'start': date_value.isoformat(),
+                'end': (date_value + date_gap).isoformat(),
+                'gap': facet_params['gap'],
+                'count': 1,
             }
+            print dates
         return dates
 
     def _marshal_value(self, value):
