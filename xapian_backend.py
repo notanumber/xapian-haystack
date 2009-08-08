@@ -494,8 +494,27 @@ class SearchBackend(BaseSearchBackend):
             date_value = datetime.datetime.strptime(
                 document.get_value(self._value_column(date_facet)), '%Y%m%d%H%M%S'
             )
-
-            date_gap = datetime.timedelta(days=int(gap_value) * 31)
+            
+            if gap_type == 'year':
+                date_gap = datetime.timedelta(days=365)
+            elif gap_type == 'month':
+                if date_value.month % 2:
+                    date_gap = datetime.timedelta(days=30)
+                else:
+                    if date_value.month == 2:
+                        date_gap = datetime.timedelta(days=28) # TODO: Add leap year handling
+                    else:
+                        date_gap = datetime.timedelta(days=31)
+            elif gap_type == 'day':
+                date_gap = datetime.timedelta(days=int(gap_value))
+            elif gap_type == 'hour':
+                date_gap = datetime.timedelta(hours=int(gap_value))
+            elif gap_type == 'minute':
+                date_gap = datetime.timedelta(minues=int(gap_value))
+            elif gap_type == 'second':
+                date_gap = datetime.timedelta(seconds=int(gap_value))
+            else:
+                raise SearchBackendError('Invalid gap type in date facet')
 
             dates[date_facet] = {
                 'start': date_value.isoformat(),
