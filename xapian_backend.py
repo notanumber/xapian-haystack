@@ -328,10 +328,6 @@ class SearchBackend(BaseSearchBackend):
                 facets_dict['fields'] = self._do_field_facets(
                     document, facets, facets_dict['fields']
                 )
-            if date_facets:
-                facets_dict['dates'] = self._do_date_facets(
-                    document, date_facets, facets_dict['dates']
-                )
             if highlight and (len(query_string) > 0):
                 model_data['highlighted'] = {
                     self.content_field_name: self._do_highlight(
@@ -341,6 +337,9 @@ class SearchBackend(BaseSearchBackend):
             results.append(
                 SearchResult(app_label, module_name, pk, match.weight, **model_data)
             )
+
+        if date_facets:
+            facets_dict['dates'] = self._do_date_facets(results, date_facets)
 
         return {
             'results': results,
@@ -469,60 +468,84 @@ class SearchBackend(BaseSearchBackend):
                     fields[match.group(1).lower()] = [(match.group(2), term[1])]
         return fields
 
-    def _do_date_facets(self, document, date_facets, dates):
+    def _do_date_facets(self, results, date_facets):
         """
         Private method that facets a document by date ranges
-        
+
         Required arguments:
-            `document` -- The document to parse
-            `schema` -- The database schema
-            `date_facets` -- A dictionary of date fields to facet with
-                             keys for start_date, end_date, and gap:
-                             eg. {'pub_date': 'start_date': datetime.date(2008, 2, 26), 'end_date': datetime.date(2008, 2, 26), 'gap': '/MONTH'}}
-                `start_date` -- The start date to facet
-                `end_date` -- The end date to facet
-                `gap` -- The size of the gap to facet.  This is a string in
-                         the format '(year|month|day|hour|minute|second+)s?=?(\d*)'
-            `dates` -- A list of dates that have already been faceted.  This
-                       will be extended with any new dates and counts found
-                       in the `document`.
+            `results` -- A list SearchResults to facet
+            `date_facets` -- A dictionary containg facet parameters:
+                {'field': {'start_date': ..., 'end_date': ...: 'gap': '...'}}
+                nb., gap must satisfy the regex: 
+                    (?P<type>year|month|day|hour|minute|second+)s?=?(?P<value>\d*)
+        
+        For each date facet field in `date_facets`, generates a list
+        of date ranges (from `start_date` to `end_date` by `gap`) then
+        iterates through `results` and tallies the count for each date_facet.
+        
+        Returns a dictionary of date facets (fields) containing a list with
+        entries for each range and a count of documents matching the range.
+        
+        eg. {
+            'pub_date': [
+                ('2009-01-01T00:00:00Z', 5),
+                ('2009-02-01T00:00:00Z', 0),
+                ('2009-03-01T00:00:00Z', 0),
+                ('2009-04-01T00:00:00Z', 1),
+                ('2009-05-01T00:00:00Z', 2),
+            ],
+        }
         """
+        facet_dict = {}
+        
         for date_facet, facet_params in date_facets.iteritems():
             match = gap_re.search(facet_params['gap']).groupdict()
             gap_type = match['type']
             gap_value = match.get('value', 1)
-            date_value = datetime.datetime.strptime(
-                document.get_value(self._value_column(date_facet)), '%Y%m%d%H%M%S'
-            )
-            
-            if gap_type == 'year':
-                date_gap = datetime.timedelta(days=365)
-            elif gap_type == 'month':
-                if date_value.month % 2:
-                    date_gap = datetime.timedelta(days=30)
-                else:
-                    if date_value.month == 2:
-                        date_gap = datetime.timedelta(days=28) # TODO: Add leap year handling
+            date_range = facet_params['start_date']
+            facet_list = []
+            while date_range <= facet_params['end_date']:
+                facet_list.append((date_range.isoformat(), 0))
+                if gap_type == 'year':
+                    date_range = date_range.replace(
+                        year=date_range.year + int(gap_value)
+                    )
+                elif gap_type == 'month':
+                    if date_range.month == 12:
+                        date_range = date_range.replace(
+                            month=1, year=date_range.year + int(gap_value)
+                        )
                     else:
-                        date_gap = datetime.timedelta(days=31)
-            elif gap_type == 'day':
-                date_gap = datetime.timedelta(days=int(gap_value))
-            elif gap_type == 'hour':
-                date_gap = datetime.timedelta(hours=int(gap_value))
-            elif gap_type == 'minute':
-                date_gap = datetime.timedelta(minues=int(gap_value))
-            elif gap_type == 'second':
-                date_gap = datetime.timedelta(seconds=int(gap_value))
-            else:
-                raise SearchBackendError('Invalid gap type in date facet')
+                        date_range = date_range.replace(
+                            month=date_range.month + int(gap_value)
+                        )
+                elif gap_type == 'day':
+                    date_range += datetime.timedelta(days=gap_value)
+                elif gap_type == 'hour':
+                    date_range += datetime.timedelta(hours=gap_value)
+                elif gap_type == 'minute':
+                    date_range += datetime.timedelta(minutes=gap_value)
+                elif gap_type == 'second':
+                    date_range += datetime.timedelta(seconds=gap_value)
+    
+            facet_list = sorted(facet_list, key=lambda n:n[0])
 
-            dates[date_facet] = {
-                'start': date_value.isoformat(),
-                'end': (date_value + date_gap).isoformat(),
-                'gap': facet_params['gap'],
-                'count': 1,
-            }
-        return dates
+            for result in results:
+                result_date = getattr(result, date_facet)
+                if result_date:
+                    if not isinstance(result_date, datetime.datetime):
+                        result_date = datetime.datetime(
+                            year=result_date.year,
+                            month=result_date.month,
+                            day=result_date.day,
+                        )
+                    for n, facet_date in enumerate(facet_list):
+                        if result_date < datetime.datetime.strptime(facet_date[0], '%Y-%m-%dT%H:%M:%S'):
+                            facet_list[n] = (facet_list[n][0], (facet_list[n][1] + 1))
+
+            facet_dict[date_facet] = facet_list
+
+        return facet_dict
 
     def _marshal_value(self, value):
         """
