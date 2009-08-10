@@ -520,13 +520,13 @@ class SearchBackend(BaseSearchBackend):
                             month=date_range.month + int(gap_value)
                         )
                 elif gap_type == 'day':
-                    date_range += datetime.timedelta(days=gap_value)
+                    date_range += datetime.timedelta(days=int(gap_value))
                 elif gap_type == 'hour':
-                    date_range += datetime.timedelta(hours=gap_value)
+                    date_range += datetime.timedelta(hours=int(gap_value))
                 elif gap_type == 'minute':
-                    date_range += datetime.timedelta(minutes=gap_value)
+                    date_range += datetime.timedelta(minutes=int(gap_value))
                 elif gap_type == 'second':
-                    date_range += datetime.timedelta(seconds=gap_value)
+                    date_range += datetime.timedelta(seconds=int(gap_value))
     
             facet_list = sorted(facet_list, key=lambda n:n[0], reverse=True)
 

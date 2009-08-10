@@ -198,6 +198,14 @@ class XapianSearchBackendTestCase(TestCase):
             ('2008-10-26T00:00:00', 0),
         ])
 
+        results = self.sb.search('index', date_facets={'pub_date': {'start_date': datetime.datetime(2009, 02, 01), 'end_date': datetime.datetime(2009, 3, 15), 'gap': 'days=15'}})
+        self.assertEqual(results['hits'], 3)
+        self.assertEqual(results['facets']['dates']['pub_date'], [
+            ('2009-03-03T00:00:00', 0),
+            ('2009-02-16T00:00:00', 3),
+            ('2009-02-01T00:00:00', 0)
+        ])
+
     # def test_query_facets(self):
     #     self.assertEqual(self.sb.search('', query_facets={'name': '[* TO e]'}), {'hits': 0, 'results': []})
     #     results = self.sb.search('index', query_facets={'name': '[* TO e]'})
