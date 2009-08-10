@@ -504,7 +504,7 @@ class SearchBackend(BaseSearchBackend):
             gap_value = match.get('value', 1)
             date_range = facet_params['start_date']
             facet_list = []
-            while date_range <= facet_params['end_date']:
+            while date_range < facet_params['end_date']:
                 facet_list.append((date_range.isoformat(), 0))
                 if gap_type == 'year':
                     date_range = date_range.replace(
@@ -528,7 +528,7 @@ class SearchBackend(BaseSearchBackend):
                 elif gap_type == 'second':
                     date_range += datetime.timedelta(seconds=gap_value)
     
-            facet_list = sorted(facet_list, key=lambda n:n[0])
+            facet_list = sorted(facet_list, key=lambda n:n[0], reverse=True)
 
             for result in results:
                 result_date = getattr(result, date_facet)
@@ -540,8 +540,9 @@ class SearchBackend(BaseSearchBackend):
                             day=result_date.day,
                         )
                     for n, facet_date in enumerate(facet_list):
-                        if result_date < datetime.datetime.strptime(facet_date[0], '%Y-%m-%dT%H:%M:%S'):
+                        if result_date > datetime.datetime.strptime(facet_date[0], '%Y-%m-%dT%H:%M:%S'):
                             facet_list[n] = (facet_list[n][0], (facet_list[n][1] + 1))
+                            break
 
             facet_dict[date_facet] = facet_list
 

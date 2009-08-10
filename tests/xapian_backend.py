@@ -187,23 +187,15 @@ class XapianSearchBackendTestCase(TestCase):
         self.sb.update(self.msi, self.sample_objs)
         self.assertEqual(len(self.xapian_search('')), 3)
 
-        self.assertEqual(self.sb.search('', date_facets={'pub_date': {'start_date': datetime.datetime(2008, 2, 26), 'end_date': datetime.datetime(2009, 2, 26), 'gap': 'month=1'}}), {'hits': 0, 'results': []})
-        results = self.sb.search('index', date_facets={'pub_date': {'start_date': datetime.datetime(2008, 2, 26), 'end_date': datetime.datetime(2009, 2, 26), 'gap': 'month=1'}})
+        self.assertEqual(self.sb.search('', date_facets={'pub_date': {'start_date': datetime.datetime(2008, 10, 26), 'end_date': datetime.datetime(2009, 3, 26), 'gap': 'month=1'}}), {'hits': 0, 'results': []})
+        results = self.sb.search('index', date_facets={'pub_date': {'start_date': datetime.datetime(2008, 10, 26), 'end_date': datetime.datetime(2009, 3, 26), 'gap': 'month=1'}})
         self.assertEqual(results['hits'], 3)
         self.assertEqual(results['facets']['dates']['pub_date'], [
-            ('2008-02-26T00:00:00', 0),
-            ('2008-03-26T00:00:00', 0),
-            ('2008-04-26T00:00:00', 0),
-            ('2008-05-26T00:00:00', 0),
-            ('2008-06-26T00:00:00', 0),
-            ('2008-07-26T00:00:00', 0),
-            ('2008-08-26T00:00:00', 0),
-            ('2008-09-26T00:00:00', 0),
-            ('2008-10-26T00:00:00', 0),
-            ('2008-11-26T00:00:00', 0),
+            ('2009-02-26T00:00:00', 0),
+            ('2009-01-26T00:00:00', 3),
             ('2008-12-26T00:00:00', 0),
-            ('2009-01-26T00:00:00', 0),
-            ('2009-02-26T00:00:00', 3),
+            ('2008-11-26T00:00:00', 0),
+            ('2008-10-26T00:00:00', 0),
         ])
 
     # def test_query_facets(self):
