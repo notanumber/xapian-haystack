@@ -340,6 +340,8 @@ class SearchBackend(BaseSearchBackend):
 
         if date_facets:
             facets_dict['dates'] = self._do_date_facets(results, date_facets)
+        if query_facets:
+            facets_dict['queries'] = self._do_query_facets(results, query_facets)
 
         return {
             'results': results,
@@ -546,6 +548,14 @@ class SearchBackend(BaseSearchBackend):
 
             facet_dict[date_facet] = facet_list
 
+        return facet_dict
+
+    def _do_query_facets(self, results, query_facets):
+        facet_dict = {}
+        
+        for field, query in query_facets.iteritems():
+            facet_dict[field] = (query, self.search(query)['hits'])
+        
         return facet_dict
 
     def _marshal_value(self, value):

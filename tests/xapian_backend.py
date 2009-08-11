@@ -206,11 +206,14 @@ class XapianSearchBackendTestCase(TestCase):
             ('2009-02-01T00:00:00', 0)
         ])
 
-    # def test_query_facets(self):
-    #     self.assertEqual(self.sb.search('', query_facets={'name': '[* TO e]'}), {'hits': 0, 'results': []})
-    #     results = self.sb.search('index', query_facets={'name': '[* TO e]'})
-    #     self.assertEqual(results['hits'], 3)
-    #     self.assertEqual(results['facets'], {})
+    def test_query_facets(self):
+        self.sb.update(self.msi, self.sample_objs)
+        self.assertEqual(len(self.xapian_search('')), 3)
+
+        self.assertEqual(self.sb.search('', query_facets={'name': 'da*'}), {'hits': 0, 'results': []})
+        results = self.sb.search('index', query_facets={'name': 'da*'})
+        self.assertEqual(results['hits'], 3)
+        self.assertEqual(results['facets']['queries']['name'], ('da*', 3))
     
     def test_narrow_queries(self):
         self.sb.update(self.msi, self.sample_objs)
