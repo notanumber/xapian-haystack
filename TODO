@@ -1,7 +1,6 @@
 Future
 ======
 
-* `query_facets` on SearchBackend.search
 * Language stemming (needs to be implemented by Haystack first)
 
 Complete
@@ -15,3 +14,4 @@ Complete
 * SearchQuerySet.boost()
 * Figure out how to deal with accents? (eg., resume vs résumé).
 * `date_facets` on SearchBackend.search
+* `query_facets` on SearchBackend.search
