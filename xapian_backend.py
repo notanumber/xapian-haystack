@@ -41,7 +41,6 @@ DOCUMENT_ID_TERM_PREFIX = 'Q'
 DOCUMENT_CUSTOM_TERM_PREFIX = 'X'
 DOCUMENT_CT_TERM_PREFIX = DOCUMENT_CUSTOM_TERM_PREFIX + 'CONTENTTYPE'
 
-field_re = re.compile(r'(?<=(?<!Z)X)([A-Z_]+)(\w+)')
 gap_re = re.compile(r'(?P<type>year|month|day|hour|minute|second+)s?=?(?P<value>\d*)', re.IGNORECASE)
 
 
@@ -324,10 +323,6 @@ class SearchBackend(BaseSearchBackend):
         for match in matches:
             document = match.get_document()
             app_label, module_name, pk, model_data = pickle.loads(document.get_data())
-            if facets:
-                facets_dict['fields'] = self._do_field_facets(
-                    document, facets, facets_dict['fields']
-                )
             if highlight and (len(query_string) > 0):
                 model_data['highlighted'] = {
                     self.content_field_name: self._do_highlight(
@@ -338,6 +333,8 @@ class SearchBackend(BaseSearchBackend):
                 SearchResult(app_label, module_name, pk, match.weight, **model_data)
             )
         
+        if facets:
+            facets_dict['fields'] = self._do_field_facets(results, facets)
         if date_facets:
             facets_dict['dates'] = self._do_date_facets(results, date_facets)
         if query_facets:
@@ -445,30 +442,26 @@ class SearchBackend(BaseSearchBackend):
             content = term_re.sub('<%s>%s</%s>' % (tag, term, tag), content)
         return content
     
-    def _do_field_facets(self, document, facets, fields):
+    def _do_field_facets(self, results, field_facets):
         """
         Private method that facets a document by field name.
         
         Required arguments:
-            `document` -- The document to parse
-            `facets` -- A list of facets to use when faceting
-            `fields` -- A list of fields that have already been faceted. This
-                        will be extended with any new field names and counts
-                        found in the `document`.
-        
-        For each term in the document, extract the field name and determine
-        if it is one of the `facets` we want.  If so, verify if it already in
-        the `fields` list.  If it is, update the count, otherwise, add it and
-        set the count to 1.
+            `results` -- A list SearchResults to facet
+            `field_facets` -- A list of fields to facet on
         """
-        for term in [(term.term, term.termfreq) for term in document]:
-            match = field_re.search(term[0])
-            if match and match.group(1).lower() in facets:
-                if match.group(1).lower() in fields:
-                    fields[match.group(1).lower()] += [(match.group(2), term[1])]
-                else:
-                    fields[match.group(1).lower()] = [(match.group(2), term[1])]
-        return fields
+        facet_dict = {}
+        
+        for field in field_facets:
+            facet_list = {}
+            
+            for result in results:
+                field_value = getattr(result, field)
+                facet_list[field_value] = facet_list.get(field_value, 0) + 1
+
+            facet_dict[field] = facet_list.items()
+
+        return facet_dict
     
     def _do_date_facets(self, results, date_facets):
         """

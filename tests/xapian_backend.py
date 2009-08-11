@@ -182,7 +182,11 @@ class XapianSearchBackendTestCase(TestCase):
         results = self.sb.search('index', facets=['name'])
         self.assertEqual(results['hits'], 3)
         self.assertEqual(results['facets']['fields']['name'], [('david1', 1), ('david2', 1), ('david3', 1)])
-    
+
+        results = self.sb.search('index', facets=['flag'])
+        self.assertEqual(results['hits'], 3)
+        self.assertEqual(results['facets']['fields']['flag'], [(False, 1), (True, 2)])
+            
     def test_date_facets(self):
         self.sb.update(self.msi, self.sample_objs)
         self.assertEqual(len(self.xapian_search('')), 3)
