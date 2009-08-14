@@ -366,13 +366,20 @@ class SearchBackend(BaseSearchBackend):
             return 0
         return database.get_doccount()
     
-    def more_like_this(self, model_instance):
+    def more_like_this(self, model_instance, additional_query_string=None, 
+                       start_offset=0, end_offset=DEFAULT_MAX_RESULTS, **kwargs):
         """
         Given a model instance, returns a result set of similar documents.
         
         Required arguments:
             `model_instance` -- The model instance to use as a basis for
                                 retrieving similar documents.
+        
+        Optional arguments:
+            `additional_query_string` -- An additional query string to narrow
+                                         results
+            `start_offset` -- The starting offset (default=0)
+            `end_offset` -- The ending offset (default=None)
         
         Returns:
             A dictionary with the following keys:
@@ -402,10 +409,14 @@ class SearchBackend(BaseSearchBackend):
         query = xapian.Query(
             xapian.Query.OP_AND_NOT, [query, self.get_identifier(model_instance)]
         )
+        if additional_query_string:
+            query = xapian.Query(
+                xapian.Query.OP_AND, [query, self._query(database, additional_query_string)]
+            )
         enquire.set_query(query)
         
         results = []
-        matches = enquire.get_mset(0, DEFAULT_MAX_RESULTS)
+        matches = enquire.get_mset(start_offset, end_offset)
         
         for match in matches:
             document = match.get_document()
