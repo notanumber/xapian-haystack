@@ -410,8 +410,11 @@ class SearchBackend(BaseSearchBackend):
             xapian.Query.OP_AND_NOT, [query, self.get_identifier(model_instance)]
         )
         if additional_query_string:
+            additional_query, __unused__ = self._query(
+                database, additional_query_string
+            )
             query = xapian.Query(
-                xapian.Query.OP_AND, [query, self._query(database, additional_query_string)]
+                xapian.Query.OP_AND, query, additional_query
             )
         enquire.set_query(query)
         

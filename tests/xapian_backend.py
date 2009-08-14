@@ -262,6 +262,10 @@ class XapianSearchBackendTestCase(TestCase):
         results = self.sb.more_like_this(self.sample_objs[0])
         self.assertEqual(results['hits'], 2)
         self.assertEqual([result.pk for result in results['results']], [3, 2])
+
+        results = self.sb.more_like_this(self.sample_objs[0], additional_query_string='david3')
+        self.assertEqual(results['hits'], 1)
+        self.assertEqual([result.pk for result in results['results']], [3])
     
     def test_document_count(self):
         self.sb.update(self.msi, self.sample_objs)
