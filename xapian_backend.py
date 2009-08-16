@@ -27,6 +27,7 @@ from django.utils.encoding import smart_unicode, force_unicode
 
 from haystack.backends import BaseSearchBackend, BaseSearchQuery
 from haystack.exceptions import MissingDependency
+from haystack.fields import DateField, DateTimeField, IntegerField, FloatField, BooleanField, MultiValueField
 from haystack.models import SearchResult
 
 try:
@@ -438,7 +439,47 @@ class SearchBackend(BaseSearchBackend):
             },
             'spelling_suggestion': None,
         }
-    
+
+    def build_schema(self, fields):
+        """
+        Build the schema from fields.
+
+        Required arguments:
+            ``fields`` -- A list of fields in the index
+
+        Returns a list of fields in dictionary format ready for inclusion in
+        an indexed meta-data.
+        """
+        content_field_name = ''
+        schema_fields = []
+        column = 0
+        
+        for field_name, field_class in fields.items():
+            if field_class.document is True:
+                content_field_name = field_name
+
+            if field_class.indexed is True:
+                field_data = {
+                    'field_name': field_name,
+                    'type': 'text',
+                    'multi_valued': 'false',
+                    'column': column,
+                }
+                        
+                if isinstance(field_class, (DateField, DateTimeField)):
+                    field_data['type'] = 'date'
+                elif isinstance(field_class, IntegerField):
+                    field_data['type'] = 'long'
+                elif isinstance(field_class, BooleanField):
+                    field_data['type'] = 'boolean'
+                elif isinstance(field_class, MultiValueField):
+                    field_data['multi_valued'] = 'true'
+            
+                schema_fields.append(field_data)
+                column += 1
+        
+        return (content_field_name, schema_fields)
+
     def _do_highlight(self, content, text, tag='em'):
         """
         Highlight `text` in `content` with html `tag`.
@@ -618,8 +659,7 @@ class SearchBackend(BaseSearchBackend):
         Returns an instance of a xapian.Database or xapian.WritableDatabase
         """
         if writable:
-            self.content_field_name, fields = self.site.build_unified_schema()
-            self.schema = self._build_schema(fields)
+            self.content_field_name, self.schema = self.build_schema(self.site.all_searchfields())
             
             database = xapian.WritableDatabase(settings.HAYSTACK_XAPIAN_PATH, xapian.DB_CREATE_OR_OPEN)
             database.set_metadata('schema', pickle.dumps(self.schema, pickle.HIGHEST_PROTOCOL))
@@ -771,25 +811,6 @@ class SearchBackend(BaseSearchBackend):
         enquire.set_docid_order(enquire.ASCENDING)
         
         return enquire
-    
-    def _build_schema(self, fields):
-        """
-        Private method to build a schema.
-        
-        Required arguments:
-            ``fields`` -- A list of fields in the index
-        
-        Returns a list of fields in dictionary format ready for inclusion in
-        an indexed meta-data.
-        """
-        schema = []
-        n = 0
-        for field in fields:
-            if field['indexed'] == 'true':
-                field['column'] = n
-                n += 1
-                schema.append(field)
-        return schema
     
     def _value_column(self, field):
         """
