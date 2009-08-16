@@ -42,8 +42,6 @@ DOCUMENT_ID_TERM_PREFIX = 'Q'
 DOCUMENT_CUSTOM_TERM_PREFIX = 'X'
 DOCUMENT_CT_TERM_PREFIX = DOCUMENT_CUSTOM_TERM_PREFIX + 'CONTENTTYPE'
 
-gap_re = re.compile(r'(?P<type>year|month|day|hour|minute|second+)s?=?(?P<value>\d*)', re.IGNORECASE)
-
 
 class XHValueRangeProcessor(xapian.ValueRangeProcessor):
     def __init__(self, sb):
@@ -525,12 +523,12 @@ class SearchBackend(BaseSearchBackend):
         Required arguments:
             `results` -- A list SearchResults to facet
             `date_facets` -- A dictionary containing facet parameters:
-                {'field': {'start_date': ..., 'end_date': ...: 'gap': '...'}}
-                nb., gap must satisfy the regex:
-                    (?P<type>year|month|day|hour|minute|second+)s?=?(?P<value>\d*)
+                {'field': {'start_date': ..., 'end_date': ...: 'gap_by': '...', 'gap_amount': n}}
+                nb., gap must be one of the following:
+                    year|month|day|hour|minute|second
         
         For each date facet field in `date_facets`, generates a list
-        of date ranges (from `start_date` to `end_date` by `gap`) then
+        of date ranges (from `start_date` to `end_date` by `gap_by`) then
         iterates through `results` and tallies the count for each date_facet.
         
         Returns a dictionary of date facets (fields) containing a list with
@@ -549,9 +547,8 @@ class SearchBackend(BaseSearchBackend):
         facet_dict = {}
         
         for date_facet, facet_params in date_facets.iteritems():
-            match = gap_re.search(facet_params['gap']).groupdict()
-            gap_type = match['type']
-            gap_value = match.get('value', 1)
+            gap_type = facet_params.get('gap_by')
+            gap_value = facet_params.get('gap_amount', 1)
             date_range = facet_params['start_date']
             facet_list = []
             while date_range < facet_params['end_date']:
