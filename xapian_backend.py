@@ -320,8 +320,7 @@ class SearchBackend(BaseSearchBackend):
         matches = enquire.get_mset(start_offset, end_offset)
         
         for match in matches:
-            document = match.get_document()
-            app_label, module_name, pk, model_data = pickle.loads(document.get_data())
+            app_label, module_name, pk, model_data = pickle.loads(match.document.get_data())
             if highlight and (len(query_string) > 0):
                 model_data['highlighted'] = {
                     self.content_field_name: self._do_highlight(
@@ -401,7 +400,7 @@ class SearchBackend(BaseSearchBackend):
         enquire = self._enquire(database, query)
         rset = xapian.RSet()
         for match in enquire.get_mset(0, DEFAULT_MAX_RESULTS):
-            rset.add_document(match.get_docid())
+            rset.add_document(match.docid)
         query = xapian.Query(xapian.Query.OP_OR,
             [expand.term for expand in enquire.get_eset(DEFAULT_MAX_RESULTS, rset)]
         )
