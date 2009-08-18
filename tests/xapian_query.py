@@ -86,6 +86,11 @@ class XapianSearchQueryTestCase(TestCase):
         self.sq.add_filter('content', 'world', use_not=True)
         self.assertEqual(self.sq.build_query(), 'NOT hello NOT world')
     
+    def test_build_query_not_and_in(self):
+        self.sq.add_filter('id__in', [1, 2, 3], use_not=True)
+        self.sq.add_filter('content', 'java')
+        self.assertEqual(self.sq.build_query(), 'java (NOT id:1 AND NOT id:2 AND NOT id:3)')
+    
     def test_build_query_phrase(self):
         self.sq.add_filter('content', 'hello world')
         self.assertEqual(self.sq.build_query(), '"hello world"')
