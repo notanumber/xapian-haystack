@@ -84,6 +84,19 @@ class XHValueRangeProcessor(xapian.ValueRangeProcessor):
                 return field_dict['column'], str(begin), str(end)
 
 
+class XHExpandDecider(xapian.ExpandDecider):
+    def __call__(self, term):
+        """
+        Return True if the term should be used for expanding the search
+        query, False otherwise.
+        
+        Currently, we only want to ignore terms beginning with `DOCUMENT_CT_TERM_PREFIX`
+        """
+        if term.startswith(DOCUMENT_CT_TERM_PREFIX):
+            return False
+        return True
+
+
 class SearchBackend(BaseSearchBackend):
     """
     `SearchBackend` defines the Xapian search backend for use with the Haystack
@@ -236,7 +249,7 @@ class SearchBackend(BaseSearchBackend):
             query, __unused__ = self._query(database, '*')
             enquire = self._enquire(database, query)
             for match in enquire.get_mset(0, DEFAULT_MAX_RESULTS):
-                database.delete_document(match.get_docid())
+                database.delete_document(match.docid)
         else:
             for model in models:
                 database.delete_document(
@@ -402,7 +415,7 @@ class SearchBackend(BaseSearchBackend):
         for match in enquire.get_mset(0, DEFAULT_MAX_RESULTS):
             rset.add_document(match.docid)
         query = xapian.Query(xapian.Query.OP_OR,
-            [expand.term for expand in enquire.get_eset(DEFAULT_MAX_RESULTS, rset)]
+            [expand.term for expand in enquire.get_eset(DEFAULT_MAX_RESULTS, rset, XHExpandDecider())]
         )
         query = xapian.Query(
             xapian.Query.OP_AND_NOT, [query, self.get_identifier(model_instance)]
@@ -415,7 +428,7 @@ class SearchBackend(BaseSearchBackend):
                 xapian.Query.OP_AND, query, additional_query
             )
         enquire.set_query(query)
-        
+
         results = []
         matches = enquire.get_mset(start_offset, end_offset)
         
