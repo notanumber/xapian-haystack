@@ -162,6 +162,9 @@ class XapianSearchBackendTestCase(TestCase):
         
         # NOT operator
         self.assertEqual([result.pk for result in self.sb.search('NOT name:david1')['results']], [2, 3])
+        self.assertEqual([result.pk for result in self.sb.search('index NOT name:david1')['results']], [2, 3])
+        # This is invalid -- NOT can't be first
+        # self.assertEqual([result.pk for result in self.sb.search('NOT name:david3 index')['results']], [1, 2])
 
         # Ranges
         self.assertEqual([result.pk for result in self.sb.search('index name:david2..david3')['results']], [2, 3])

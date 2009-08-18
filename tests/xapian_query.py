@@ -76,6 +76,16 @@ class XapianSearchQueryTestCase(TestCase):
         self.sq.add_filter('content', 'world', use_not=True)
         self.assertEqual(self.sq.build_query(), 'why OR hello NOT world')
 
+    def test_build_query_not_first_single(self):
+        self.sq.add_filter('content', 'hello', use_not=True)
+        self.sq.add_filter('content', 'world')
+        self.assertEqual(self.sq.build_query(), 'world NOT hello')
+
+    def test_build_query_not_first_multiple(self):
+        self.sq.add_filter('content', 'hello', use_not=True)
+        self.sq.add_filter('content', 'world', use_not=True)
+        self.assertEqual(self.sq.build_query(), 'NOT hello NOT world')
+    
     def test_build_query_phrase(self):
         self.sq.add_filter('content', 'hello world')
         self.assertEqual(self.sq.build_query(), '"hello world"')

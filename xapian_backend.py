@@ -718,7 +718,16 @@ class SearchBackend(BaseSearchBackend):
         if query_string == '*':
             query = xapian.Query('') # Make '*' match everything
         else:
-            flags = self._flags()
+            flags = xapian.QueryParser.FLAG_PARTIAL \
+                  | xapian.QueryParser.FLAG_PHRASE \
+                  | xapian.QueryParser.FLAG_BOOLEAN \
+                  | xapian.QueryParser.FLAG_LOVEHATE \
+                  | xapian.QueryParser.FLAG_WILDCARD
+            if query_string.upper().startswith('NOT'):
+                flags = flags | xapian.QueryParser.FLAG_PURE_NOT
+            if getattr(settings, 'HAYSTACK_INCLUDE_SPELLING', False) is True:
+                flags = flags | xapian.QueryParser.FLAG_SPELLING_CORRECTION
+
             qp = self._query_parser(database)
             vrp = XHValueRangeProcessor(self)
             qp.add_valuerangeprocessor(vrp)
@@ -768,20 +777,6 @@ class SearchBackend(BaseSearchBackend):
             sorter.add(self._value_column(sort_field), reverse)
         
         return sorter
-    
-    def _flags(self):
-        """
-        Returns the commonly used Xapian.QueryParser flags
-        """
-        flags = xapian.QueryParser.FLAG_PARTIAL \
-              | xapian.QueryParser.FLAG_PHRASE \
-              | xapian.QueryParser.FLAG_BOOLEAN \
-              | xapian.QueryParser.FLAG_LOVEHATE \
-              | xapian.QueryParser.FLAG_WILDCARD \
-              | xapian.QueryParser.FLAG_PURE_NOT
-        if getattr(settings, 'HAYSTACK_INCLUDE_SPELLING', False) is True:
-            flags = flags | xapian.QueryParser.FLAG_SPELLING_CORRECTION
-        return flags
     
     def _query_parser(self, database):
         """
@@ -870,6 +865,8 @@ class SearchQuery(BaseSearchQuery):
         else:
             query_chunks = []
             
+            self._move_not_filters()
+            
             for the_filter in self.query_filters:
                 if the_filter.is_and():
                     query_chunks.append('AND')
@@ -927,7 +924,7 @@ class SearchQuery(BaseSearchQuery):
         
         else:
             final_query = query
-        
+
         return final_query
     
     def run(self):
@@ -983,7 +980,28 @@ class SearchQuery(BaseSearchQuery):
         
         if self.end_offset is not None:
             kwargs['end_offset'] = self.end_offset - self.start_offset
-        
+
         results = self.backend.more_like_this(self._mlt_instance, additional_query_string, **kwargs)
         self._results = results.get('results', [])
         self._hit_count = results.get('hits', 0)
+
+    def _move_not_filters(self):
+        """
+        Private method that will move any NOT expressions to the end of the 
+        `query_filters` list if there are more than one.  This is because we 
+        don't want to use FLAG_PURE_NOT when mixing with other expressions and 
+        NOT can't be first when there are multiple expressions.
+        
+        Further explanation: http://xapian.org/docs/queryparser.html
+        """
+        if self.query_filters[0].is_not() and len(self.query_filters) > 1:
+            not_filter_list = []
+            n = 0
+            for m in range(0, len(self.query_filters)):
+                if self.query_filters[n].is_not():
+                    not_filter_list.append(self.query_filters[n])
+                    del self.query_filters[n]
+                else:
+                    n += 1
+            self.query_filters.extend(not_filter_list)
+        
