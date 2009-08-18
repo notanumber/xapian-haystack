@@ -718,27 +718,18 @@ class SearchBackend(BaseSearchBackend):
         if query_string == '*':
             query = xapian.Query('') # Make '*' match everything
         else:
-            flags = xapian.QueryParser.FLAG_PARTIAL \
-                  | xapian.QueryParser.FLAG_PHRASE \
-                  | xapian.QueryParser.FLAG_BOOLEAN \
-                  | xapian.QueryParser.FLAG_LOVEHATE
-            if '*' in query_string:
-                flags = flags | xapian.QueryParser.FLAG_WILDCARD
-            if query_string.upper().startswith('NOT'):
-                flags = flags | xapian.QueryParser.FLAG_PURE_NOT
-            if getattr(settings, 'HAYSTACK_INCLUDE_SPELLING', False) is True:
-                flags = flags | xapian.QueryParser.FLAG_SPELLING_CORRECTION
-
             qp = self._query_parser(database)
             vrp = XHValueRangeProcessor(self)
             qp.add_valuerangeprocessor(vrp)
-            query = qp.parse_query(query_string, flags)
+            query = qp.parse_query(query_string, self._flags(query_string))
             if getattr(settings, 'HAYSTACK_INCLUDE_SPELLING', False) is True:
                 spelling_suggestion = qp.get_corrected_query_string()
         
         if narrow_queries:
             subqueries = [
-                qp.parse_query(narrow_query, flags) for narrow_query in narrow_queries
+                qp.parse_query(
+                    narrow_query, self._flags(narrow_query)
+                ) for narrow_query in narrow_queries
             ]
             query = xapian.Query(
                 xapian.Query.OP_FILTER,
@@ -757,9 +748,31 @@ class SearchBackend(BaseSearchBackend):
         
         return query, spelling_suggestion
     
+    def _flags(self, query_string):
+        """
+        Private method that returns an appropriate xapian.QueryParser flags
+        set given a `query_string`.
+        
+        Required Arguments:
+            `query_string` -- The query string to be parsed.
+        
+        Returns a xapian.QueryParser flag set (an integer)
+        """
+        flags = xapian.QueryParser.FLAG_PARTIAL \
+              | xapian.QueryParser.FLAG_PHRASE \
+              | xapian.QueryParser.FLAG_BOOLEAN \
+              | xapian.QueryParser.FLAG_LOVEHATE
+        if '*' in query_string:
+            flags = flags | xapian.QueryParser.FLAG_WILDCARD
+        if query_string.upper().startswith('NOT'):
+            flags = flags | xapian.QueryParser.FLAG_PURE_NOT
+        if getattr(settings, 'HAYSTACK_INCLUDE_SPELLING', False) is True:
+            flags = flags | xapian.QueryParser.FLAG_SPELLING_CORRECTION
+        return flags
+
     def _sorter(self, sort_by):
         """
-        Private methos that takes a list of fields to sort by and returns a
+        Private method that takes a list of fields to sort by and returns a
         xapian.MultiValueSorter
         
         Required Arguments:
