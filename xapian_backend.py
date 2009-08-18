@@ -721,8 +721,9 @@ class SearchBackend(BaseSearchBackend):
             flags = xapian.QueryParser.FLAG_PARTIAL \
                   | xapian.QueryParser.FLAG_PHRASE \
                   | xapian.QueryParser.FLAG_BOOLEAN \
-                  | xapian.QueryParser.FLAG_LOVEHATE \
-                  | xapian.QueryParser.FLAG_WILDCARD
+                  | xapian.QueryParser.FLAG_LOVEHATE
+            if '*' in query_string:
+                flags = flags | xapian.QueryParser.FLAG_WILDCARD
             if query_string.upper().startswith('NOT'):
                 flags = flags | xapian.QueryParser.FLAG_PURE_NOT
             if getattr(settings, 'HAYSTACK_INCLUDE_SPELLING', False) is True:
