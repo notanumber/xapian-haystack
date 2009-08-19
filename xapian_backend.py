@@ -879,8 +879,6 @@ class SearchQuery(BaseSearchQuery):
         else:
             query_chunks = []
             
-            self._move_not_filters()
-            
             for the_filter in self.query_filters:
                 if the_filter.is_and():
                     query_chunks.append('AND')
@@ -921,10 +919,10 @@ class SearchQuery(BaseSearchQuery):
                         in_options = []
                         
                         for possible_value in value:
-                            query_chunks.append("AND NOT %s:%s" % (the_filter.field, possible_value))
+                            in_options.append("NOT %s:%s" % (the_filter.field, possible_value))
                         
-                        # query_chunks.append("AND")
-                        # query_chunks.append("(%s)" % " ".join(in_options))
+                        query_chunks.append("AND")
+                        query_chunks.append("(%s)" % " ".join(in_options))
                     else:
                         in_options = []
                         
@@ -1006,24 +1004,4 @@ class SearchQuery(BaseSearchQuery):
         results = self.backend.more_like_this(self._mlt_instance, additional_query_string, **kwargs)
         self._results = results.get('results', [])
         self._hit_count = results.get('hits', 0)
-    
-    def _move_not_filters(self):
-        """
-        Private method that will move any NOT expressions to the end of the
-        `query_filters` list if there are more than one.  This is because we
-        don't want to use FLAG_PURE_NOT when mixing with other expressions and
-        NOT can't be first when there are multiple expressions.
-        
-        Further explanation: http://xapian.org/docs/queryparser.html
-        """
-        if self.query_filters[0].is_not() and len(self.query_filters) > 1:
-            not_filter_list = []
-            n = 0
-            for m in range(0, len(self.query_filters)):
-                if self.query_filters[n].is_not():
-                    not_filter_list.append(self.query_filters[n])
-                    del self.query_filters[n]
-                else:
-                    n += 1
-            self.query_filters.extend(not_filter_list)
         
