@@ -161,11 +161,11 @@ class XapianSearchBackendTestCase(TestCase):
         self.assertEqual([result.pk for result in self.sb.search('*')['results']], [1, 2, 3])
         
         # NOT operator
-        self.assertEqual([result.pk for result in self.sb.search('NOT name:david1')['results']], [2, 3])
-        self.assertEqual([result.pk for result in self.sb.search('index NOT name:david1')['results']], [2, 3])
-        self.assertEqual([result.pk for result in self.sb.search('index NOT name:david1 NOT name:david2')['results']], [3])
-        # This is invalid -- NOT can't be first, so should return no results
-        self.assertEqual(self.sb.search('NOT name:david3 index')['hits'], 0)
+        self.assertEqual([result.pk for result in self.sb.search('(NOT name:david1)')['results']], [2, 3])
+        self.assertEqual([result.pk for result in self.sb.search('(NOT name:david1) AND index')['results']], [2, 3])
+        self.assertEqual([result.pk for result in self.sb.search('index AND (NOT name:david1)')['results']], [2, 3])
+        self.assertEqual([result.pk for result in self.sb.search('index AND (NOT name:david1 NOT name:david2)')['results']], [3])
+        self.assertEqual([result.pk for result in self.sb.search('(NOT name:david1 NOT name:david2)')['results']], [3])
 
         # Ranges
         self.assertEqual([result.pk for result in self.sb.search('index name:david2..david3')['results']], [2, 3])

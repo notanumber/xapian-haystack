@@ -377,7 +377,7 @@ class SearchBackend(BaseSearchBackend):
             return 0
         return database.get_doccount()
     
-    def more_like_this(self, model_instance, additional_query_string=None, 
+    def more_like_this(self, model_instance, additional_query_string=None,
                        start_offset=0, end_offset=DEFAULT_MAX_RESULTS, **kwargs):
         """
         Given a model instance, returns a result set of similar documents.
@@ -428,7 +428,7 @@ class SearchBackend(BaseSearchBackend):
                 xapian.Query.OP_AND, query, additional_query
             )
         enquire.set_query(query)
-
+        
         results = []
         matches = enquire.get_mset(start_offset, end_offset)
         
@@ -449,14 +449,14 @@ class SearchBackend(BaseSearchBackend):
             },
             'spelling_suggestion': None,
         }
-
+    
     def build_schema(self, fields):
         """
         Build the schema from fields.
-
+        
         Required arguments:
             ``fields`` -- A list of fields in the index
-
+        
         Returns a list of fields in dictionary format ready for inclusion in
         an indexed meta-data.
         """
@@ -467,7 +467,7 @@ class SearchBackend(BaseSearchBackend):
         for field_name, field_class in fields.items():
             if field_class.document is True:
                 content_field_name = field_name
-
+            
             if field_class.indexed is True:
                 field_data = {
                     'field_name': field_name,
@@ -475,7 +475,7 @@ class SearchBackend(BaseSearchBackend):
                     'multi_valued': 'false',
                     'column': column,
                 }
-                        
+                
                 if isinstance(field_class, (DateField, DateTimeField)):
                     field_data['type'] = 'date'
                 elif isinstance(field_class, IntegerField):
@@ -484,12 +484,12 @@ class SearchBackend(BaseSearchBackend):
                     field_data['type'] = 'boolean'
                 elif isinstance(field_class, MultiValueField):
                     field_data['multi_valued'] = 'true'
-            
+                
                 schema_fields.append(field_data)
                 column += 1
         
         return (content_field_name, schema_fields)
-
+    
     def _do_highlight(self, content, text, tag='em'):
         """
         Highlight `text` in `content` with html `tag`.
@@ -523,9 +523,9 @@ class SearchBackend(BaseSearchBackend):
             for result in results:
                 field_value = getattr(result, field)
                 facet_list[field_value] = facet_list.get(field_value, 0) + 1
-
+            
             facet_dict[field] = facet_list.items()
-
+        
         return facet_dict
     
     def _do_date_facets(self, results, date_facets):
@@ -764,12 +764,12 @@ class SearchBackend(BaseSearchBackend):
               | xapian.QueryParser.FLAG_LOVEHATE
         if '*' in query_string:
             flags = flags | xapian.QueryParser.FLAG_WILDCARD
-        if query_string.upper().startswith('NOT'):
+        if 'NOT' in query_string.upper():
             flags = flags | xapian.QueryParser.FLAG_PURE_NOT
         if getattr(settings, 'HAYSTACK_INCLUDE_SPELLING', False) is True:
             flags = flags | xapian.QueryParser.FLAG_SPELLING_CORRECTION
         return flags
-
+    
     def _sorter(self, sort_by):
         """
         Private method that takes a list of fields to sort by and returns a
@@ -879,8 +879,6 @@ class SearchQuery(BaseSearchQuery):
         else:
             query_chunks = []
             
-            self._move_not_filters()
-            
             for the_filter in self.query_filters:
                 if the_filter.is_and():
                     query_chunks.append('AND')
@@ -919,19 +917,20 @@ class SearchQuery(BaseSearchQuery):
                         query_chunks.append(filter_types[the_filter.filter_type] % (the_filter.field, value))
                     elif the_filter.is_not():
                         in_options = []
-
+                        
                         for possible_value in value:
                             in_options.append("NOT %s:%s" % (the_filter.field, possible_value))
-                         
-                        query_chunks.append("(%s)" % " AND ".join(in_options))
+                        
+                        query_chunks.append("AND")
+                        query_chunks.append("(%s)" % " ".join(in_options))
                     else:
                         in_options = []
-
+                        
                         for possible_value in value:
                                 in_options.append("%s:%s" % (the_filter.field, possible_value))
-                         
+                        
                         query_chunks.append("(%s)" % " OR ".join(in_options))
-
+            
             if query_chunks[0] in ('AND', 'OR'):
                 # Pull off an undesirable leading "AND" or "OR".
                 del(query_chunks[0])
@@ -945,7 +944,7 @@ class SearchQuery(BaseSearchQuery):
         
         else:
             final_query = query
-
+        
         return final_query
     
     def run(self):
@@ -1001,28 +1000,8 @@ class SearchQuery(BaseSearchQuery):
         
         if self.end_offset is not None:
             kwargs['end_offset'] = self.end_offset - self.start_offset
-
+        
         results = self.backend.more_like_this(self._mlt_instance, additional_query_string, **kwargs)
         self._results = results.get('results', [])
         self._hit_count = results.get('hits', 0)
-
-    def _move_not_filters(self):
-        """
-        Private method that will move any NOT expressions to the end of the 
-        `query_filters` list if there are more than one.  This is because we 
-        don't want to use FLAG_PURE_NOT when mixing with other expressions and 
-        NOT can't be first when there are multiple expressions.
-        
-        Further explanation: http://xapian.org/docs/queryparser.html
-        """
-        if self.query_filters[0].is_not() and len(self.query_filters) > 1:
-            not_filter_list = []
-            n = 0
-            for m in range(0, len(self.query_filters)):
-                if self.query_filters[n].is_not():
-                    not_filter_list.append(self.query_filters[n])
-                    del self.query_filters[n]
-                else:
-                    n += 1
-            self.query_filters.extend(not_filter_list)
         

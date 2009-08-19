@@ -79,7 +79,7 @@ class XapianSearchQueryTestCase(TestCase):
     def test_build_query_not_first_single(self):
         self.sq.add_filter('content', 'hello', use_not=True)
         self.sq.add_filter('content', 'world')
-        self.assertEqual(self.sq.build_query(), 'world NOT hello')
+        self.assertEqual(self.sq.build_query(), 'NOT hello AND world')
 
     def test_build_query_not_first_multiple(self):
         self.sq.add_filter('content', 'hello', use_not=True)
@@ -89,7 +89,7 @@ class XapianSearchQueryTestCase(TestCase):
     def test_build_query_not_and_in(self):
         self.sq.add_filter('id__in', [1, 2, 3], use_not=True)
         self.sq.add_filter('content', 'java')
-        self.assertEqual(self.sq.build_query(), 'java (NOT id:1 AND NOT id:2 AND NOT id:3)')
+        self.assertEqual(self.sq.build_query(), '(NOT id:1 NOT id:2 NOT id:3) AND java')
     
     def test_build_query_phrase(self):
         self.sq.add_filter('content', 'hello world')
