@@ -76,21 +76,6 @@ class XapianSearchQueryTestCase(TestCase):
         self.sq.add_filter('content', 'world', use_not=True)
         self.assertEqual(self.sq.build_query(), 'why OR hello NOT world')
 
-    def test_build_query_not_first_single(self):
-        self.sq.add_filter('content', 'hello', use_not=True)
-        self.sq.add_filter('content', 'world')
-        self.assertEqual(self.sq.build_query(), 'NOT hello AND world')
-
-    def test_build_query_not_first_multiple(self):
-        self.sq.add_filter('content', 'hello', use_not=True)
-        self.sq.add_filter('content', 'world', use_not=True)
-        self.assertEqual(self.sq.build_query(), 'NOT hello NOT world')
-    
-    def test_build_query_not_and_in(self):
-        self.sq.add_filter('id__in', [1, 2, 3], use_not=True)
-        self.sq.add_filter('content', 'java')
-        self.assertEqual(self.sq.build_query(), '(NOT id:1 NOT id:2 NOT id:3) AND java')
-    
     def test_build_query_phrase(self):
         self.sq.add_filter('content', 'hello world')
         self.assertEqual(self.sq.build_query(), '"hello world"')
@@ -103,6 +88,15 @@ class XapianSearchQueryTestCase(TestCase):
         self.sq.add_filter('title__gte', 'B')
         self.sq.add_filter('id__in', [1, 2, 3])
         self.assertEqual(self.sq.build_query(), 'why AND pub_date:..20090210015900 AND NOT author:..david AND NOT created:20090212121300..* AND title:B..* AND (id:1 OR id:2 OR id:3)')
+
+    def test_build_query_multiple_exclude_types(self):
+        self.sq.add_filter('content', 'why', use_not=True)
+        # self.sq.add_filter('pub_date__lte', datetime.datetime(2009, 2, 10, 1, 59))
+        # self.sq.add_filter('author__gt', 'david')
+        # self.sq.add_filter('created__lt', datetime.datetime(2009, 2, 12, 12, 13))
+        # self.sq.add_filter('title__gte', 'B')
+        self.sq.add_filter('id__in', [1, 2, 3], use_not=True)
+        self.assertEqual(self.sq.build_query(), 'NOT why NOT id:1 NOT id:2 NOT id:3')
 
     def test_build_query_wildcard_filter_types(self):
         self.sq.add_filter('content', 'why')

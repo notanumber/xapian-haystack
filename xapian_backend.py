@@ -883,7 +883,7 @@ class SearchQuery(BaseSearchQuery):
                 if the_filter.is_and():
                     query_chunks.append('AND')
                 
-                if the_filter.is_not() and the_filter.filter_type != 'in':
+                if the_filter.is_not():
                     query_chunks.append('NOT')
                 
                 if the_filter.is_or():
@@ -919,17 +919,16 @@ class SearchQuery(BaseSearchQuery):
                         in_options = []
                         
                         for possible_value in value:
-                            in_options.append("NOT %s:%s" % (the_filter.field, possible_value))
+                            in_options.append('%s:%s' % (the_filter.field, possible_value))
                         
-                        query_chunks.append("AND")
-                        query_chunks.append("(%s)" % " ".join(in_options))
+                        query_chunks.append('%s' % ' NOT '.join(in_options))
                     else:
                         in_options = []
                         
                         for possible_value in value:
-                                in_options.append("%s:%s" % (the_filter.field, possible_value))
+                                in_options.append('%s:%s' % (the_filter.field, possible_value))
                         
-                        query_chunks.append("(%s)" % " OR ".join(in_options))
+                        query_chunks.append('(%s)' % ' OR '.join(in_options))
             
             if query_chunks[0] in ('AND', 'OR'):
                 # Pull off an undesirable leading "AND" or "OR".
