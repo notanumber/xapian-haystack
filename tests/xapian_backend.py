@@ -337,3 +337,16 @@ class XapianSearchBackendTestCase(TestCase):
         self.assertEqual(self.sb._marshal_value(datetime.datetime(2009, 5, 9, 0, 0)), u'20090509000000')
         self.assertEqual(self.sb._marshal_value(datetime.datetime(1899, 5, 18, 0, 0)), u'18990518000000')
         self.assertEqual(self.sb._marshal_value(datetime.datetime(2009, 5, 18, 1, 16, 30, 250)), u'20090518011630000250')
+
+    def test_build_schema(self):
+        (content_field_name, fields) = self.sb.build_schema(self.site.all_searchfields())
+        self.assertEqual(content_field_name, 'text')
+        self.assertEqual(len(fields), 6)
+        self.assertEqual(fields, [
+            {'column': 0, 'type': 'text', 'field_name': 'name', 'multi_valued': 'false'},
+            {'column': 1, 'type': 'text', 'field_name': 'text', 'multi_valued': 'false'},
+            {'column': 2, 'type': 'text', 'field_name': 'popularity', 'multi_valued': 'false'},
+            {'column': 3, 'type': 'long', 'field_name': 'value', 'multi_valued': 'false'},
+            {'column': 4, 'type': 'boolean', 'field_name': 'flag', 'multi_valued': 'false'},
+            {'column': 5, 'type': 'date', 'field_name': 'pub_date', 'multi_valued': 'false'},
+        ])
