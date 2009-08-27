@@ -163,8 +163,8 @@ class XapianSearchBackendTestCase(TestCase):
         # NOT operator
         self.assertEqual([result.pk for result in self.sb.search('NOT name:david1')['results']], [2, 3])
         self.assertEqual([result.pk for result in self.sb.search('NOT name:david1 AND index')['results']], [2, 3])
-        self.assertEqual([result.pk for result in self.sb.search('index AND NOT name:david1')['results']], [2, 3])
-        self.assertEqual([result.pk for result in self.sb.search('index AND NOT name:david1 AND NOT name:david2')['results']], [3])
+        self.assertEqual([result.pk for result in self.sb.search('index NOT name:david1')['results']], [2, 3])
+        self.assertEqual([result.pk for result in self.sb.search('index NOT name:david1 NOT name:david2')['results']], [3])
         self.assertEqual([result.pk for result in self.sb.search('NOT name:david1 NOT name:david2')['results']], [3])
 
         # Ranges
