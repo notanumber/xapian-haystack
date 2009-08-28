@@ -91,12 +91,12 @@ class XapianSearchQueryTestCase(TestCase):
 
     def test_build_query_multiple_exclude_types(self):
         self.sq.add_filter('content', 'why', use_not=True)
-        # self.sq.add_filter('pub_date__lte', datetime.datetime(2009, 2, 10, 1, 59))
-        # self.sq.add_filter('author__gt', 'david')
-        # self.sq.add_filter('created__lt', datetime.datetime(2009, 2, 12, 12, 13))
-        # self.sq.add_filter('title__gte', 'B')
+        self.sq.add_filter('pub_date__lte', datetime.datetime(2009, 2, 10, 1, 59), use_not=True)
+        self.sq.add_filter('author__gt', 'david', use_not=True)
+        self.sq.add_filter('created__lt', datetime.datetime(2009, 2, 12, 12, 13), use_not=True)
+        self.sq.add_filter('title__gte', 'B', use_not=True)
         self.sq.add_filter('id__in', [1, 2, 3], use_not=True)
-        self.assertEqual(self.sq.build_query(), 'NOT why NOT id:1 NOT id:2 NOT id:3')
+        self.assertEqual(self.sq.build_query(), 'NOT why AND NOT pub_date:..20090210015900 AND author:..david AND created:20090212121300..* AND NOT title:B..* AND NOT id:1 NOT id:2 NOT id:3')
 
     def test_build_query_wildcard_filter_types(self):
         self.sq.add_filter('content', 'why')

@@ -882,13 +882,13 @@ class SearchQuery(BaseSearchQuery):
             for the_filter in self.query_filters:
                 if the_filter.is_and():
                     query_chunks.append('AND')
-                
-                if the_filter.is_not():
-                    query_chunks.append('NOT')
-                
+
                 if the_filter.is_or():
                     query_chunks.append('OR')
-                
+
+                if the_filter.is_not() and the_filter.field == 'content':
+                    query_chunks.append('NOT')
+
                 value = the_filter.value
                 
                 if not isinstance(value, (list, tuple)):
@@ -904,37 +904,44 @@ class SearchQuery(BaseSearchQuery):
                 if the_filter.field == 'content':
                     query_chunks.append(value)
                 else:
-                    filter_types = {
-                        'exact': "%s:%s",
-                        'gte': "%s:%s..*",
-                        'gt': "NOT %s:..%s",
-                        'lte': "%s:..%s",
-                        'lt': "NOT %s:%s..*",
-                        'startswith': "%s:%s*",
-                    }
-                    
+                    if the_filter.is_not():
+                        query_chunks.append('AND')
+                        filter_types = {
+                            'exact': 'NOT %s:%s',
+                            'gte': 'NOT %s:%s..*',
+                            'gt': '%s:..%s',
+                            'lte': 'NOT %s:..%s',
+                            'lt': '%s:%s..*',
+                            'startswith': 'NOT %s:%s*',
+                        }
+                    else:
+                        filter_types = {
+                            'exact': '%s:%s',
+                            'gte': '%s:%s..*',
+                            'gt': 'NOT %s:..%s',
+                            'lte': '%s:..%s',
+                            'lt': 'NOT %s:%s..*',
+                            'startswith': '%s:%s*',
+                        }
+
                     if the_filter.filter_type != 'in':
                         query_chunks.append(filter_types[the_filter.filter_type] % (the_filter.field, value))
-                    elif the_filter.is_not():
-                        in_options = []
-                        
-                        for possible_value in value:
-                            in_options.append('%s:%s' % (the_filter.field, possible_value))
-                        
-                        query_chunks.append('%s' % ' NOT '.join(in_options))
                     else:
                         in_options = []
-                        
-                        for possible_value in value:
+                        if the_filter.is_not():                        
+                            for possible_value in value:
                                 in_options.append('%s:%s' % (the_filter.field, possible_value))
-                        
-                        query_chunks.append('(%s)' % ' OR '.join(in_options))
+                            query_chunks.append('NOT %s' % ' NOT '.join(in_options))
+                        else:
+                            for possible_value in value:
+                                in_options.append('%s:%s' % (the_filter.field, possible_value))
+                            query_chunks.append('(%s)' % ' OR '.join(in_options))
             
             if query_chunks[0] in ('AND', 'OR'):
                 # Pull off an undesirable leading "AND" or "OR".
                 del(query_chunks[0])
             
-            query = " ".join(query_chunks)
+            query = ' '.join(query_chunks)
         
         if len(self.models):
             models = ['django_ct:%s.%s' % (model._meta.app_label, model._meta.module_name) for model in self.models]
