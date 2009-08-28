@@ -19,6 +19,7 @@ import cPickle as pickle
 import os
 import re
 import shutil
+import sys
 import warnings
 
 from django.conf import settings
@@ -67,20 +68,27 @@ class XHValueRangeProcessor(xapian.ValueRangeProcessor):
                 if not begin:
                     if field_dict['type'] == 'text':
                         begin = u'a' # TODO: A better way of getting a min text value?
-                    elif field_dict['type'] == 'long' or field_dict['type'] == 'float':
+                    elif field_dict['type'] == 'long':
+                        begin = -sys.maxint - 1
+                    elif field_dict['type'] == 'float':
                         begin = float('-inf')
                     elif field_dict['type'] == 'date' or field_dict['type'] == 'datetime':
                         begin = u'00010101000000'
                 elif end == '*':
                     if field_dict['type'] == 'text':
                         end = u'z' * 100 # TODO: A better way of getting a max text value?
-                    elif field_dict['type'] == 'long' or field_dict['type'] == 'float':
+                    elif field_dict['type'] == 'long':
+                        end = sys.maxint
+                    elif field_dict['type'] == 'float':
                         end = float('inf')
                     elif field_dict['type'] == 'date' or field_dict['type'] == 'datetime':
                         end = u'99990101000000'
-                if field_dict['type'] == 'long' or field_dict['type'] == 'float':
-                    begin = xapian.sortable_serialise(float(begin))
-                    end = xapian.sortable_serialise(float(end))
+                if field_dict['type'] == 'float':
+                    begin = self.sb._marshal_value(float(begin))
+                    end = self.sb._marshal_value(float(end))
+                elif field_dict['type'] == 'long':
+                    begin = self.sb._marshal_value(long(begin))
+                    end = self.sb._marshal_value(long(end))
                 return field_dict['column'], str(begin), str(end)
 
 
@@ -651,8 +659,10 @@ class SearchBackend(BaseSearchBackend):
                 value = u't'
             else:
                 value = u'f'
-        elif isinstance(value, (int, long, float)):
+        elif isinstance(value, float):
             value = xapian.sortable_serialise(value)
+        elif isinstance(value, (int, long)):
+            value = u'%012d' % value
         else:
             value = force_unicode(value)
         return value
