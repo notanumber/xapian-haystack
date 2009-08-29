@@ -488,6 +488,8 @@ class SearchBackend(BaseSearchBackend):
                     field_data['type'] = 'date'
                 elif isinstance(field_class, IntegerField):
                     field_data['type'] = 'long'
+                elif isinstance(field_class, FloatField):
+                    field_data['type'] = 'float'
                 elif isinstance(field_class, BooleanField):
                     field_data['type'] = 'boolean'
                 elif isinstance(field_class, MultiValueField):

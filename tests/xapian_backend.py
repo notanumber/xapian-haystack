@@ -177,6 +177,8 @@ class XapianSearchBackendTestCase(TestCase):
         self.assertEqual([result.pk for result in self.sb.search('index value:10..15')['results']], [2, 3])
         self.assertEqual([result.pk for result in self.sb.search('index value:..10')['results']], [1, 2])
         self.assertEqual([result.pk for result in self.sb.search('index value:10..*')['results']], [2, 3])
+        self.assertEqual([result.pk for result in self.sb.search('index popularity:..100.0')['results']], [2])
+        self.assertEqual([result.pk for result in self.sb.search('index popularity:100.0..*')['results']], [1, 3])
 
     def test_field_facets(self):
         self.sb.update(self.msi, self.sample_objs)
@@ -345,7 +347,7 @@ class XapianSearchBackendTestCase(TestCase):
         self.assertEqual(fields, [
             {'column': 0, 'type': 'text', 'field_name': 'name', 'multi_valued': 'false'},
             {'column': 1, 'type': 'text', 'field_name': 'text', 'multi_valued': 'false'},
-            {'column': 2, 'type': 'text', 'field_name': 'popularity', 'multi_valued': 'false'},
+            {'column': 2, 'type': 'float', 'field_name': 'popularity', 'multi_valued': 'false'},
             {'column': 3, 'type': 'long', 'field_name': 'value', 'multi_valued': 'false'},
             {'column': 4, 'type': 'boolean', 'field_name': 'flag', 'multi_valued': 'false'},
             {'column': 5, 'type': 'date', 'field_name': 'pub_date', 'multi_valued': 'false'},
