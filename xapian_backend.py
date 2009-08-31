@@ -513,8 +513,9 @@ class SearchBackend(BaseSearchBackend):
             `text` -- The text to be highlighted
         """
         for term in [term.replace('*', '') for term in text.split()]:
-            term_re = re.compile(re.escape(term), re.IGNORECASE)
-            content = term_re.sub('<%s>%s</%s>' % (tag, term, tag), content)
+            if term not in ('AND','OR'):
+                term_re = re.compile(re.escape(term), re.IGNORECASE)
+                content = term_re.sub('<%s>%s</%s>' % (tag, term, tag), content)
         return content
     
     def _do_field_facets(self, results, field_facets):
