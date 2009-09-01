@@ -513,7 +513,7 @@ class SearchBackend(BaseSearchBackend):
             `text` -- The text to be highlighted
         """
         for term in [term.replace('*', '') for term in text.split()]:
-            if term not in ('AND','OR'):
+            if term not in self.RESERVED_WORDS:
                 term_re = re.compile(re.escape(term), re.IGNORECASE)
                 content = term_re.sub('<%s>%s</%s>' % (tag, term, tag), content)
         return content
