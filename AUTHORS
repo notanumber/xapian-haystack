@@ -10,3 +10,4 @@ Thanks to:
       resources to complete this project as well as Q&A.
     * Supreet Sethi for suggestions regarding morphologic date comparisons and
       for fixing NOT query expressions.
+    * Joshua Jonah for changes to highlighting logic to avoid reserved words.
