@@ -716,6 +716,7 @@ class SearchBackend(BaseSearchBackend):
         Private method that takes a query string and returns a xapian.Query.
         
         Required arguments:
+            `database` -- The database to query
             `query_string` -- The query string to parse
         
         Optional arguments:
