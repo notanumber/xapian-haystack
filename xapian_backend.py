@@ -202,18 +202,18 @@ class SearchBackend(BaseSearchBackend):
                 document = xapian.Document()
                 term_generator = self._term_generator(database, document)
                 document_id = self.get_identifier(obj)
-                model_data = index.prepare(obj)
+                data = index.prepare(obj)
                 
                 for field in self.schema:
-                    if field['field_name'] in model_data.keys():
+                    if field['field_name'] in data.keys():
                         prefix = DOCUMENT_CUSTOM_TERM_PREFIX + field['field_name'].upper()
-                        value = model_data[field['field_name']]
+                        value = data[field['field_name']]
                         term_generator.index_text(force_unicode(value))
                         term_generator.index_text(force_unicode(value), 1, prefix)
                         document.add_value(field['column'], self._marshal_value(value))
                 
                 document.set_data(pickle.dumps(
-                    (obj._meta.app_label, obj._meta.module_name, obj.pk, model_data),
+                    (obj._meta.app_label, obj._meta.module_name, obj.pk, data),
                     pickle.HIGHEST_PROTOCOL
                 ))
                 document.add_term(document_id)
@@ -522,6 +522,9 @@ class SearchBackend(BaseSearchBackend):
         """
         Private method that facets a document by field name.
         
+        Fields of type MultiValueField will be faceted on each item in the 
+        (containing) list.
+        
         Required arguments:
             `results` -- A list SearchResults to facet
             `field_facets` -- A list of fields to facet on
@@ -533,7 +536,11 @@ class SearchBackend(BaseSearchBackend):
             
             for result in results:
                 field_value = getattr(result, field)
-                facet_list[field_value] = facet_list.get(field_value, 0) + 1
+                if self._multi_value_field(field):
+                    for item in field_value: # Facet each item in a MultiValueField
+                        facet_list[item] = facet_list.get(item, 0) + 1
+                else:
+                    facet_list[field_value] = facet_list.get(field_value, 0) + 1
             
             facet_dict[field] = facet_list.items()
         
@@ -858,6 +865,21 @@ class SearchBackend(BaseSearchBackend):
             if field_dict['field_name'] == field:
                 return field_dict['column']
         return 0
+
+    def _multi_value_field(self, field):
+        """
+        Private method that returns `True` if a field is multi-valued, else
+        `False`.
+        
+        Required arguemnts:
+            `field` -- The field to lookup
+        
+        Returns a boolean value indicating whether the field is multi-valued.
+        """
+        for field_dict in self.schema:
+            if field_dict['field_name'] == field:
+                return field_dict['multi_valued'] == 'true'
+        return False
 
 
 class SearchQuery(BaseSearchQuery):
