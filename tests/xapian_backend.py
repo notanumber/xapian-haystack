@@ -258,7 +258,10 @@ class XapianSearchBackendTestCase(TestCase):
         
         self.assertEqual(self.sb.search('indxed')['hits'], 0)
         self.assertEqual(self.sb.search('indxed')['spelling_suggestion'], 'indexed')
-    
+        
+        self.assertEqual(self.sb.search('indx')['hits'], 0)
+        self.assertEqual(self.sb.search('indx', spelling_query='indexy')['spelling_suggestion'], 'indexed')
+        
     def test_stemming(self):
         self.sb.update(self.msi, self.sample_objs)
         self.assertEqual(len(self.xapian_search('')), 3)

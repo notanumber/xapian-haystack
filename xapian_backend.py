@@ -267,7 +267,7 @@ class SearchBackend(BaseSearchBackend):
     
     def search(self, query_string, sort_by=None, start_offset=0, end_offset=DEFAULT_MAX_RESULTS,
                fields='', highlight=False, facets=None, date_facets=None, query_facets=None,
-               narrow_queries=None, boost=None, **kwargs):
+               narrow_queries=None, boost=None, spelling_query=None, **kwargs):
         """
         Executes the search as defined in `query_string`.
         
@@ -284,6 +284,7 @@ class SearchBackend(BaseSearchBackend):
             `date_facets` -- Facet results on date ranges (default = None)
             `query_facets` -- Facet results on queries (default = None)
             `narrow_queries` -- Narrow queries (default = None)
+            `spelling_query` -- An optional query to execute spelling suggestion on
             `boost` -- Dictionary of terms and weights to boost results
         
         Returns:
@@ -324,7 +325,7 @@ class SearchBackend(BaseSearchBackend):
         
         database = self._database()
         query, spelling_suggestion = self._query(
-            database, query_string, narrow_queries, boost
+            database, query_string, narrow_queries, spelling_query, boost
         )
         enquire = self._enquire(database, query)
         
@@ -719,7 +720,7 @@ class SearchBackend(BaseSearchBackend):
         term_generator.set_document(document)
         return term_generator
     
-    def _query(self, database, query_string, narrow_queries=None, boost=None):
+    def _query(self, database, query_string, narrow_queries=None, spelling_query=None, boost=None):
         """
         Private method that takes a query string and returns a xapian.Query.
         
@@ -729,6 +730,7 @@ class SearchBackend(BaseSearchBackend):
         
         Optional arguments:
             `narrow_queries` -- A list of queries to narrow the query with
+            `spelling_query` -- An optional query to execute spelling suggestion on
             `boost` -- A dictionary of terms to boost with values
         
         Returns a xapian.Query instance with prefixes and ranges properly
@@ -744,7 +746,11 @@ class SearchBackend(BaseSearchBackend):
             qp.add_valuerangeprocessor(vrp)
             query = qp.parse_query(query_string, self._flags(query_string))
             if getattr(settings, 'HAYSTACK_INCLUDE_SPELLING', False) is True:
-                spelling_suggestion = qp.get_corrected_query_string()
+                if spelling_query:
+                    qp.parse_query(spelling_query, self._flags(spelling_query))
+                    spelling_suggestion = qp.get_corrected_query_string()
+                else:
+                    spelling_suggestion = qp.get_corrected_query_string()
         
         if narrow_queries:
             subqueries = [
@@ -989,7 +995,7 @@ class SearchQuery(BaseSearchQuery):
         
         return final_query
     
-    def run(self):
+    def run(self, spelling_query=None):
         """
         Builds and executes the query. Returns a list of search results.
         """
@@ -1018,6 +1024,9 @@ class SearchQuery(BaseSearchQuery):
         
         if self.narrow_queries:
             kwargs['narrow_queries'] = self.narrow_queries
+        
+        if spelling_query:
+            kwargs['spelling_query'] = spelling_query
         
         if self.boost:
             kwargs['boost'] = self.boost
