@@ -320,9 +320,6 @@ class SearchBackend(BaseSearchBackend):
                 'hits': 0,
             }
         
-        if query_facets is not None:
-            warnings.warn("Query faceting has not been implemented yet.", Warning, stacklevel=2)
-        
         database = self._database()
         query, spelling_suggestion = self._query(
             database, query_string, narrow_queries, spelling_query, boost
