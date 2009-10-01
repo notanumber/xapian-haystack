@@ -23,7 +23,19 @@ Note
 Installation
 ------------
 
-1. Copy or symlink `xapian_backend.py` into `haystack/backends/`
+1. Copy or symlink `xapian_backend.py` into `haystack/backends/` or install
+   it by running one of the following commands::
+
+    python setup.py install
+
+    # or
+
+    pip install xapian-haystack
+
+    # or
+
+    easy_install xapian-haystack
+
 2. Add `HAYSTACK_XAPIAN_PATH` to `settings.py`
 3. Set `HAYSTACK_SEARCH_ENGINE` to `xapian`
 
