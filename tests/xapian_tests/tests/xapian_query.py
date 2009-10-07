@@ -22,7 +22,7 @@ from django.test import TestCase
 
 from haystack.backends.xapian_backend import SearchBackend, SearchQuery
 
-from xapian_haystack.tests.models import MockModel, AnotherMockModel
+from core.models import MockModel, AnotherMockModel
 
 
 class XapianSearchQueryTestCase(TestCase):
@@ -112,10 +112,10 @@ class XapianSearchQueryTestCase(TestCase):
     def test_build_query_with_models(self):
         self.sq.add_filter('content', 'hello')
         self.sq.add_model(MockModel)
-        self.assertEqual(self.sq.build_query(), '(hello) django_ct:tests.mockmodel')
+        self.assertEqual(self.sq.build_query(), u'(hello) django_ct:core.mockmodel')
 
         self.sq.add_model(AnotherMockModel)
-        self.assertEqual(self.sq.build_query(), '(hello) django_ct:tests.anothermockmodel django_ct:tests.mockmodel')
+        self.assertEqual(self.sq.build_query(), u'(hello) django_ct:core.anothermockmodel django_ct:core.mockmodel')
 
     def test_build_query_with_datetime(self):
         self.sq.add_filter('pub_date', datetime.datetime(2009, 5, 9, 16, 20))

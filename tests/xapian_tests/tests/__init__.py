@@ -13,6 +13,9 @@
 # You should have received a copy of the GNU General Public License along
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+import warnings
 
-import haystack
-haystack.autodiscover()
+warnings.simplefilter('ignore', Warning)
+
+from xapian_tests.tests.xapian_query import *
+from xapian_tests.tests.xapian_backend import *

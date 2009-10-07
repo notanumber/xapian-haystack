@@ -14,27 +14,13 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-import datetime
+import os
+from settings import *
 
-from django.db import models
+INSTALLED_APPS += [
+    'xapian_tests',
+]
 
-
-class MockModel(models.Model):
-    user = models.CharField(max_length=255)
-    foo = models.CharField(max_length=255, blank=True)
-    pub_date = models.DateTimeField(default=datetime.datetime.now)
-    value = models.IntegerField()
-    flag = models.BooleanField()
-    slug = models.SlugField()
-    popularity = models.FloatField()
-    
-    def __unicode__(self):
-        return self.user
-
-
-class AnotherMockModel(models.Model):
-    user = models.CharField(max_length=255)
-    pub_date = models.DateTimeField(default=datetime.datetime.now)
-    
-    def __unicode__(self):
-        return self.user
+HAYSTACK_SEARCH_ENGINE = 'xapian'
+HAYSTACK_XAPIAN_PATH = os.path.join('tmp', 'test_xapian_query')
+HAYSTACK_INCLUDE_SPELLING = True

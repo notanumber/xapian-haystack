@@ -25,10 +25,9 @@ from django.utils.encoding import force_unicode
 from django.test import TestCase
 
 from haystack import indexes, sites
-from haystack.backends.xapian_backend import SearchBackend
+from haystack.backends.xapian_backend import SearchBackend, DEFAULT_MAX_RESULTS
 
-from xapian_haystack.tests.models import MockModel, AnotherMockModel
-from xapian_haystack.xapian_backend import DEFAULT_MAX_RESULTS
+from core.models import MockModel, AnotherMockModel
 
 
 class XapianMockSearchIndex(indexes.SearchIndex):
@@ -39,9 +38,9 @@ class XapianMockSearchIndex(indexes.SearchIndex):
     flag = indexes.BooleanField(model_attr='flag')
     slug = indexes.CharField(indexed=False, model_attr='slug')
     popularity = indexes.FloatField(model_attr='popularity')
-    mvf = indexes.MultiValueField()
+    sites = indexes.MultiValueField()
 
-    def prepare_mvf(self, obj):
+    def prepare_sites(self, obj):
         return ['%d' % (i * obj.id) for i in xrange(1, 4)]
 
 
@@ -115,9 +114,9 @@ class XapianSearchBackendTestCase(TestCase):
         
         self.assertEqual(len(self.xapian_search('')), 3)
         self.assertEqual([dict(doc) for doc in self.xapian_search('')], [
-            {'flag': u't', 'name': u'david1', 'text': u'Indexed!\n1', 'mvf': u"['1', '2', '3']", 'pub_date': u'20090224000000', 'value': '000000000005', 'id': u'tests.mockmodel.1', 'slug': 'http://example.com/1', 'popularity': '\xca\x84'},
-            {'flag': u'f', 'name': u'david2', 'text': u'Indexed!\n2', 'mvf': u"['2', '4', '6']", 'pub_date': u'20090223000000', 'value': '000000000010', 'id': u'tests.mockmodel.2', 'slug': 'http://example.com/2', 'popularity': '\xb4`'},
-            {'flag': u't', 'name': u'david3', 'text': u'Indexed!\n3', 'mvf': u"['3', '6', '9']", 'pub_date': u'20090222000000', 'value': '000000000015', 'id': u'tests.mockmodel.3', 'slug': 'http://example.com/3', 'popularity': '\xcb\x98'}
+            {'flag': u't', 'name': u'david1', 'text': u'Indexed!\n1', 'sites': u"['1', '2', '3']", 'pub_date': u'20090224000000', 'value': '000000000005', 'id': u'core.mockmodel.1', 'slug': 'http://example.com/1', 'popularity': '\xca\x84'},
+            {'flag': u'f', 'name': u'david2', 'text': u'Indexed!\n2', 'sites': u"['2', '4', '6']", 'pub_date': u'20090223000000', 'value': '000000000010', 'id': u'core.mockmodel.2', 'slug': 'http://example.com/2', 'popularity': '\xb4`'},
+            {'flag': u't', 'name': u'david3', 'text': u'Indexed!\n3', 'sites': u"['3', '6', '9']", 'pub_date': u'20090222000000', 'value': '000000000015', 'id': u'core.mockmodel.3', 'slug': 'http://example.com/3', 'popularity': '\xcb\x98'}
         ])
 
     def test_remove(self):
@@ -127,8 +126,8 @@ class XapianSearchBackendTestCase(TestCase):
         self.sb.remove(self.sample_objs[0])
         self.assertEqual(len(self.xapian_search('')), 2)
         self.assertEqual([dict(doc) for doc in self.xapian_search('')], [
-            {'flag': u'f', 'name': u'david2', 'text': u'Indexed!\n2', 'mvf': u"['2', '4', '6']", 'pub_date': u'20090223000000', 'value': '000000000010', 'id': u'tests.mockmodel.2', 'slug': 'http://example.com/2', 'popularity': '\xb4`'},
-            {'flag': u't', 'name': u'david3', 'text': u'Indexed!\n3', 'mvf': u"['3', '6', '9']", 'pub_date': u'20090222000000', 'value': '000000000015', 'id': u'tests.mockmodel.3', 'slug': 'http://example.com/3', 'popularity': '\xcb\x98'}
+            {'flag': u'f', 'name': u'david2', 'text': u'Indexed!\n2', 'sites': u"['2', '4', '6']", 'pub_date': u'20090223000000', 'value': '000000000010', 'id': u'core.mockmodel.2', 'slug': 'http://example.com/2', 'popularity': '\xb4`'},
+            {'flag': u't', 'name': u'david3', 'text': u'Indexed!\n3', 'sites': u"['3', '6', '9']", 'pub_date': u'20090222000000', 'value': '000000000015', 'id': u'core.mockmodel.3', 'slug': 'http://example.com/3', 'popularity': '\xcb\x98'}
         ])
     
     def test_clear(self):
@@ -197,9 +196,9 @@ class XapianSearchBackendTestCase(TestCase):
         self.assertEqual(results['hits'], 3)
         self.assertEqual(results['facets']['fields']['flag'], [(False, 1), (True, 2)])
         
-        results = self.sb.search('index', facets=['mvf'])
+        results = self.sb.search('index', facets=['sites'])
         self.assertEqual(results['hits'], 3)
-        self.assertEqual(results['facets']['fields']['mvf'], [('1', 1), ('3', 2), ('2', 2), ('4', 1), ('6', 2), ('9', 1)])
+        self.assertEqual(results['facets']['fields']['sites'], [('1', 1), ('3', 2), ('2', 2), ('4', 1), ('6', 2), ('9', 1)])
             
     def test_date_facets(self):
         self.sb.update(self.msi, self.sample_objs)
@@ -356,11 +355,11 @@ class XapianSearchBackendTestCase(TestCase):
         self.assertEqual(content_field_name, 'text')
         self.assertEqual(len(fields), 7)
         self.assertEqual(fields, [
-            {'column': 0, 'type': 'text', 'field_name': 'name', 'multi_valued': 'false'},
-            {'column': 1, 'type': 'text', 'field_name': 'text', 'multi_valued': 'false'},
-            {'column': 2, 'type': 'float', 'field_name': 'popularity', 'multi_valued': 'false'},
-            {'column': 3, 'type': 'long', 'field_name': 'value', 'multi_valued': 'false'},
-            {'column': 4, 'type': 'boolean', 'field_name': 'flag', 'multi_valued': 'false'},
-            {'column': 5, 'type': 'text', 'field_name': 'mvf', 'multi_valued': 'true'},
-            {'column': 6, 'type': 'date', 'field_name': 'pub_date', 'multi_valued': 'false'},
+            {'column': 0, 'field_name': 'name', 'type': 'text', 'multi_valued': 'false'},
+            {'column': 1, 'field_name': 'text', 'type': 'text', 'multi_valued': 'false'},
+            {'column': 2, 'field_name': 'popularity', 'type': 'float', 'multi_valued': 'false'},
+            {'column': 3, 'field_name': 'sites', 'type': 'text', 'multi_valued': 'true'},
+            {'column': 4, 'field_name': 'value', 'type': 'long', 'multi_valued': 'false'},
+            {'column': 5, 'field_name': 'flag', 'type': 'boolean', 'multi_valued': 'false'},
+            {'column': 6, 'field_name': 'pub_date', 'type': 'date', 'multi_valued': 'false'},
         ])
