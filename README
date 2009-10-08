@@ -15,10 +15,11 @@ Requirements
 - Xapian 1.13.X (May work with earlier versions, but untested)
 - mod_wsgi 1.3.X
 
-Note
-----
+Notes
+-----
 
 - Due to an issue with mod_python causing deadlocks with Xapian (http://trac.xapian.org/ticket/185), mod_python is not supported with xapian-haystack.  It may work, with some tweaking, but your mileage will vary.
+- Because Xapian does not support simultaneous WritableDatabase connections, it is *strongly* recommended that users either set `WSGIDaemonProcess processes=1` or override the default SearchIndex class to remove the post-save and post-delete signals that cause an immediate re-index.  Instead, manually re-index your site content through a cronjob at pre-determined times.
 
 Installation
 ------------
