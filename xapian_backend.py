@@ -29,7 +29,7 @@ from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.utils.encoding import smart_unicode, force_unicode
 
-from haystack.backends import BaseSearchBackend, BaseSearchQuery
+from haystack.backends import BaseSearchBackend, BaseSearchQuery, log_query
 from haystack.exceptions import MissingDependency
 from haystack.fields import DateField, DateTimeField, IntegerField, FloatField, BooleanField, MultiValueField
 from haystack.models import SearchResult
@@ -267,10 +267,12 @@ class SearchBackend(BaseSearchBackend):
                     DOCUMENT_CT_TERM_PREFIX + '%s.%s' %
                     (model._meta.app_label, model._meta.module_name)
                 )
-    
-    def search(self, query_string, sort_by=None, start_offset=0, end_offset=DEFAULT_MAX_RESULTS,
-               fields='', highlight=False, facets=None, date_facets=None, query_facets=None,
-               narrow_queries=None, boost=None, spelling_query=None, **kwargs):
+    @log_query
+    def search(self, query_string, sort_by=None, start_offset=0, 
+               end_offset=DEFAULT_MAX_RESULTS, fields='', highlight=False, 
+               facets=None, date_facets=None, query_facets=None,
+               narrow_queries=None, boost=None, spelling_query=None, 
+               limit_to_registered_models=True, **kwargs):
         """
         Executes the search as defined in `query_string`.
         
@@ -289,7 +291,8 @@ class SearchBackend(BaseSearchBackend):
             `narrow_queries` -- Narrow queries (default = None)
             `spelling_query` -- An optional query to execute spelling suggestion on
             `boost` -- Dictionary of terms and weights to boost results
-        
+            `limit_to_registered_models` -- Limit returned results to models registered in the current `SearchSite` (default = True)
+            
         Returns:
             A dictionary with the following keys:
                 `results` -- A list of `SearchResult`
@@ -323,6 +326,17 @@ class SearchBackend(BaseSearchBackend):
                 'hits': 0,
             }
         
+        if limit_to_registered_models:
+            if narrow_queries is None:
+                 narrow_queries = []
+            
+            registered_models = self.build_registered_models_list()
+            
+            if len(registered_models) > 0:
+                narrow_queries.append(
+                    ' '.join(['django_ct:%s' % model for model in registered_models])
+                )
+        
         database = self._database()
         query, spelling_suggestion = self._query(
             database, query_string, narrow_queries, spelling_query, boost
@@ -339,7 +353,7 @@ class SearchBackend(BaseSearchBackend):
             'dates': {},
             'queries': {},
         }
-        matches = enquire.get_mset(start_offset, end_offset)
+        matches = enquire.get_mset(start_offset, (end_offset - start_offset))
         
         for match in matches:
             app_label, module_name, pk, model_data = pickle.loads(match.document.get_data())
@@ -387,7 +401,8 @@ class SearchBackend(BaseSearchBackend):
         return database.get_doccount()
     
     def more_like_this(self, model_instance, additional_query_string=None,
-                       start_offset=0, end_offset=DEFAULT_MAX_RESULTS, **kwargs):
+                       start_offset=0, end_offset=DEFAULT_MAX_RESULTS, 
+                       limit_to_registered_models=True, **kwargs):
         """
         Given a model instance, returns a result set of similar documents.
         
@@ -400,6 +415,7 @@ class SearchBackend(BaseSearchBackend):
                                          results
             `start_offset` -- The starting offset (default=0)
             `end_offset` -- The ending offset (default=None)
+            `limit_to_registered_models` -- Limit returned results to models registered in the current `SearchSite` (default = True)
         
         Returns:
             A dictionary with the following keys:
@@ -429,13 +445,23 @@ class SearchBackend(BaseSearchBackend):
         query = xapian.Query(
             xapian.Query.OP_AND_NOT, [query, self.get_identifier(model_instance)]
         )
+        narrow_queries = None
+        if limit_to_registered_models:
+            registered_models = self.build_registered_models_list()
+            
+            if len(registered_models) > 0:
+                narrow_queries = []
+                narrow_queries.append(
+                    ' '.join(['django_ct:%s' % model for model in registered_models])
+                )
         if additional_query_string:
             additional_query, __unused__ = self._query(
-                database, additional_query_string
+                database, additional_query_string, narrow_queries
             )
             query = xapian.Query(
                 xapian.Query.OP_AND, query, additional_query
             )
+
         enquire.set_query(query)
         
         results = []
@@ -737,6 +763,7 @@ class SearchBackend(BaseSearchBackend):
         setup as pulled from the `query_string`.
         """
         spelling_suggestion = None
+        qp = None
         
         if query_string == '*':
             query = xapian.Query('') # Make '*' match everything
@@ -753,6 +780,8 @@ class SearchBackend(BaseSearchBackend):
                     spelling_suggestion = qp.get_corrected_query_string()
         
         if narrow_queries:
+            if qp is None:
+                qp = self._query_parser(database)
             subqueries = [
                 qp.parse_query(
                     narrow_query, self._flags(narrow_query)
