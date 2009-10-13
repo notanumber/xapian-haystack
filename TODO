@@ -2,6 +2,7 @@ Future
 ======
 
 * Language stemming (needs to be implemented by Haystack first)
+* Refactor SearchBackend and SearchQuery to make use of the Xapian.Query object natively instead of passing query strings between them.
 
 Complete
 ========
