@@ -919,10 +919,9 @@ class SearchBackend(BaseSearchBackend):
 
 class SearchQuery(BaseSearchQuery):
     """
-    `SearchQuery` is responsible for converting search queries into a format
-    that Xapian can understand.
-    
-    Most of the work is done by the :method:`build_query`.
+    This class is the Xapian specific version of the SearchQuery class.
+    It acts as an intermediary between the ``SearchQuerySet`` and the
+    ``SearchBackend`` itself.
     """
     def __init__(self, backend=None):
         """
@@ -930,103 +929,33 @@ class SearchQuery(BaseSearchQuery):
         specified.  If no backend is set, will use the Xapian `SearchBackend`.
         
         Optional arguments:
-            `backend` -- The `SearchBackend` to use (default = None)
+            ``backend`` -- The ``SearchBackend`` to use (default = None)
         """
         super(SearchQuery, self).__init__(backend=backend)
         self.backend = backend or SearchBackend()
     
     def build_query(self):
-        """
-        Builds a search query from previously set values, returning a query
-        string in a format ready for use by the Xapian `SearchBackend`.
+        if not self.query_filter:
+            return xapian.Query('')
+
+        values = []
         
-        Returns:
-            A query string suitable for parsing by Xapian.
-        """
-        query = ''
-        
-        if not self.query_filters:
-            query = '*'
-        else:
-            query_chunks = []
-            
-            for the_filter in self.query_filters:
-                if the_filter.is_and():
-                    query_chunks.append('AND')
-
-                if the_filter.is_or():
-                    query_chunks.append('OR')
-
-                if the_filter.is_not() and the_filter.field == 'content':
-                    query_chunks.append('NOT')
-
-                value = the_filter.value
+        for child in self.query_filter.children:
+            if isinstance(child, self.query_filter.__class__):
+                print 'SQ: ', child # TODO: Recursive call down tree...
+            else:
+                expression, value = child
+                field, filter_type = self.query_filter.split_expression(expression)
+                values.append(value)
                 
-                if not isinstance(value, (list, tuple)):
-                    # Convert whatever we find to what xapian wants.
-                    value = self.backend._marshal_value(value)
-                
-                # Check to see if it's a phrase for an exact match.
-                if ' ' in value:
-                    value = '"%s"' % value
-                
-                # 'content' is a special reserved word, much like 'pk' in
-                # Django's ORM layer. It indicates 'no special field'.
-                if the_filter.field == 'content':
-                    query_chunks.append(value)
-                else:
-                    if the_filter.is_not():
-                        query_chunks.append('AND')
-                        filter_types = {
-                            'exact': 'NOT %s:%s',
-                            'gte': 'NOT %s:%s..*',
-                            'gt': '%s:..%s',
-                            'lte': 'NOT %s:..%s',
-                            'lt': '%s:%s..*',
-                            'startswith': 'NOT %s:%s*',
-                        }
-                    else:
-                        filter_types = {
-                            'exact': '%s:%s',
-                            'gte': '%s:%s..*',
-                            'gt': 'NOT %s:..%s',
-                            'lte': '%s:..%s',
-                            'lt': 'NOT %s:%s..*',
-                            'startswith': '%s:%s*',
-                        }
-
-                    if the_filter.filter_type != 'in':
-                        query_chunks.append(filter_types[the_filter.filter_type] % (the_filter.field, value))
-                    else:
-                        in_options = []
-                        if the_filter.is_not():                        
-                            for possible_value in value:
-                                in_options.append('%s:%s' % (the_filter.field, possible_value))
-                            query_chunks.append('NOT %s' % ' NOT '.join(in_options))
-                        else:
-                            for possible_value in value:
-                                in_options.append('%s:%s' % (the_filter.field, possible_value))
-                            query_chunks.append('(%s)' % ' OR '.join(in_options))
-            
-            if query_chunks[0] in ('AND', 'OR'):
-                # Pull off an undesirable leading "AND" or "OR".
-                del(query_chunks[0])
-            
-            query = ' '.join(query_chunks)
-        
-        if len(self.models):
-            models = ['django_ct:%s.%s' % (model._meta.app_label, model._meta.module_name) for model in self.models]
-            models_clause = ' '.join(models)
-            final_query = '(%s) %s' % (query, models_clause)
-        
-        else:
-            final_query = query
-        
-        return final_query
+        return xapian.Query(xapian.Query.OP_AND, values)
     
     def run(self, spelling_query=None):
         """
         Builds and executes the query. Returns a list of search results.
+        
+        Returns:
+            List of search results
         """
         final_query = self.build_query()
         kwargs = {
@@ -1069,6 +998,9 @@ class SearchQuery(BaseSearchQuery):
     def run_mlt(self):
         """
         Builds and executes the query. Returns a list of search results.
+        
+        Returns:
+            List of search results
         """
         if self._more_like_this is False or self._mlt_instance is None:
             raise MoreLikeThisError("No instance was provided to determine 'More Like This' results.")
