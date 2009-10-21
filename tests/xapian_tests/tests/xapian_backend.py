@@ -21,17 +21,43 @@ import shutil
 import xapian
 
 from django.conf import settings
+from django.db import models
 from django.utils.encoding import force_unicode
 from django.test import TestCase
 
 from haystack import indexes, sites
 from haystack.backends.xapian_backend import SearchBackend, DEFAULT_MAX_RESULTS
 
-from core.models import MockModel, AnotherMockModel
+from core.models import MockTag, AnotherMockModel
+
+
+class XapianMockModel(models.Model):
+    """
+    Same as tests.core.MockModel with a few extra fields for testing various
+    sorting and ordering criteria.
+    """
+    author = models.CharField(max_length=255)
+    foo = models.CharField(max_length=255, blank=True)
+    pub_date = models.DateTimeField(default=datetime.datetime.now)
+    tag = models.ForeignKey(MockTag)
+
+    value = models.IntegerField(default=0)
+    flag = models.BooleanField(default=True)
+    slug = models.SlugField()
+    popularity = models.FloatField(default=0.0)
+
+    def __unicode__(self):
+        return self.author
+    
+    def hello(self):
+        return 'World!'
 
 
 class XapianMockSearchIndex(indexes.SearchIndex):
-    text = indexes.CharField(document=True, use_template=True)
+    text = indexes.CharField(
+        document=True, use_template=True, 
+        template_name='search/indexes/core/mockmodel_text.txt'
+    )
     name = indexes.CharField(model_attr='author')
     pub_date = indexes.DateField(model_attr='pub_date')
     value = indexes.IntegerField(model_attr='value')
@@ -58,13 +84,13 @@ class XapianSearchBackendTestCase(TestCase):
         
         self.site = XapianSearchSite()
         self.sb = SearchBackend(site=self.site)
-        self.msi = XapianMockSearchIndex(MockModel, backend=self.sb)
-        self.site.register(MockModel, XapianMockSearchIndex)
+        self.msi = XapianMockSearchIndex(XapianMockModel, backend=self.sb)
+        self.site.register(XapianMockModel, XapianMockSearchIndex)
         
         self.sample_objs = []
         
         for i in xrange(1, 4):
-            mock = MockModel()
+            mock = XapianMockModel()
             mock.id = i
             mock.author = 'david%s' % i
             mock.pub_date = datetime.date(2009, 2, 25) - datetime.timedelta(days=i)
@@ -114,9 +140,9 @@ class XapianSearchBackendTestCase(TestCase):
         
         self.assertEqual(len(self.xapian_search('')), 3)
         self.assertEqual([dict(doc) for doc in self.xapian_search('')], [
-            {'flag': u't', 'name': u'david1', 'text': u'Indexed!\n1', 'sites': u"['1', '2', '3']", 'pub_date': u'20090224000000', 'value': '000000000005', 'id': u'core.mockmodel.1', 'slug': 'http://example.com/1', 'popularity': '\xca\x84'},
-            {'flag': u'f', 'name': u'david2', 'text': u'Indexed!\n2', 'sites': u"['2', '4', '6']", 'pub_date': u'20090223000000', 'value': '000000000010', 'id': u'core.mockmodel.2', 'slug': 'http://example.com/2', 'popularity': '\xb4`'},
-            {'flag': u't', 'name': u'david3', 'text': u'Indexed!\n3', 'sites': u"['3', '6', '9']", 'pub_date': u'20090222000000', 'value': '000000000015', 'id': u'core.mockmodel.3', 'slug': 'http://example.com/3', 'popularity': '\xcb\x98'}
+            {'flag': u't', 'name': u'david1', 'text': u'Indexed!\n1', 'sites': u"['1', '2', '3']", 'pub_date': u'20090224000000', 'value': u'000000000005', 'id': u'tests.xapianmockmodel.1', 'slug': u'http://example.com/1', 'popularity': '\xca\x84'},
+            {'flag': u'f', 'name': u'david2', 'text': u'Indexed!\n2', 'sites': u"['2', '4', '6']", 'pub_date': u'20090223000000', 'value': u'000000000010', 'id': u'tests.xapianmockmodel.2', 'slug': u'http://example.com/2', 'popularity': '\xb4`'},
+            {'flag': u't', 'name': u'david3', 'text': u'Indexed!\n3', 'sites': u"['3', '6', '9']", 'pub_date': u'20090222000000', 'value': u'000000000015', 'id': u'tests.xapianmockmodel.3', 'slug': u'http://example.com/3', 'popularity': '\xcb\x98'}
         ])
 
     def test_remove(self):
@@ -126,8 +152,8 @@ class XapianSearchBackendTestCase(TestCase):
         self.sb.remove(self.sample_objs[0])
         self.assertEqual(len(self.xapian_search('')), 2)
         self.assertEqual([dict(doc) for doc in self.xapian_search('')], [
-            {'flag': u'f', 'name': u'david2', 'text': u'Indexed!\n2', 'sites': u"['2', '4', '6']", 'pub_date': u'20090223000000', 'value': '000000000010', 'id': u'core.mockmodel.2', 'slug': 'http://example.com/2', 'popularity': '\xb4`'},
-            {'flag': u't', 'name': u'david3', 'text': u'Indexed!\n3', 'sites': u"['3', '6', '9']", 'pub_date': u'20090222000000', 'value': '000000000015', 'id': u'core.mockmodel.3', 'slug': 'http://example.com/3', 'popularity': '\xcb\x98'}
+            {'flag': u'f', 'name': u'david2', 'text': u'Indexed!\n2', 'sites': u"['2', '4', '6']", 'pub_date': u'20090223000000', 'value': u'000000000010', 'id': u'tests.xapianmockmodel.2', 'slug': u'http://example.com/2', 'popularity': '\xb4`'},
+            {'flag': u't', 'name': u'david3', 'text': u'Indexed!\n3', 'sites': u"['3', '6', '9']", 'pub_date': u'20090222000000', 'value': u'000000000015', 'id': u'tests.xapianmockmodel.3', 'slug': u'http://example.com/3', 'popularity': '\xcb\x98'}
         ])
     
     def test_clear(self):
@@ -143,13 +169,13 @@ class XapianSearchBackendTestCase(TestCase):
         self.sb.clear([AnotherMockModel])
         self.assertEqual(len(self.xapian_search('')), 3)
         
-        self.sb.clear([MockModel])
+        self.sb.clear([XapianMockModel])
         self.assertEqual(len(self.xapian_search('')), 0)
         
         self.sb.update(self.msi, self.sample_objs)
         self.assertEqual(len(self.xapian_search('')), 3)
         
-        self.sb.clear([AnotherMockModel, MockModel])
+        self.sb.clear([AnotherMockModel, XapianMockModel])
         self.assertEqual(len(self.xapian_search('')), 0)
     
     def test_search(self):
