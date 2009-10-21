@@ -934,11 +934,9 @@ class SearchQuery(BaseSearchQuery):
         self.backend = backend or SearchBackend()
     
     def build_query(self):
-        if not self.query_filter:
-            return xapian.Query('')
-
         values = []
-        
+
+        return final_query
         for child in self.query_filter.children:
             if isinstance(child, self.query_filter.__class__):
                 print 'SQ: ', child # TODO: Recursive call down tree...
@@ -946,9 +944,49 @@ class SearchQuery(BaseSearchQuery):
                 expression, value = child
                 field, filter_type = self.query_filter.split_expression(expression)
                 values.append(value)
-                
+                        
         return xapian.Query(xapian.Query.OP_AND, values)
-    
+        
+    def build_query_fragment(self, field, filter_type, value):
+        """
+        Builds a search query fragment from a field, filter type and value.
+        Returns:
+        A query string fragment suitable for parsing by Xapian.
+        """
+        result = ''
+
+        if not isinstance(value, (list, tuple)):
+            # Convert whatever we find to what xapian wants.
+            value = self.backend._marshal_value(value)
+
+        # Check to see if it's a phrase for an exact match.
+        if ' ' in value:
+            value = '"%s"' % value
+
+        # 'content' is a special reserved word, much like 'pk' in
+        # Django's ORM layer. It indicates 'no special field'.
+        if field == 'content':
+            result = value
+        else:
+            filter_types = {
+                'exact': '%s:%s',
+                'gte': '%s:%s..*',
+                'gt': 'NOT %s:..%s',
+                'lte': '%s:..%s',
+                'lt': 'NOT %s:%s..*',
+                'startswith': '%s:%s*',
+            }
+
+            if filter_type != 'in':
+                result = filter_types[filter_type] % (field, value)
+            else:
+                in_options = []
+                for possible_value in value:
+                    in_options.append('%s:%s' % (field, possible_value))
+                result = '(%s)' % ' OR '.join(in_options)
+
+        return result
+        
     def run(self, spelling_query=None):
         """
         Builds and executes the query. Returns a list of search results.
