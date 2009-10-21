@@ -936,58 +936,63 @@ class SearchQuery(BaseSearchQuery):
     def build_query(self):
         if not self.query_filter:
             return xapian.Query('')
-        else:
-            return self._query_from_search_node(self.query_filter)
 
-    def _query_from_search_node(self, search_node, is_not=False):
-        query_list = []
+        values = []
         
-        for child in search_node.children:
-            if isinstance(child, SearchNode):
-                query_list.append(
-                    xapian.Query(
-                        xapian.Query.OP_AND, 
-                        self._query_from_search_node(
-                            child, child.negated
-                        )
-                    )
-                )
+        for child in self.query_filter.children:
+            if isinstance(child, self.query_filter.__class__):
+                print 'SQ: ', child # TODO: Recursive call down tree...
             else:
                 expression, value = child
-                if is_not:
-                    # DS_TODO: This can almost definitely be improved.
-                    query_list.append(xapian.Query(xapian.Query.OP_AND_NOT, '', value))
-                else:
-                    query_list.append(xapian.Query(value))
+                field, filter_type = self.query_filter.split_expression(expression)
+                values.append(value)
                 
-        if search_node.connector == 'OR':
-            return xapian.Query(xapian.Query.OP_OR, query_list)
-        else:
-            return xapian.Query(xapian.Query.OP_AND, query_list)
-
-    def build_sub_query(self, value):
-        return xapian.Query(value)
-
-        # 
-        # if not self.query_filter.children:
-        #     return xapian.Query('')
-        # else:
-        #     query_list = []
-        #     
-        #     for child in self.query_filter.children:
-        #         if isinstance(child, self.query_filter.__class__):
-        #             query_list.append(self.build_query(child))
-        #         else:
-        #             expression, value = child
-        #             field, filter_type = self.query_filter.split_expression(expression)
-        #             query_list.append(xapian.Query(value))
-        #             
-        #     return xapian.Query(xapian.Query.OP_AND, query_list)
-                
-    # def build_query_fragment(self, field, filter_type, value):
-        # print 'field: ', field
-        # print 'filter_type: ', filter_type
-        # print 'value: ', value
+        return xapian.Query(xapian.Query.OP_AND, values)
+    
+    def run(self, spelling_query=None):
+        """
+        Builds and executes the query. Returns a list of search results.
+        
+        Returns:
+            List of search results
+        """
+        final_query = self.build_query()
+        kwargs = {
+            'start_offset': self.start_offset,
+        }
+        
+        if self.order_by:
+            kwargs['sort_by'] = self.order_by
+        
+        if self.end_offset is not None:
+            kwargs['end_offset'] = self.end_offset - self.start_offset
+        
+        if self.highlight:
+            kwargs['highlight'] = self.highlight
+        
+        if self.facets:
+            kwargs['facets'] = list(self.facets)
+        
+        if self.date_facets:
+            kwargs['date_facets'] = self.date_facets
+        
+        if self.query_facets:
+            kwargs['query_facets'] = self.query_facets
+        
+        if self.narrow_queries:
+            kwargs['narrow_queries'] = self.narrow_queries
+        
+        if spelling_query:
+            kwargs['spelling_query'] = spelling_query
+        
+        if self.boost:
+            kwargs['boost'] = self.boost
+        
+        results = self.backend.search(final_query, **kwargs)
+        self._results = results.get('results', [])
+        self._hit_count = results.get('hits', 0)
+        self._facet_counts = results.get('facets', {})
+        self._spelling_suggestion = results.get('spelling_suggestion', None)
     
         # """
         # Builds a search query fragment from a field, filter type and value.
