@@ -932,125 +932,64 @@ class SearchQuery(BaseSearchQuery):
         """
         super(SearchQuery, self).__init__(backend=backend)
         self.backend = backend or SearchBackend()
-    
+        
     def build_query(self):
-        values = []
-
-        return final_query
-        for child in self.query_filter.children:
-            if isinstance(child, self.query_filter.__class__):
-                print 'SQ: ', child # TODO: Recursive call down tree...
-            else:
-                expression, value = child
-                field, filter_type = self.query_filter.split_expression(expression)
-                values.append(value)
-                        
-        return xapian.Query(xapian.Query.OP_AND, values)
-        
-    def build_query_fragment(self, field, filter_type, value):
-        """
-        Builds a search query fragment from a field, filter type and value.
-        Returns:
-        A query string fragment suitable for parsing by Xapian.
-        """
-        result = ''
-
-        if not isinstance(value, (list, tuple)):
-            # Convert whatever we find to what xapian wants.
-            value = self.backend._marshal_value(value)
-
-        # Check to see if it's a phrase for an exact match.
-        if ' ' in value:
-            value = '"%s"' % value
-
-        # 'content' is a special reserved word, much like 'pk' in
-        # Django's ORM layer. It indicates 'no special field'.
-        if field == 'content':
-            result = value
+        if not self.query_filter.children:
+            return xapian.Query('')
         else:
-            filter_types = {
-                'exact': '%s:%s',
-                'gte': '%s:%s..*',
-                'gt': 'NOT %s:..%s',
-                'lte': '%s:..%s',
-                'lt': 'NOT %s:%s..*',
-                'startswith': '%s:%s*',
-            }
+            query_list = []
+            
+            for child in self.query_filter.children:
+                if isinstance(child, self.query_filter.__class__):
+                    pass
+                else:
+                    expression, value = child
+                    field, filter_type = self.query_filter.split_expression(expression)
+                    query_list.append(xapian.Query(value))
+                    
+            return xapian.Query(xapian.Query.OP_AND, query_list)
+                
 
-            if filter_type != 'in':
-                result = filter_types[filter_type] % (field, value)
-            else:
-                in_options = []
-                for possible_value in value:
-                    in_options.append('%s:%s' % (field, possible_value))
-                result = '(%s)' % ' OR '.join(in_options)
-
-        return result
-        
-    def run(self, spelling_query=None):
-        """
-        Builds and executes the query. Returns a list of search results.
-        
-        Returns:
-            List of search results
-        """
-        final_query = self.build_query()
-        kwargs = {
-            'start_offset': self.start_offset,
-        }
-        
-        if self.order_by:
-            kwargs['sort_by'] = self.order_by
-        
-        if self.end_offset is not None:
-            kwargs['end_offset'] = self.end_offset - self.start_offset
-        
-        if self.highlight:
-            kwargs['highlight'] = self.highlight
-        
-        if self.facets:
-            kwargs['facets'] = list(self.facets)
-        
-        if self.date_facets:
-            kwargs['date_facets'] = self.date_facets
-        
-        if self.query_facets:
-            kwargs['query_facets'] = self.query_facets
-        
-        if self.narrow_queries:
-            kwargs['narrow_queries'] = self.narrow_queries
-        
-        if spelling_query:
-            kwargs['spelling_query'] = spelling_query
-        
-        if self.boost:
-            kwargs['boost'] = self.boost
-        
-        results = self.backend.search(final_query, **kwargs)
-        self._results = results.get('results', [])
-        self._hit_count = results.get('hits', 0)
-        self._facet_counts = results.get('facets', {})
-        self._spelling_suggestion = results.get('spelling_suggestion', None)
+    # def build_query_fragment(self, field, filter_type, value):
+        # print 'field: ', field
+        # print 'filter_type: ', filter_type
+        # print 'value: ', value
     
-    def run_mlt(self):
-        """
-        Builds and executes the query. Returns a list of search results.
-        
-        Returns:
-            List of search results
-        """
-        if self._more_like_this is False or self._mlt_instance is None:
-            raise MoreLikeThisError("No instance was provided to determine 'More Like This' results.")
-        
-        additional_query_string = self.build_query()
-        kwargs = {
-            'start_offset': self.start_offset,
-        }
-        
-        if self.end_offset is not None:
-            kwargs['end_offset'] = self.end_offset - self.start_offset
-        
-        results = self.backend.more_like_this(self._mlt_instance, additional_query_string, **kwargs)
-        self._results = results.get('results', [])
-        self._hit_count = results.get('hits', 0)
-        
+        # """
+        # Builds a search query fragment from a field, filter type and value.
+        # Returns:
+        # A query string fragment suitable for parsing by Xapian.
+        # """
+        # result = ''
+        # 
+        # if not isinstance(value, (list, tuple)):
+        #     # Convert whatever we find to what xapian wants.
+        #     value = self.backend._marshal_value(value)
+        # 
+        # # Check to see if it's a phrase for an exact match.
+        # if ' ' in value:
+        #     value = '"%s"' % value
+        # 
+        # # 'content' is a special reserved word, much like 'pk' in
+        # # Django's ORM layer. It indicates 'no special field'.
+        # if field == 'content':
+        #     result = value
+        # else:
+        #     filter_types = {
+        #         'exact': '%s:%s',
+        #         'gte': '%s:%s..*',
+        #         'gt': 'NOT %s:..%s',
+        #         'lte': '%s:..%s',
+        #         'lt': 'NOT %s:%s..*',
+        #         'startswith': '%s:%s*',
+        #     }
+        # 
+        #     if filter_type != 'in':
+        #         result = filter_types[filter_type] % (field, value)
+        #     else:
+        #         in_options = []
+        #         for possible_value in value:
+        #             in_options.append('%s:%s' % (field, possible_value))
+        #         result = '(%s)' % ' OR '.join(in_options)
+        # 
+        # return result
