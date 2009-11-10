@@ -33,6 +33,7 @@ from haystack.backends import BaseSearchBackend, BaseSearchQuery, log_query
 from haystack.exceptions import MissingDependency
 from haystack.fields import DateField, DateTimeField, IntegerField, FloatField, BooleanField, MultiValueField
 from haystack.models import SearchResult
+from haystack.utils import get_identifier
 
 try:
     import xapian
@@ -159,9 +160,6 @@ class SearchBackend(BaseSearchBackend):
         
         self.stemmer = xapian.Stem(stemming_language)
     
-    def get_identifier(self, obj_or_string):
-        return DOCUMENT_ID_TERM_PREFIX + super(SearchBackend, self).get_identifier(obj_or_string)
-    
     def update(self, index, iterable):
         """
         Updates the `index` with any objects in `iterable` by adding/updating
@@ -204,7 +202,7 @@ class SearchBackend(BaseSearchBackend):
             for obj in iterable:
                 document = xapian.Document()
                 term_generator = self._term_generator(database, document)
-                document_id = self.get_identifier(obj)
+                document_id = DOCUMENT_ID_TERM_PREFIX + get_identifier(obj)
                 data = index.prepare(obj)
                 
                 for field in self.schema:
@@ -238,7 +236,7 @@ class SearchBackend(BaseSearchBackend):
         should be unique to this object.
         """
         database = self._database(writable=True)
-        database.delete_document(self.get_identifier(obj))
+        database.delete_document(DOCUMENT_ID_TERM_PREFIX + get_identifier(obj))
     
     def clear(self, models=[]):
         """
@@ -434,7 +432,7 @@ class SearchBackend(BaseSearchBackend):
         Finally, processes the resulting matches and returns.
         """
         database = self._database()
-        query = xapian.Query(self.get_identifier(model_instance))
+        query = xapian.Query(DOCUMENT_ID_TERM_PREFIX + get_identifier(model_instance))
         enquire = self._enquire(database, query)
         rset = xapian.RSet()
         for match in enquire.get_mset(0, DEFAULT_MAX_RESULTS):
@@ -443,7 +441,7 @@ class SearchBackend(BaseSearchBackend):
             [expand.term for expand in enquire.get_eset(DEFAULT_MAX_RESULTS, rset, XHExpandDecider())]
         )
         query = xapian.Query(
-            xapian.Query.OP_AND_NOT, [query, self.get_identifier(model_instance)]
+            xapian.Query.OP_AND_NOT, [query, DOCUMENT_ID_TERM_PREFIX + get_identifier(model_instance)]
         )
         narrow_queries = None
         if limit_to_registered_models:
