@@ -932,24 +932,42 @@ class SearchQuery(BaseSearchQuery):
         """
         super(SearchQuery, self).__init__(backend=backend)
         self.backend = backend or SearchBackend()
+    
+    def as_xapian_query(self, parent, query_fragment_callback):
+        query_list = []
+
+        for child in parent.children:
+            if hasattr(child, 'as_query_string'):
+                query_list.append(self.as_xapian_query(child, query_fragment_callback))
+            else:
+                expression, value = child
+                field, filter_type = self.query_filter.split_expression(expression)
+                query_list.append(query_fragment_callback(field, filter_type, value))
+        
+        return xapian.Query(xapian.Query.OP_AND, query_list)
         
     def build_query(self):
-        if not self.query_filter.children:
-            return xapian.Query('')
-        else:
-            query_list = []
-            
-            for child in self.query_filter.children:
-                if isinstance(child, self.query_filter.__class__):
-                    pass
-                else:
-                    expression, value = child
-                    field, filter_type = self.query_filter.split_expression(expression)
-                    query_list.append(xapian.Query(value))
-                    
-            return xapian.Query(xapian.Query.OP_AND, query_list)
-                
+        query = self.as_xapian_query(self.query_filter, self.build_query_fragment)
 
+    def build_query_fragment(self, field, filter_type, value):
+        return xapian.Query(value)
+
+        # 
+        # if not self.query_filter.children:
+        #     return xapian.Query('')
+        # else:
+        #     query_list = []
+        #     
+        #     for child in self.query_filter.children:
+        #         if isinstance(child, self.query_filter.__class__):
+        #             query_list.append(self.build_query(child))
+        #         else:
+        #             expression, value = child
+        #             field, filter_type = self.query_filter.split_expression(expression)
+        #             query_list.append(xapian.Query(value))
+        #             
+        #     return xapian.Query(xapian.Query.OP_AND, query_list)
+                
     # def build_query_fragment(self, field, filter_type, value):
         # print 'field: ', field
         # print 'filter_type: ', filter_type
