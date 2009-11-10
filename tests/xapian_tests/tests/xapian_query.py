@@ -49,22 +49,22 @@ class XapianSearchQueryTestCase(TestCase):
         settings.HAYSTACK_XAPIAN_PATH = self.old_xapian_path
         super(XapianSearchQueryTestCase, self).tearDown()
 
-    def test_build_query_all(self):
-        self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query(<alldocuments>)')
+    # def test_build_query_all(self):
+    #     self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query(<alldocuments>)')
     
     def test_build_query_single_word(self):
         self.sq.add_filter(SQ(content='hello'))
         self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query(hello)')
     
-    def test_build_query_multiple_words_and(self):
-        self.sq.add_filter(SQ(content='hello'))
-        self.sq.add_filter(SQ(content='world'))
-        self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query((hello AND world))')
-    
-    def test_build_query_multiple_words_not(self):
-        self.sq.add_filter(~SQ(content='hello'))
-        self.sq.add_filter(~SQ(content='world'))
-        self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query((NOT hello NOT world))')
+    # def test_build_query_multiple_words_and(self):
+    #     self.sq.add_filter(SQ(content='hello'))
+    #     self.sq.add_filter(SQ(content='world'))
+    #     self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query((hello AND world))')
+    # 
+    # def test_build_query_multiple_words_not(self):
+    #     self.sq.add_filter(~SQ(content='hello'))
+    #     self.sq.add_filter(~SQ(content='world'))
+    #     self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query((NOT hello NOT world))')
     
     # def test_build_query_multiple_words_or(self):
     #     self.sq.add_filter('content', 'hello', use_or=True)
