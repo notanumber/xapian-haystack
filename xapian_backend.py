@@ -947,7 +947,9 @@ class SearchQuery(BaseSearchQuery):
                 query_list.append(
                     xapian.Query(
                         xapian.Query.OP_AND, 
-                        self._query_from_search_node(child, child.negated)
+                        self._query_from_search_node(
+                            child, child.negated
+                        )
                     )
                 )
             else:
@@ -958,7 +960,10 @@ class SearchQuery(BaseSearchQuery):
                 else:
                     query_list.append(xapian.Query(value))
                 
-        return xapian.Query(xapian.Query.OP_AND, query_list)
+        if search_node.connector == 'OR':
+            return xapian.Query(xapian.Query.OP_OR, query_list)
+        else:
+            return xapian.Query(xapian.Query.OP_AND, query_list)
 
     def build_sub_query(self, value):
         return xapian.Query(value)
