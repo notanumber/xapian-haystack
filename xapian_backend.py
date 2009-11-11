@@ -934,21 +934,15 @@ class SearchQuery(BaseSearchQuery):
         super(SearchQuery, self).__init__(backend=backend)
         self.backend = backend or SearchBackend()
     
-    def as_xapian_query(self, parent, query_fragment_callback):
-        query_list = []
-
-        for child in parent.children:
-            if hasattr(child, 'as_query_string'):
-                query_list.append(self.as_xapian_query(child, query_fragment_callback))
-            else:
-                expression, value = child
-                field, filter_type = self.query_filter.split_expression(expression)
-                query_list.append(query_fragment_callback(field, filter_type, value))
-        
-        return xapian.Query(xapian.Query.OP_AND, query_list)
-        
     def build_query(self):
-        query = self.as_xapian_query(self.query_filter, self.build_query_fragment)
+        if not self.query_filter:
+            query = xapian.Query('')
+        else:
+            for child in self.query_filter.children:
+                expression, value = child
+                query = xapian.Query(value)
+        
+        return query
 
     def build_query_fragment(self, field, filter_type, value):
         return xapian.Query(value)
