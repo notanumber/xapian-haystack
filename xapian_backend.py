@@ -938,9 +938,13 @@ class SearchQuery(BaseSearchQuery):
         if not self.query_filter:
             query = xapian.Query('')
         else:
+            query_list = []
+            
             for child in self.query_filter.children:
                 expression, value = child
-                query = xapian.Query(value)
+                query_list.append(value)
+                
+            query = xapian.Query(xapian.Query.OP_AND, query_list)
         
         return query
 
