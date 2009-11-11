@@ -61,10 +61,10 @@ class XapianSearchQueryTestCase(TestCase):
         self.sq.add_filter(SQ(content='world'))
         self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query((hello AND world))')
     
-    # def test_build_query_multiple_words_not(self):
-    #     self.sq.add_filter(~SQ(content='hello'))
-    #     self.sq.add_filter(~SQ(content='world'))
-    #     self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query((NOT hello NOT world))')
+    def test_build_query_multiple_words_not(self):
+        self.sq.add_filter(~SQ(content='hello'))
+        self.sq.add_filter(~SQ(content='world'))
+        self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query(((<alldocuments> AND_NOT hello) AND (<alldocuments> AND_NOT world)))')
     
     # def test_build_query_multiple_words_or(self):
     #     self.sq.add_filter('content', 'hello', use_or=True)
