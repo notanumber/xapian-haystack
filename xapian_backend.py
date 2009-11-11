@@ -935,19 +935,32 @@ class SearchQuery(BaseSearchQuery):
     
     def build_query(self):
         if not self.query_filter:
-            query = xapian.Query('')
+            return xapian.Query('')
         else:
-            query_list = []
-            
-            for child in self.query_filter.children:
-                expression, value = child
-                query_list.append(value)
-                
-            query = xapian.Query(xapian.Query.OP_AND, query_list)
-        
-        return query
+            return self._query_from_search_node(self.query_filter)
 
-    def build_query_fragment(self, field, filter_type, value):
+    def _query_from_search_node(self, search_node, is_not=False):
+        query_list = []
+        
+        for child in search_node.children:
+            if isinstance(child, SearchNode):
+                query_list.append(
+                    xapian.Query(
+                        xapian.Query.OP_AND, 
+                        self._query_from_search_node(child, child.negated)
+                    )
+                )
+            else:
+                expression, value = child
+                if is_not:
+                    # DS_TODO: This can almost definitely be improved.
+                    query_list.append(xapian.Query(xapian.Query.OP_AND_NOT, '', value))
+                else:
+                    query_list.append(xapian.Query(value))
+                
+        return xapian.Query(xapian.Query.OP_AND, query_list)
+
+    def build_sub_query(self, value):
         return xapian.Query(value)
 
         # 
