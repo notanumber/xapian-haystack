@@ -17,6 +17,7 @@
 __author__ = 'David Sauve'
 __version__ = (1, 0, 0, 'beta')
 
+import time
 import datetime
 import cPickle as pickle
 import os
@@ -642,7 +643,7 @@ class SearchBackend(BaseSearchBackend):
                             day=result_date.day,
                         )
                     for n, facet_date in enumerate(facet_list):
-                        if result_date > datetime.datetime.strptime(facet_date[0], '%Y-%m-%dT%H:%M:%S'):
+                        if result_date > datetime.datetime(*(time.strptime(facet_date[0], '%Y-%m-%dT%H:%M:%S')[0:6])):
                             facet_list[n] = (facet_list[n][0], (facet_list[n][1] + 1))
                             break
             
