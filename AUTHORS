@@ -5,8 +5,9 @@ Primary Authors:
 
 Thanks to:
     * Daniel Lindsley for the awesome Haystack API and putting up with all of my questions.
-    * Trapeze Media <http://www.trapeze.com/> for providing the time and resources to complete this project as well as Q&A.
+    * Trapeze Media <http://www.trapeze.com/> for providing time and resources to complete this project as well as Q&A.
     * Supreet Sethi for suggestions regarding morphologic date comparisons and for fixing NOT query expressions.
     * Joshua Jonah for changes to highlighting logic to avoid reserved words.
     * Jannis Leidel for setting up the code base for pip, easy_install and PyPI.
     * Erik Aigner for the initial patch to get_identifier changes.
+    * wshallum for a patch that makes date facets compatible with Python 2.4
