@@ -965,25 +965,6 @@ class SearchQuery(BaseSearchQuery):
         else:
             return xapian.Query(xapian.Query.OP_AND, query_list)
 
-    def build_sub_query(self, value):
-        return xapian.Query(value)
-
-        # 
-        # if not self.query_filter.children:
-        #     return xapian.Query('')
-        # else:
-        #     query_list = []
-        #     
-        #     for child in self.query_filter.children:
-        #         if isinstance(child, self.query_filter.__class__):
-        #             query_list.append(self.build_query(child))
-        #         else:
-        #             expression, value = child
-        #             field, filter_type = self.query_filter.split_expression(expression)
-        #             query_list.append(xapian.Query(value))
-        #             
-        #     return xapian.Query(xapian.Query.OP_AND, query_list)
-                
     # def build_query_fragment(self, field, filter_type, value):
         # print 'field: ', field
         # print 'filter_type: ', filter_type
