@@ -256,7 +256,7 @@ class SearchBackend(BaseSearchBackend):
         """
         database = self._database(writable=True)
         if not models:
-            query, __unused__ = self._query(database, '*')
+            query = xapian.Query('')
             enquire = self._enquire(database, query)
             for match in enquire.get_mset(0, DEFAULT_MAX_RESULTS):
                 database.delete_document(match.docid)
@@ -267,7 +267,7 @@ class SearchBackend(BaseSearchBackend):
                     (model._meta.app_label, model._meta.module_name)
                 )
     @log_query
-    def search(self, query_string, sort_by=None, start_offset=0, 
+    def search(self, query, sort_by=None, start_offset=0, 
                end_offset=DEFAULT_MAX_RESULTS, fields='', highlight=False, 
                facets=None, date_facets=None, query_facets=None,
                narrow_queries=None, boost=None, spelling_query=None, 
@@ -276,7 +276,7 @@ class SearchBackend(BaseSearchBackend):
         Executes the search as defined in `query_string`.
         
         Required arguments:
-            `query_string` -- Search query to execute
+            `query` -- Search query to execute
         
         Optional arguments:
             `sort_by` -- Sort results by specified field (default = None)
@@ -319,7 +319,7 @@ class SearchBackend(BaseSearchBackend):
         and any suggestions for spell correction will be returned as well as
         the results.
         """
-        if not query_string:
+        if not query:
             return {
                 'results': [],
                 'hits': 0,
@@ -964,47 +964,3 @@ class SearchQuery(BaseSearchQuery):
             return xapian.Query(xapian.Query.OP_OR, query_list)
         else:
             return xapian.Query(xapian.Query.OP_AND, query_list)
-
-    # def build_query_fragment(self, field, filter_type, value):
-        # print 'field: ', field
-        # print 'filter_type: ', filter_type
-        # print 'value: ', value
-    
-        # """
-        # Builds a search query fragment from a field, filter type and value.
-        # Returns:
-        # A query string fragment suitable for parsing by Xapian.
-        # """
-        # result = ''
-        # 
-        # if not isinstance(value, (list, tuple)):
-        #     # Convert whatever we find to what xapian wants.
-        #     value = self.backend._marshal_value(value)
-        # 
-        # # Check to see if it's a phrase for an exact match.
-        # if ' ' in value:
-        #     value = '"%s"' % value
-        # 
-        # # 'content' is a special reserved word, much like 'pk' in
-        # # Django's ORM layer. It indicates 'no special field'.
-        # if field == 'content':
-        #     result = value
-        # else:
-        #     filter_types = {
-        #         'exact': '%s:%s',
-        #         'gte': '%s:%s..*',
-        #         'gt': 'NOT %s:..%s',
-        #         'lte': '%s:..%s',
-        #         'lt': 'NOT %s:%s..*',
-        #         'startswith': '%s:%s*',
-        #     }
-        # 
-        #     if filter_type != 'in':
-        #         result = filter_types[filter_type] % (field, value)
-        #     else:
-        #         in_options = []
-        #         for possible_value in value:
-        #             in_options.append('%s:%s' % (field, possible_value))
-        #         result = '(%s)' % ' OR '.join(in_options)
-        # 
-        # return result
