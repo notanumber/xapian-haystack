@@ -16,6 +16,7 @@
 
 import datetime
 import os
+import shutil
 
 from django.conf import settings
 from django.test import TestCase
@@ -29,24 +30,12 @@ from core.models import MockModel, AnotherMockModel
 class XapianSearchQueryTestCase(TestCase):
     def setUp(self):
         super(XapianSearchQueryTestCase, self).setUp()
-
-        # Stow.
-        temp_path = os.path.join('tmp', 'test_xapian_query')
-        self.old_xapian_path = getattr(settings, 'HAYSTACK_XAPIAN_PATH', temp_path)
-        settings.HAYSTACK_XAPIAN_PATH = temp_path
-
         self.sq = SearchQuery(backend=SearchBackend())
 
     def tearDown(self):
         if os.path.exists(settings.HAYSTACK_XAPIAN_PATH):
-            index_files = os.listdir(settings.HAYSTACK_XAPIAN_PATH)
+            shutil.rmtree(settings.HAYSTACK_XAPIAN_PATH)
 
-            for index_file in index_files:
-                os.remove(os.path.join(settings.HAYSTACK_XAPIAN_PATH, index_file))
-
-            os.removedirs(settings.HAYSTACK_XAPIAN_PATH)
-
-        settings.HAYSTACK_XAPIAN_PATH = self.old_xapian_path
         super(XapianSearchQueryTestCase, self).tearDown()
 
     def test_build_query_all(self):
