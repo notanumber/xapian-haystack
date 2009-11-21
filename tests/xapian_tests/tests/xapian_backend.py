@@ -78,10 +78,6 @@ class XapianSearchBackendTestCase(TestCase):
     def setUp(self):
         super(XapianSearchBackendTestCase, self).setUp()
         
-        temp_path = os.path.join('tmp', 'test_xapian_query')
-        self.old_xapian_path = getattr(settings, 'HAYSTACK_XAPIAN_PATH', temp_path)
-        settings.HAYSTACK_XAPIAN_PATH = temp_path
-        
         self.site = XapianSearchSite()
         self.sb = SearchBackend(site=self.site)
         self.msi = XapianMockSearchIndex(XapianMockModel, backend=self.sb)
@@ -107,7 +103,6 @@ class XapianSearchBackendTestCase(TestCase):
         if os.path.exists(settings.HAYSTACK_XAPIAN_PATH):
             shutil.rmtree(settings.HAYSTACK_XAPIAN_PATH)
 
-        settings.HAYSTACK_XAPIAN_PATH = self.old_xapian_path
         super(XapianSearchBackendTestCase, self).tearDown()
     
     def xapian_search(self, query_string):
