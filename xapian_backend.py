@@ -31,7 +31,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.utils.encoding import smart_unicode, force_unicode
 
 from haystack.backends import BaseSearchBackend, BaseSearchQuery, log_query
-from haystack.exceptions import MissingDependency
+from haystack.exceptions import MissingDependency, HaystackError
 from haystack.fields import DateField, DateTimeField, IntegerField, FloatField, BooleanField, MultiValueField
 from haystack.models import SearchResult
 from haystack.utils import get_identifier
@@ -42,11 +42,14 @@ except ImportError:
     raise MissingDependency("The 'xapian' backend requires the installation of 'xapian'. Please refer to the documentation.")
 
 
-DEFAULT_MAX_RESULTS = 100000
-
 DOCUMENT_ID_TERM_PREFIX = 'Q'
 DOCUMENT_CUSTOM_TERM_PREFIX = 'X'
 DOCUMENT_CT_TERM_PREFIX = DOCUMENT_CUSTOM_TERM_PREFIX + 'CONTENTTYPE'
+
+
+class InvalidIndexError(HaystackError):
+    """Raised when an index can not be opened."""
+    pass
 
 
 class XHValueRangeProcessor(xapian.ValueRangeProcessor):
@@ -258,7 +261,7 @@ class SearchBackend(BaseSearchBackend):
         if not models:
             query, __unused__ = self._query(database, '*')
             enquire = self._enquire(database, query)
-            for match in enquire.get_mset(0, DEFAULT_MAX_RESULTS):
+            for match in enquire.get_mset(0, self.document_count()):
                 database.delete_document(match.docid)
         else:
             for model in models:
@@ -268,7 +271,7 @@ class SearchBackend(BaseSearchBackend):
                 )
     @log_query
     def search(self, query_string, sort_by=None, start_offset=0, 
-               end_offset=DEFAULT_MAX_RESULTS, fields='', highlight=False, 
+               end_offset=0, fields='', highlight=False, 
                facets=None, date_facets=None, query_facets=None,
                narrow_queries=None, boost=None, spelling_query=None, 
                limit_to_registered_models=True, **kwargs):
@@ -281,7 +284,7 @@ class SearchBackend(BaseSearchBackend):
         Optional arguments:
             `sort_by` -- Sort results by specified field (default = None)
             `start_offset` -- Slice results from `start_offset` (default = 0)
-            `end_offset` -- Slice results at `end_offset` (default = 10,000)
+            `end_offset` -- Slice results at `end_offset` (default = 0), if 0, then all documents
             `fields` -- Filter results on `fields` (default = '')
             `highlight` -- Highlight terms in results (default = False)
             `facets` -- Facet results on fields (default = None)
@@ -352,6 +355,8 @@ class SearchBackend(BaseSearchBackend):
             'dates': {},
             'queries': {},
         }
+        if not end_offset:
+            end_offset = self.document_count()
         matches = enquire.get_mset(start_offset, (end_offset - start_offset))
         
         for match in matches:
@@ -393,14 +398,10 @@ class SearchBackend(BaseSearchBackend):
         """
         Retrieves the total document count for the search index.
         """
-        try:
-            database = self._database()
-        except xapian.DatabaseOpeningError:
-            return 0
-        return database.get_doccount()
+        return self._database().get_doccount()
     
     def more_like_this(self, model_instance, additional_query_string=None,
-                       start_offset=0, end_offset=DEFAULT_MAX_RESULTS, 
+                       start_offset=0, end_offset=0, 
                        limit_to_registered_models=True, **kwargs):
         """
         Given a model instance, returns a result set of similar documents.
@@ -413,7 +414,7 @@ class SearchBackend(BaseSearchBackend):
             `additional_query_string` -- An additional query string to narrow
                                          results
             `start_offset` -- The starting offset (default=0)
-            `end_offset` -- The ending offset (default=None)
+            `end_offset` -- The ending offset (default=0), if 0, then all documents
             `limit_to_registered_models` -- Limit returned results to models registered in the current `SearchSite` (default = True)
         
         Returns:
@@ -436,10 +437,12 @@ class SearchBackend(BaseSearchBackend):
         query = xapian.Query(DOCUMENT_ID_TERM_PREFIX + get_identifier(model_instance))
         enquire = self._enquire(database, query)
         rset = xapian.RSet()
-        for match in enquire.get_mset(0, DEFAULT_MAX_RESULTS):
+        if not end_offset:
+            end_offset = self.document_count()
+        for match in enquire.get_mset(0, end_offset):
             rset.add_document(match.docid)
         query = xapian.Query(xapian.Query.OP_OR,
-            [expand.term for expand in enquire.get_eset(DEFAULT_MAX_RESULTS, rset, XHExpandDecider())]
+            [expand.term for expand in enquire.get_eset(match.document.termlist_count(), rset, XHExpandDecider())]
         )
         query = xapian.Query(
             xapian.Query.OP_AND_NOT, [query, DOCUMENT_ID_TERM_PREFIX + get_identifier(model_instance)]
@@ -715,15 +718,18 @@ class SearchBackend(BaseSearchBackend):
         """
         if writable:
             self.content_field_name, self.schema = self.build_schema(self.site.all_searchfields())
-            
+        
             database = xapian.WritableDatabase(settings.HAYSTACK_XAPIAN_PATH, xapian.DB_CREATE_OR_OPEN)
             database.set_metadata('schema', pickle.dumps(self.schema, pickle.HIGHEST_PROTOCOL))
             database.set_metadata('content', pickle.dumps(self.content_field_name, pickle.HIGHEST_PROTOCOL))
         else:
-            database = xapian.Database(settings.HAYSTACK_XAPIAN_PATH)
+            try:
+                database = xapian.Database(settings.HAYSTACK_XAPIAN_PATH)
             
-            self.schema = pickle.loads(database.get_metadata('schema'))
-            self.content_field_name = pickle.loads(database.get_metadata('content'))
+                self.schema = pickle.loads(database.get_metadata('schema'))
+                self.content_field_name = pickle.loads(database.get_metadata('content'))
+            except xapian.DatabaseOpeningError:
+                raise InvalidIndexError(u'Unable to open index at %s' % settings.HAYSTACK_XAPIAN_PATH)
         
         return database
     

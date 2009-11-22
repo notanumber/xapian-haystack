@@ -26,7 +26,7 @@ from django.utils.encoding import force_unicode
 from django.test import TestCase
 
 from haystack import indexes, sites
-from haystack.backends.xapian_backend import SearchBackend, DEFAULT_MAX_RESULTS
+from haystack.backends.xapian_backend import SearchBackend, InvalidIndexError
 
 from core.models import MockTag, AnotherMockModel
 
@@ -115,7 +115,7 @@ class XapianSearchBackendTestCase(TestCase):
             query = xapian.Query(query_string) # Empty query matches all
         enquire = xapian.Enquire(database)
         enquire.set_query(query)
-        matches = enquire.get_mset(0, DEFAULT_MAX_RESULTS)
+        matches = enquire.get_mset(0, database.get_doccount())
         
         document_list = []
         
@@ -313,7 +313,7 @@ class XapianSearchBackendTestCase(TestCase):
         self.assert_(self.sb.document_count() > 0)
         
         self.sb.delete_index()
-        self.assertEqual(self.sb.document_count(), 0)
+        self.assertRaises(InvalidIndexError, self.sb.document_count)
     
     def test_order_by(self):
         self.sb.update(self.msi, self.sample_objs)
