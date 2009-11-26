@@ -11,3 +11,4 @@ Thanks to:
     * Jannis Leidel for setting up the code base for pip, easy_install and PyPI.
     * Erik Aigner for the initial patch to get_identifier changes.
     * wshallum for a patch that makes date facets compatible with Python 2.4
+    * askfir for reporting issues with narrow_queries and float fields.
