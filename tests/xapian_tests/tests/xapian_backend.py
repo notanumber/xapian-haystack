@@ -189,7 +189,7 @@ class XapianSearchBackendTestCase(TestCase):
         self.assertEqual([result.pk for result in self.sb.search('value:10')['results']], [2])
         self.assertEqual([result.pk for result in self.sb.search('flag:false')['results']], [2])
         self.assertEqual([result.pk for result in self.sb.search('popularity:35.5')['results']], [2])
-        
+
         # NOT operator
         self.assertEqual([result.pk for result in self.sb.search('NOT name:david1')['results']], [2, 3])
         self.assertEqual([result.pk for result in self.sb.search('NOT name:david1 AND index')['results']], [2, 3])
@@ -263,8 +263,8 @@ class XapianSearchBackendTestCase(TestCase):
         self.sb.update(self.msi, self.sample_objs)
         self.assertEqual(len(self.xapian_search('')), 3)
         
-        self.assertEqual(self.sb.search('', narrow_queries=['name:david1']), {'hits': 0, 'results': []})
-        results = self.sb.search('index', narrow_queries=['name:david1'])
+        self.assertEqual(self.sb.search('', narrow_queries=set(['name:david1'])), {'hits': 0, 'results': []})
+        results = self.sb.search('index', narrow_queries=set(['name:david1']))
         self.assertEqual(results['hits'], 1)
     
     def test_highlight(self):
