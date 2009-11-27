@@ -452,8 +452,8 @@ class SearchBackend(BaseSearchBackend):
             registered_models = self.build_registered_models_list()
             
             if len(registered_models) > 0:
-                narrow_queries = []
-                narrow_queries.append(
+                narrow_queries = set()
+                narrow_queries.add(
                     ' '.join(['django_ct:%s' % model for model in registered_models])
                 )
         if additional_query_string:
