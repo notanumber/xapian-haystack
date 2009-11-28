@@ -26,7 +26,7 @@ from django.utils.encoding import force_unicode
 from django.test import TestCase
 
 from haystack import indexes, sites
-from haystack.backends.xapian_backend import SearchBackend, DEFAULT_MAX_RESULTS
+from haystack.backends.xapian_backend import SearchBackend
 
 from core.models import MockTag, AnotherMockModel
 
@@ -78,10 +78,6 @@ class XapianSearchBackendTestCase(TestCase):
     def setUp(self):
         super(XapianSearchBackendTestCase, self).setUp()
         
-        temp_path = os.path.join('tmp', 'test_xapian_query')
-        self.old_xapian_path = getattr(settings, 'HAYSTACK_XAPIAN_PATH', temp_path)
-        settings.HAYSTACK_XAPIAN_PATH = temp_path
-        
         self.site = XapianSearchSite()
         self.sb = SearchBackend(site=self.site)
         self.msi = XapianMockSearchIndex(XapianMockModel, backend=self.sb)
@@ -100,14 +96,13 @@ class XapianSearchBackendTestCase(TestCase):
             self.sample_objs.append(mock)
             
         self.sample_objs[0].popularity = 834.0
-        self.sample_objs[1].popularity = 35.0
+        self.sample_objs[1].popularity = 35.5
         self.sample_objs[2].popularity = 972.0
     
     def tearDown(self):
         if os.path.exists(settings.HAYSTACK_XAPIAN_PATH):
             shutil.rmtree(settings.HAYSTACK_XAPIAN_PATH)
 
-        settings.HAYSTACK_XAPIAN_PATH = self.old_xapian_path
         super(XapianSearchBackendTestCase, self).tearDown()
     
     def xapian_search(self, query_string):
@@ -120,7 +115,7 @@ class XapianSearchBackendTestCase(TestCase):
             query = xapian.Query(query_string) # Empty query matches all
         enquire = xapian.Enquire(database)
         enquire.set_query(query)
-        matches = enquire.get_mset(0, DEFAULT_MAX_RESULTS)
+        matches = enquire.get_mset(0, database.get_doccount())
         
         document_list = []
         
@@ -188,6 +183,12 @@ class XapianSearchBackendTestCase(TestCase):
         # Wildcard -- All
         self.assertEqual(self.sb.search('*')['hits'], 3)
         self.assertEqual([result.pk for result in self.sb.search('*')['results']], [1, 2, 3])
+        
+        # Exact match
+        self.assertEqual([result.pk for result in self.sb.search('name:david2')['results']], [2])
+        self.assertEqual([result.pk for result in self.sb.search('value:10')['results']], [2])
+        self.assertEqual([result.pk for result in self.sb.search('flag:false')['results']], [2])
+        self.assertEqual([result.pk for result in self.sb.search('popularity:35.5')['results']], [2])
         
         # NOT operator
         self.assertEqual([result.pk for result in self.sb.search('NOT name:david1')['results']], [2, 3])
@@ -262,8 +263,8 @@ class XapianSearchBackendTestCase(TestCase):
         self.sb.update(self.msi, self.sample_objs)
         self.assertEqual(len(self.xapian_search('')), 3)
         
-        self.assertEqual(self.sb.search('', narrow_queries=['name:david1']), {'hits': 0, 'results': []})
-        results = self.sb.search('index', narrow_queries=['name:david1'])
+        self.assertEqual(self.sb.search('', narrow_queries=set(['name:david1'])), {'hits': 0, 'results': []})
+        results = self.sb.search('index', narrow_queries=set(['name:david1']))
         self.assertEqual(results['hits'], 1)
     
     def test_highlight(self):
