@@ -45,6 +45,14 @@ class XapianSearchQueryTestCase(TestCase):
         self.sq.add_filter(SQ(content='hello'))
         self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query(hello)')
     
+    def test_build_query_boolean(self):
+        self.sq.add_filter(SQ(content=True))
+        self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query(true)')
+    
+    def test_build_query_datetime(self):
+        self.sq.add_filter(SQ(content=datetime.datetime(2009, 5, 8, 11, 28)))
+        self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query(20090508T112800Z)')
+    
     def test_build_query_multiple_words_and(self):
         self.sq.add_filter(SQ(content='hello'))
         self.sq.add_filter(SQ(content='world'))
@@ -64,9 +72,14 @@ class XapianSearchQueryTestCase(TestCase):
         self.sq.add_filter(~SQ(content='world'))
         self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query(((why OR hello) AND (<alldocuments> AND_NOT world)))')
     
-    # def test_build_query_phrase(self):
-    #     self.sq.add_filter('content', 'hello world')
-    #     self.assertEqual(self.sq.build_query(), '"hello world"')
+    def test_build_query_phrase(self):
+        self.sq.add_filter(SQ(content='hello world'))
+        self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query(hello world)')
+    
+    # def test_build_query_boost(self):
+    #     self.sq.add_filter(SQ(content='hello'))
+    #     self.sq.add_boost('world', 5)
+    #     self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query(hello world)')
     # 
     # def test_build_query_multiple_filter_types(self):
     #     self.sq.add_filter('content', 'why')

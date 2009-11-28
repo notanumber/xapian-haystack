@@ -92,11 +92,11 @@ class XHValueRangeProcessor(xapian.ValueRangeProcessor):
                     elif field_dict['type'] == 'date' or field_dict['type'] == 'datetime':
                         end = u'99990101000000'
                 if field_dict['type'] == 'float':
-                    begin = self.sb._marshal_value(float(begin))
-                    end = self.sb._marshal_value(float(end))
+                    begin = _marshal_value(float(begin))
+                    end = _marshal_value(float(end))
                 elif field_dict['type'] == 'long':
-                    begin = self.sb._marshal_value(long(begin))
-                    end = self.sb._marshal_value(long(end))
+                    begin = _marshal_value(long(begin))
+                    end = _marshal_value(long(end))
                 return field_dict['column'], str(begin), str(end)
 
 
@@ -215,7 +215,7 @@ class SearchBackend(BaseSearchBackend):
                         value = data[field['field_name']]
                         term_generator.index_text(force_unicode(value))
                         term_generator.index_text(force_unicode(value), 1, prefix)
-                        document.add_value(field['column'], self._marshal_value(value))
+                        document.add_value(field['column'], _marshal_value(value))
                 
                 document.set_data(pickle.dumps(
                     (obj._meta.app_label, obj._meta.module_name, obj.pk, data),
@@ -676,36 +676,6 @@ class SearchBackend(BaseSearchBackend):
         
         return facet_dict
     
-    def _marshal_value(self, value):
-        """
-        Private method that converts Python values to a string for Xapian values.
-        """
-        if isinstance(value, datetime.datetime):
-            if value.microsecond:
-                value = u'%04d%02d%02d%02d%02d%02d%06d' % (
-                    value.year, value.month, value.day, value.hour,
-                    value.minute, value.second, value.microsecond
-                )
-            else:
-                value = u'%04d%02d%02d%02d%02d%02d' % (
-                    value.year, value.month, value.day, value.hour,
-                    value.minute, value.second
-                )
-        elif isinstance(value, datetime.date):
-            value = u'%04d%02d%02d000000' % (value.year, value.month, value.day)
-        elif isinstance(value, bool):
-            if value:
-                value = u't'
-            else:
-                value = u'f'
-        elif isinstance(value, float):
-            value = xapian.sortable_serialise(value)
-        elif isinstance(value, (int, long)):
-            value = u'%012d' % value
-        else:
-            value = force_unicode(value)
-        return value
-    
     def _database(self, writable=False):
         """
         Private method that returns a xapian.Database for use and sets up
@@ -960,6 +930,7 @@ class SearchQuery(BaseSearchQuery):
                 )
             else:
                 expression, value = child
+                value = _marshal_value(value)
                 if is_not:
                     # DS_TODO: This can almost definitely be improved.
                     query_list.append(xapian.Query(xapian.Query.OP_AND_NOT, '', value))
@@ -970,3 +941,35 @@ class SearchQuery(BaseSearchQuery):
             return xapian.Query(xapian.Query.OP_OR, query_list)
         else:
             return xapian.Query(xapian.Query.OP_AND, query_list)
+
+
+def _marshal_value(value):
+    """
+    Private method that converts Python values to a string for Xapian values.
+    """
+    if isinstance(value, datetime.datetime):
+        if value.microsecond:
+            value = u'%04d%02d%02dT%02d%02d%02d%06dZ' % (
+                value.year, value.month, value.day, value.hour,
+                value.minute, value.second, value.microsecond
+            )
+        else:
+            value = u'%04d%02d%02dT%02d%02d%02dZ' % (
+                value.year, value.month, value.day, value.hour,
+                value.minute, value.second
+            )
+    elif isinstance(value, datetime.date):
+        value = u'%04d%02d%02dT000000Z' % (value.year, value.month, value.day)
+    elif isinstance(value, bool):
+        if value:
+            value = u'true'
+        else:
+            value = u'false'
+    elif isinstance(value, float):
+        value = xapian.sortable_serialise(value)
+    elif isinstance(value, (int, long)):
+        value = u'%012d' % value
+    else:
+        value = force_unicode(value)
+    return value
+
