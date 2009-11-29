@@ -888,6 +888,19 @@ class SearchQuery(BaseSearchQuery):
         else:
             query = self._query_from_search_node(self.query_filter)
 
+        if self.models:
+            subqueries = [
+                xapian.Query('%s%s.%s' % (
+                        DOCUMENT_CT_TERM_PREFIX, 
+                        model._meta.app_label, model._meta.module_name
+                    )
+                ) for model in self.models
+            ]
+            query = xapian.Query(
+                xapian.Query.OP_AND, query,
+                xapian.Query(xapian.Query.OP_OR, subqueries)
+            )
+
         if self.boost:
             subqueries = [
                 xapian.Query(
