@@ -130,20 +130,6 @@ class SearchBackend(BaseSearchBackend):
     your settings.  This should point to a location where you would your
     indexes to reside.
     """
-    RESERVED_WORDS = (
-        'AND',
-        'NOT',
-        'OR',
-        'XOR',
-        'NEAR',
-        'ADJ',
-    )
-    
-    RESERVED_CHARACTERS = (
-        '\\', '+', '-', '&&', '||', '!', '(', ')', '{', '}',
-        '[', ']', '^', '"', '~', '*', '?', ':',
-    )
-    
     def __init__(self, site=None, stemming_language='english'):
         """
         Instantiates an instance of `SearchBackend`.
@@ -270,10 +256,9 @@ class SearchBackend(BaseSearchBackend):
                     (model._meta.app_label, model._meta.module_name)
                 )
     @log_query
-    def search(self, query, sort_by=None, start_offset=0, 
-               end_offset=0, fields='', highlight=False, 
-               facets=None, date_facets=None, query_facets=None,
-               narrow_queries=None, boost=None, spelling_query=None, 
+    def search(self, query, sort_by=None, start_offset=0, end_offset=None,
+               fields='', highlight=False, facets=None, date_facets=None,
+               query_facets=None, narrow_queries=None, spelling_query=None,
                limit_to_registered_models=True, **kwargs):
         """
         Executes the search as defined in `query_string`.
@@ -284,7 +269,7 @@ class SearchBackend(BaseSearchBackend):
         Optional arguments:
             `sort_by` -- Sort results by specified field (default = None)
             `start_offset` -- Slice results from `start_offset` (default = 0)
-            `end_offset` -- Slice results at `end_offset` (default = 0), if 0, then all documents
+            `end_offset` -- Slice results at `end_offset` (default = None), if None, then all documents
             `fields` -- Filter results on `fields` (default = '')
             `highlight` -- Highlight terms in results (default = False)
             `facets` -- Facet results on fields (default = None)
@@ -292,7 +277,6 @@ class SearchBackend(BaseSearchBackend):
             `query_facets` -- Facet results on queries (default = None)
             `narrow_queries` -- Narrow queries (default = None)
             `spelling_query` -- An optional query to execute spelling suggestion on
-            `boost` -- Dictionary of terms and weights to boost results
             `limit_to_registered_models` -- Limit returned results to models registered in the current `SearchSite` (default = True)
             
         Returns:
@@ -341,7 +325,7 @@ class SearchBackend(BaseSearchBackend):
         
         database = self._database()
         query, spelling_suggestion = self._query(
-            database, query_string, narrow_queries, spelling_query, boost
+            database, query_string, narrow_queries, spelling_query
         )
         enquire = self._enquire(database, query)
         
@@ -401,7 +385,7 @@ class SearchBackend(BaseSearchBackend):
         return self._database().get_doccount()
     
     def more_like_this(self, model_instance, additional_query_string=None,
-                       start_offset=0, end_offset=0, 
+                       start_offset=0, end_offset=None, 
                        limit_to_registered_models=True, **kwargs):
         """
         Given a model instance, returns a result set of similar documents.
@@ -414,7 +398,7 @@ class SearchBackend(BaseSearchBackend):
             `additional_query_string` -- An additional query string to narrow
                                          results
             `start_offset` -- The starting offset (default=0)
-            `end_offset` -- The ending offset (default=0), if 0, then all documents
+            `end_offset` -- The ending offset (default=None), if None, then all documents
             `limit_to_registered_models` -- Limit returned results to models registered in the current `SearchSite` (default = True)
         
         Returns:
@@ -721,7 +705,7 @@ class SearchBackend(BaseSearchBackend):
         term_generator.set_document(document)
         return term_generator
     
-    def _query(self, database, query_string, narrow_queries=None, spelling_query=None, boost=None):
+    def _query(self, database, query_string, narrow_queries=None, spelling_query=None):
         """
         Private method that takes a query string and returns a xapian.Query.
         
@@ -732,7 +716,6 @@ class SearchBackend(BaseSearchBackend):
         Optional arguments:
             `narrow_queries` -- A list of queries to narrow the query with
             `spelling_query` -- An optional query to execute spelling suggestion on
-            `boost` -- A dictionary of terms to boost with values
         
         Returns a xapian.Query instance with prefixes and ranges properly
         setup as pulled from the `query_string`.
@@ -765,16 +748,6 @@ class SearchBackend(BaseSearchBackend):
             query = xapian.Query(
                 xapian.Query.OP_FILTER,
                 query, xapian.Query(xapian.Query.OP_AND, subqueries)
-            )
-        if boost:
-            subqueries = [
-                xapian.Query(
-                    xapian.Query.OP_SCALE_WEIGHT, xapian.Query(term), value
-                ) for term, value in boost.iteritems()
-            ]
-            query = xapian.Query(
-                xapian.Query.OP_OR, query,
-                xapian.Query(xapian.Query.OP_AND, subqueries)
             )
         
         return query, spelling_suggestion

@@ -82,46 +82,39 @@ class XapianSearchQueryTestCase(TestCase):
         self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query((hello OR 5 * world))')
     
     # def test_build_query_multiple_filter_types(self):
-    #     self.sq.add_filter('content', 'why')
-    #     self.sq.add_filter('pub_date__lte', datetime.datetime(2009, 2, 10, 1, 59))
-    #     self.sq.add_filter('author__gt', 'david')
-    #     self.sq.add_filter('created__lt', datetime.datetime(2009, 2, 12, 12, 13))
-    #     self.sq.add_filter('title__gte', 'B')
-    #     self.sq.add_filter('id__in', [1, 2, 3])
-    #     self.assertEqual(self.sq.build_query(), 'why AND pub_date:..20090210015900 AND NOT author:..david AND NOT created:20090212121300..* AND title:B..* AND (id:1 OR id:2 OR id:3)')
+    #     self.sq.add_filter(SQ(content='why'))
+    #     self.sq.add_filter(SQ(pub_date__lte='2009-02-10 01:59:00'))
+    #     self.sq.add_filter(SQ(author__gt='daniel'))
+    #     self.sq.add_filter(SQ(created__lt='2009-02-12 12:13:00'))
+    #     self.sq.add_filter(SQ(title__gte='B'))
+    #     self.sq.add_filter(SQ(id__in=[1, 2, 3]))
+    #     self.assertEqual(self.sq.build_query(), u'(why AND pub_date:[* TO "2009-02-10 01:59:00"] AND author:{daniel TO *} AND created:{* TO "2009-02-12 12:13:00"} AND title:[B TO *] AND (id:"1" OR id:"2" OR id:"3"))')
     # 
-    # def test_build_query_multiple_exclude_types(self):
-    #     self.sq.add_filter('content', 'why', use_not=True)
-    #     self.sq.add_filter('pub_date__lte', datetime.datetime(2009, 2, 10, 1, 59), use_not=True)
-    #     self.sq.add_filter('author__gt', 'david', use_not=True)
-    #     self.sq.add_filter('created__lt', datetime.datetime(2009, 2, 12, 12, 13), use_not=True)
-    #     self.sq.add_filter('title__gte', 'B', use_not=True)
-    #     self.sq.add_filter('id__in', [1, 2, 3], use_not=True)
-    #     self.assertEqual(self.sq.build_query(), 'NOT why AND NOT pub_date:..20090210015900 AND author:..david AND created:20090212121300..* AND NOT title:B..* AND NOT id:1 NOT id:2 NOT id:3')
+    # def test_build_query_in_filter_multiple_words(self):
+    #     self.sq.add_filter(SQ(content='why'))
+    #     self.sq.add_filter(SQ(title__in=["A Famous Paper", "An Infamous Article"]))
+    #     self.assertEqual(self.sq.build_query(), u'(why AND (title:"A Famous Paper" OR title:"An Infamous Article"))')
+    # 
+    # def test_build_query_in_filter_datetime(self):
+    #     self.sq.add_filter(SQ(content='why'))
+    #     self.sq.add_filter(SQ(pub_date__in=[datetime.datetime(2009, 7, 6, 1, 56, 21)]))
+    #     self.assertEqual(self.sq.build_query(), u'(why AND (pub_date:"2009-07-06T01:56:21Z"))')
     # 
     # def test_build_query_wildcard_filter_types(self):
-    #     self.sq.add_filter('content', 'why')
-    #     self.sq.add_filter('title__startswith', 'haystack')
-    #     self.assertEqual(self.sq.build_query(), 'why AND title:haystack*')
+    #     self.sq.add_filter(SQ(content='why'))
+    #     self.sq.add_filter(SQ(title__startswith='haystack'))
+    #     self.assertEqual(self.sq.build_query(), u'(why AND title:haystack*)')
     # 
-    # def test_clean(self):
-    #     self.assertEqual(self.sq.clean('hello world'), 'hello world')
-    #     self.assertEqual(self.sq.clean('hello AND world'), 'hello and world')
-    #     self.assertEqual(self.sq.clean('hello AND OR NOT + - && || ! ( ) { } [ ] ^ " ~ * ? : \ world'), 'hello and or not \\+ \\- \\&& \\|| \\! \\( \\) \\{ \\} \\[ \\] \\^ \\" \\~ \\* \\? \\: \\\\ world')
-    #     self.assertEqual(self.sq.clean('so please NOTe i am in a bAND and bORed'), 'so please NOTe i am in a bAND and bORed')
-    # 
+    def test_clean(self):
+        self.assertEqual(self.sq.clean('hello world'), 'hello world')
+        self.assertEqual(self.sq.clean('hello AND world'), 'hello AND world')
+        self.assertEqual(self.sq.clean('hello AND OR NOT TO + - && || ! ( ) { } [ ] ^ " ~ * ? : \ world'), 'hello AND OR NOT TO + - && || ! ( ) { } [ ] ^ " ~ * ? : \ world')
+        self.assertEqual(self.sq.clean('so please NOTe i am in a bAND and bORed'), 'so please NOTe i am in a bAND and bORed')
+    
     # def test_build_query_with_models(self):
-    #     self.sq.add_filter('content', 'hello')
+    #     self.sq.add_filter(SQ(content='hello'))
     #     self.sq.add_model(MockModel)
-    #     self.assertEqual(self.sq.build_query(), u'(hello) django_ct:core.mockmodel')
+    #     self.assertEqual(self.sq.build_query(), '(hello) AND (django_ct:core.mockmodel)')
     # 
     #     self.sq.add_model(AnotherMockModel)
-    #     self.assertEqual(self.sq.build_query(), u'(hello) django_ct:core.anothermockmodel django_ct:core.mockmodel')
-    # 
-    # def test_build_query_with_datetime(self):
-    #     self.sq.add_filter('pub_date', datetime.datetime(2009, 5, 9, 16, 20))
-    #     self.assertEqual(self.sq.build_query(), u'pub_date:20090509162000')
-    # 
-    # def test_build_query_with_sequence_and_filter_not_in(self):
-    #     self.sq.add_filter('id__exact', [1, 2, 3])
-    #     self.assertEqual(self.sq.build_query(), u'id:[1, 2, 3]')
+    #     self.assertEqual(self.sq.build_query(), '(hello) AND (django_ct:core.mockmodel OR django_ct:core.anothermockmodel)')
