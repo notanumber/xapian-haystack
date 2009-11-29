@@ -911,9 +911,22 @@ class SearchQuery(BaseSearchQuery):
     
     def build_query(self):
         if not self.query_filter:
-            return xapian.Query('')
+            query = xapian.Query('')
         else:
-            return self._query_from_search_node(self.query_filter)
+            query = self._query_from_search_node(self.query_filter)
+
+        if self.boost:
+            subqueries = [
+                xapian.Query(
+                    xapian.Query.OP_SCALE_WEIGHT, xapian.Query(term), value
+                ) for term, value in self.boost.iteritems()
+            ]
+            query = xapian.Query(
+                xapian.Query.OP_OR, query,
+                xapian.Query(xapian.Query.OP_AND, subqueries)
+            )
+        
+        return query
 
     def _query_from_search_node(self, search_node, is_not=False):
         query_list = []
