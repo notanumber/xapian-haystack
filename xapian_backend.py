@@ -962,33 +962,25 @@ class SearchQuery(BaseSearchQuery):
                 else:
                     if filter_type == 'exact':
                         if ' ' in value:
+                            phrase_query = xapian.Query(
+                                xapian.Query.OP_PHRASE, [
+                                    '%s%s%s' % (
+                                        DOCUMENT_CUSTOM_TERM_PREFIX,
+                                        field.upper(), _marshal_value(term)
+                                    ) for term in value.split()
+                                ]
+                            )
+                            
                             if is_not:
                                 query_list.append(
                                     xapian.Query(
                                         xapian.Query.OP_AND_NOT,
                                         xapian.Query(''),
-                                        xapian.Query(
-                                            xapian.Query.OP_PHRASE, [
-                                                '%s%s%s' % (
-                                                    DOCUMENT_CUSTOM_TERM_PREFIX,
-                                                    field.upper(),
-                                                    _marshal_value(term)
-                                                ) for term in value.split()
-                                            ]
-                                        )
+                                        phrase_query
                                     )
                                 )
                             else:
-                                query_list.append(
-                                    xapian.Query(
-                                        xapian.Query.OP_PHRASE, [
-                                            '%s%s%s' % (
-                                                DOCUMENT_CUSTOM_TERM_PREFIX,
-                                                field.upper(), value
-                                            ) for term in value.split()
-                                        ]
-                                    )
-                                )
+                                query_list.append(phrase_query)
                         else:
                             if is_not:
                                 query_list.append(
@@ -1021,10 +1013,18 @@ class SearchQuery(BaseSearchQuery):
                     elif filter_type == 'in':
                         query_list.append(
                             xapian.Query(
-                                xapian.Query.OP_OR, [xapian.Query('%s%s%s' % (DOCUMENT_CUSTOM_TERM_PREFIX, field.upper(), _marshal_value(possible_value))) for possible_value in value]
+                                xapian.Query.OP_OR, [
+                                    xapian.Query(
+                                        '%s%s%s' % (
+                                            DOCUMENT_CUSTOM_TERM_PREFIX,
+                                            field.upper(),
+                                            _marshal_value(possible_value)
+                                        )
+                                    ) for possible_value in value
+                                ]
                             )
                         )
-                        
+                    
 
         if search_node.connector == 'OR':
             return xapian.Query(xapian.Query.OP_OR, query_list)
