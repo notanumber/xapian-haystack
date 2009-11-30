@@ -936,19 +936,6 @@ class SearchQuery(BaseSearchQuery):
                 if not isinstance(value, (list, tuple)):
                     value = _marshal_value(value)
 
-                # if ' ' in value:
-                #     phrase_query = [
-                #         xapian.Query(
-                #             '%s%s%s' % (
-                #                 DOCUMENT_CUSTOM_TERM_PREFIX,
-                #                 field.upper(), 
-                #                 _marshal_value(term)
-                #             )
-                #         ) for term in value.split()
-                #     ]
-                # else:
-                #     phrase_query = None
-
                 if field == 'content':
                     if ' ' in value:
                         if is_not:
@@ -956,7 +943,9 @@ class SearchQuery(BaseSearchQuery):
                                 xapian.Query(
                                     xapian.Query.OP_AND_NOT,
                                     xapian.Query(''),
-                                    xapian.Query(xapian.Query.OP_PHRASE, value.split())
+                                    xapian.Query
+                                        (xapian.Query.OP_PHRASE, value.split()
+                                    )
                                 )
                             )
                         else:
@@ -982,7 +971,8 @@ class SearchQuery(BaseSearchQuery):
                                             xapian.Query.OP_PHRASE, [
                                                 '%s%s%s' % (
                                                     DOCUMENT_CUSTOM_TERM_PREFIX,
-                                                    field.upper(), _marshal_value(term)
+                                                    field.upper(),
+                                                    _marshal_value(term)
                                                 ) for term in value.split()
                                             ]
                                         )
@@ -1003,13 +993,19 @@ class SearchQuery(BaseSearchQuery):
                             if is_not:
                                 query_list.append(
                                     xapian.Query(
-                                        xapian.Query. OP_AND_NOT, '', '%s%s%s' % (DOCUMENT_CUSTOM_TERM_PREFIX, field.upper(), value)
+                                        xapian.Query.OP_AND_NOT, '', '%s%s%s' % (
+                                            DOCUMENT_CUSTOM_TERM_PREFIX,
+                                            field.upper(), value
+                                        )
                                     )
                                 )
                             else:
                                 query_list.append(
                                     xapian.Query(
-                                        '%s%s%s' % (DOCUMENT_CUSTOM_TERM_PREFIX, field.upper(), value)
+                                        '%s%s%s' % (
+                                            DOCUMENT_CUSTOM_TERM_PREFIX,
+                                            field.upper(), value
+                                        )
                                     )
                                 )
                     elif filter_type == 'gt':
@@ -1023,17 +1019,10 @@ class SearchQuery(BaseSearchQuery):
                     elif filter_type == 'startswith':
                         pass
                     elif filter_type == 'in':
-                        subqueries = [
-                            xapian.Query(
-                                '%s%s%s' % (
-                                    DOCUMENT_CUSTOM_TERM_PREFIX,
-                                    field.upper(), 
-                                    _marshal_value(possible_value)
-                                )
-                            ) for possible_value in value
-                        ]
                         query_list.append(
-                            xapian.Query(xapian.Query.OP_OR, subqueries)
+                            xapian.Query(
+                                xapian.Query.OP_OR, [xapian.Query('%s%s%s' % (DOCUMENT_CUSTOM_TERM_PREFIX, field.upper(), _marshal_value(possible_value))) for possible_value in value]
+                            )
                         )
                         
 
