@@ -890,10 +890,12 @@ class SearchQuery(BaseSearchQuery):
 
         if self.models:
             subqueries = [
-                xapian.Query('%s%s.%s' % (
-                        DOCUMENT_CT_TERM_PREFIX, 
-                        model._meta.app_label, model._meta.module_name
-                    )
+                xapian.Query(
+                    xapian.Query.OP_SCALE_WEIGHT, xapian.Query('%s%s.%s' % (
+                            DOCUMENT_CT_TERM_PREFIX, 
+                            model._meta.app_label, model._meta.module_name
+                        )
+                    ), 0
                 ) for model in self.models
             ]
             query = xapian.Query(

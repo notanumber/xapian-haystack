@@ -114,7 +114,7 @@ class XapianSearchQueryTestCase(TestCase):
     def test_build_query_with_models(self):
         self.sq.add_filter(SQ(content='hello'))
         self.sq.add_model(MockModel)
-        self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query((hello AND XCONTENTTYPEcore.mockmodel))')
+        self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query((hello AND 0 * XCONTENTTYPEcore.mockmodel))')
     
         self.sq.add_model(AnotherMockModel)
-        self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query((hello AND (XCONTENTTYPEcore.anothermockmodel OR XCONTENTTYPEcore.mockmodel)))')
+        self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query((hello AND (0 * XCONTENTTYPEcore.anothermockmodel OR 0 * XCONTENTTYPEcore.mockmodel)))')
