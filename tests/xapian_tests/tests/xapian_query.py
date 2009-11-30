@@ -45,6 +45,18 @@ class XapianSearchQueryTestCase(TestCase):
         self.sq.add_filter(SQ(content='hello'))
         self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query(hello)')
     
+    def test_build_query_single_word_not(self):
+        self.sq.add_filter(~SQ(content='hello'))
+        self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query((<alldocuments> AND_NOT hello))')
+
+    def test_build_query_single_word_field_exact(self):
+        self.sq.add_filter(SQ(foo='hello'))
+        self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query(XFOOhello)')
+
+    def test_build_query_single_word_field_exact_not(self):
+        self.sq.add_filter(~SQ(foo='hello'))
+        self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query((<alldocuments> AND_NOT XFOOhello))')
+
     def test_build_query_boolean(self):
         self.sq.add_filter(SQ(content=True))
         self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query(true)')
@@ -67,15 +79,33 @@ class XapianSearchQueryTestCase(TestCase):
         self.sq.add_filter(SQ(content='hello') | SQ(content='world'))
         self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query((hello OR world))')
     
+    def test_build_query_multiple_words_or_not(self):
+        self.sq.add_filter(~SQ(content='hello') | ~SQ(content='world'))
+        self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query(((<alldocuments> AND_NOT hello) OR (<alldocuments> AND_NOT world)))')
+
     def test_build_query_multiple_words_mixed(self):
         self.sq.add_filter(SQ(content='why') | SQ(content='hello'))
         self.sq.add_filter(~SQ(content='world'))
         self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query(((why OR hello) AND (<alldocuments> AND_NOT world)))')
     
+    def test_build_query_multiple_word_field_exact(self):
+        self.sq.add_filter(SQ(foo='hello'))
+        self.sq.add_filter(SQ(bar='world'))
+        self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query((XFOOhello AND XBARworld))')
+
+    def test_build_query_multiple_word_field_exact_not(self):
+        self.sq.add_filter(~SQ(foo='hello'))
+        self.sq.add_filter(~SQ(bar='world'))
+        self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query(((<alldocuments> AND_NOT XFOOhello) AND (<alldocuments> AND_NOT XBARworld)))')
+
     def test_build_query_phrase(self):
         self.sq.add_filter(SQ(content='hello world'))
-        self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query(hello world)')
+        self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query((hello PHRASE 2 world))')
     
+    def test_build_query_phrase_not(self):
+        self.sq.add_filter(~SQ(content='hello world'))
+        self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query((<alldocuments> AND_NOT (hello PHRASE 2 world)))')
+
     def test_build_query_boost(self):
         self.sq.add_filter(SQ(content='hello'))
         self.sq.add_boost('world', 5)
@@ -88,13 +118,13 @@ class XapianSearchQueryTestCase(TestCase):
     #     self.sq.add_filter(SQ(created__lt='2009-02-12 12:13:00'))
     #     self.sq.add_filter(SQ(title__gte='B'))
     #     self.sq.add_filter(SQ(id__in=[1, 2, 3]))
-    #     self.assertEqual(self.sq.build_query(), u'(why AND pub_date:[* TO "2009-02-10 01:59:00"] AND author:{daniel TO *} AND created:{* TO "2009-02-12 12:13:00"} AND title:[B TO *] AND (id:"1" OR id:"2" OR id:"3"))')
-    # 
-    # def test_build_query_in_filter_multiple_words(self):
-    #     self.sq.add_filter(SQ(content='why'))
-    #     self.sq.add_filter(SQ(title__in=["A Famous Paper", "An Infamous Article"]))
-    #     self.assertEqual(self.sq.build_query(), u'(why AND (title:"A Famous Paper" OR title:"An Infamous Article"))')
-    # 
+    #     self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query(why AND pub_date:[* TO "2009-02-10 01:59:00"] AND author:{daniel TO *} AND created:{* TO "2009-02-12 12:13:00"} AND title:[B TO *] AND (id:"1" OR id:"2" OR id:"3"))')
+    
+    def test_build_query_in_filter_multiple_words(self):
+        self.sq.add_filter(SQ(content='why'))
+        self.sq.add_filter(SQ(title__in=["A Famous Paper", "An Infamous Article"]))
+        self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query((why AND (XTITLEa famous paper OR XTITLEan infamous article)))')
+    
     # def test_build_query_in_filter_datetime(self):
     #     self.sq.add_filter(SQ(content='why'))
     #     self.sq.add_filter(SQ(pub_date__in=[datetime.datetime(2009, 7, 6, 1, 56, 21)]))
@@ -104,7 +134,7 @@ class XapianSearchQueryTestCase(TestCase):
     #     self.sq.add_filter(SQ(content='why'))
     #     self.sq.add_filter(SQ(title__startswith='haystack'))
     #     self.assertEqual(self.sq.build_query(), u'(why AND title:haystack*)')
-    # 
+
     def test_clean(self):
         self.assertEqual(self.sq.clean('hello world'), 'hello world')
         self.assertEqual(self.sq.clean('hello AND world'), 'hello AND world')
