@@ -895,7 +895,7 @@ class SearchQuery(BaseSearchQuery):
                             DOCUMENT_CT_TERM_PREFIX, 
                             model._meta.app_label, model._meta.module_name
                         )
-                    ), 0
+                    ), 0 # Pure boolean sub-query
                 ) for model in self.models
             ]
             query = xapian.Query(
