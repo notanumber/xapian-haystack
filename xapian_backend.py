@@ -982,24 +982,19 @@ class SearchQuery(BaseSearchQuery):
                             else:
                                 query_list.append(phrase_query)
                         else:
+                            term = '%s%s%s' % (
+                                DOCUMENT_CUSTOM_TERM_PREFIX,
+                                field.upper(), value
+                            )
+                            
                             if is_not:
                                 query_list.append(
                                     xapian.Query(
-                                        xapian.Query.OP_AND_NOT, '', '%s%s%s' % (
-                                            DOCUMENT_CUSTOM_TERM_PREFIX,
-                                            field.upper(), value
-                                        )
+                                        xapian.Query.OP_AND_NOT, '', term
                                     )
                                 )
                             else:
-                                query_list.append(
-                                    xapian.Query(
-                                        '%s%s%s' % (
-                                            DOCUMENT_CUSTOM_TERM_PREFIX,
-                                            field.upper(), value
-                                        )
-                                    )
-                                )
+                                query_list.append(xapian.Query(term))
                     elif filter_type == 'gt':
                         pass
                     elif filter_type == 'gte':
