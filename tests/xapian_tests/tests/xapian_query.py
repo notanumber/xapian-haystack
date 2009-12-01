@@ -120,16 +120,21 @@ class XapianSearchQueryTestCase(TestCase):
     #     self.sq.add_filter(SQ(id__in=[1, 2, 3]))
     #     self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query(why AND pub_date:[* TO "2009-02-10 01:59:00"] AND author:{daniel TO *} AND created:{* TO "2009-02-12 12:13:00"} AND title:[B TO *] AND (id:"1" OR id:"2" OR id:"3"))')
     
+    def test_build_query_in_filter_single_words(self):
+        self.sq.add_filter(SQ(content='why'))
+        self.sq.add_filter(SQ(title__in=["Dune", "Jaws"]))
+        self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query((why AND (XTITLEdune OR XTITLEjaws)))')
+
     def test_build_query_in_filter_multiple_words(self):
         self.sq.add_filter(SQ(content='why'))
         self.sq.add_filter(SQ(title__in=["A Famous Paper", "An Infamous Article"]))
-        self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query((why AND (XTITLEa famous paper OR XTITLEan infamous article)))')
+        self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query((why AND ((XTITLEa PHRASE 3 XTITLEfamous PHRASE 3 XTITLEpaper) OR (XTITLEan PHRASE 3 XTITLEinfamous PHRASE 3 XTITLEarticle))))')
     
     # def test_build_query_not_in_filter_multiple_words(self):
     #     self.sq.add_filter(SQ(content='why'))
     #     self.sq.add_filter(~SQ(title__in=["A Famous Paper", "An Infamous Article"]))
     #     self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query((why AND_NOT (XTITLEa famous paper OR XTITLEan infamous article)))')
-
+    # 
     # def test_build_query_in_filter_datetime(self):
     #     self.sq.add_filter(SQ(content='why'))
     #     self.sq.add_filter(SQ(pub_date__in=[datetime.datetime(2009, 7, 6, 1, 56, 21)]))

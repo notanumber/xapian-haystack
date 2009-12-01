@@ -952,19 +952,7 @@ class SearchQuery(BaseSearchQuery):
                     elif filter_type == 'startswith':
                         pass
                     elif filter_type == 'in':
-                        query_list.append(
-                            xapian.Query(
-                                xapian.Query.OP_OR, [
-                                    xapian.Query(
-                                        '%s%s%s' % (
-                                            DOCUMENT_CUSTOM_TERM_PREFIX,
-                                            field.upper(),
-                                            _marshal_value(possible_value)
-                                        )
-                                    ) for possible_value in value
-                                ]
-                            )
-                        )
+                        query_list.append(self._filter_in(value, field, is_not))
                     
 
         if search_node.connector == 'OR':
@@ -976,50 +964,75 @@ class SearchQuery(BaseSearchQuery):
         if ' ' in value:
             if is_not:
                 return xapian.Query(
-                        xapian.Query.OP_AND_NOT,
-                        xapian.Query(''),
-                        xapian.Query
-                            (xapian.Query.OP_PHRASE, value.split()
-                        )
-                    )
+                    xapian.Query.OP_AND_NOT, self._all_query(), self._phrase_query(value.split())
+                )
             else:
-                return xapian.Query(xapian.Query.OP_PHRASE, value.split())
+                return self._phrase_query(value.split())
         else:
             if is_not:
-                return xapian.Query(xapian.Query.OP_AND_NOT, '', value)
+                return xapian.Query(xapian.Query.OP_AND_NOT, self._all_query(), self._term_query(value))
             else:
-                return xapian.Query(value)
+                return self._term_query(value)
     
     def _filter_exact(self, value, field, is_not):
         if ' ' in value:
-            phrase_query = xapian.Query(
-                xapian.Query.OP_PHRASE, [
-                    '%s%s%s' % (
-                        DOCUMENT_CUSTOM_TERM_PREFIX, field.upper(), _marshal_value(term)
-                    ) for term in value.split()
-                ]
-            )
-            
             if is_not:
                 return xapian.Query(
-                    xapian.Query.OP_AND_NOT, xapian.Query(''), phrase_query
+                    xapian.Query.OP_AND_NOT, self._all_query(), self._phrase_query(value.split(), field)
                 )
             else:
-                return phrase_query
+                return self._phrase_query(value.split(), field)
         else:
-            term = '%s%s%s' % (
-                DOCUMENT_CUSTOM_TERM_PREFIX, field.upper(), value
-            )
-            
             if is_not:
-                return xapian.Query(xapian.Query.OP_AND_NOT, '', term)
+                return xapian.Query(xapian.Query.OP_AND_NOT, self._all_query(), self._term_query(value, field))
             else:
-                return xapian.Query(term)
-        
+                return self._term_query(value, field)
+    
+    def _filter_in(self, value_list, field, is_not):
+        query_list = []
+        for value in value_list:
+            if ' ' in value:
+                query_list.append(
+                    xapian.Query(
+                        xapian.Query.OP_OR, self._phrase_query(value.split(), field)
+                    )
+                )
+            else:
+                query_list.append(
+                    xapian.Query(
+                        xapian.Query.OP_OR, self._term_query(value, field)
+                    )
+                )
+        return xapian.Query(xapian.Query.OP_OR, query_list)
+    
+    def _all_query(self):
+        return xapian.Query('')
+
+    def _term_query(self, value, field=None):
+        if field:
+            return xapian.Query('%s%s%s' % (
+                    DOCUMENT_CUSTOM_TERM_PREFIX, field.upper(), _marshal_value(value)
+                )
+            )
+        else:
+            return xapian.Query(value)
+
+    def _phrase_query(self, value_list, field=None):
+        if field:
+            return xapian.Query(
+                xapian.Query.OP_PHRASE, [
+                    '%s%s%s' % (
+                        DOCUMENT_CUSTOM_TERM_PREFIX, field.upper(), _marshal_value(value)
+                    ) for value in value_list
+                ]
+            )
+        else:
+            return xapian.Query(xapian.Query.OP_PHRASE, value_list)
+
 
 def _marshal_value(value):
     """
-    Private method that converts Python values to a string for Xapian values.
+    Private utility method that converts Python values to a string for Xapian values.
     """
     if isinstance(value, datetime.datetime):
         if value.microsecond:
