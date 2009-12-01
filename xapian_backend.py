@@ -1003,7 +1003,10 @@ class SearchQuery(BaseSearchQuery):
                         xapian.Query.OP_OR, self._term_query(value, field)
                     )
                 )
-        return xapian.Query(xapian.Query.OP_OR, query_list)
+        if is_not:
+            return xapian.Query(xapian.Query.OP_AND_NOT, self._all_query(), xapian.Query(xapian.Query.OP_OR, query_list))          
+        else:
+            return xapian.Query(xapian.Query.OP_OR, query_list)
     
     def _all_query(self):
         return xapian.Query('')
