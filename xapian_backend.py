@@ -954,13 +954,23 @@ class SearchQuery(BaseSearchQuery):
                     elif filter_type == 'in':
                         query_list.append(self._filter_in(value, field, is_not))
                     
-
         if search_node.connector == 'OR':
             return xapian.Query(xapian.Query.OP_OR, query_list)
         else:
             return xapian.Query(xapian.Query.OP_AND, query_list)
 
     def _content_field(self, value, is_not):
+        """
+        Private method that returns a xapian.Query that searches for `value`
+        in all fields.
+        
+        Required arguments:
+            ``value`` -- The value to search for
+            ``is_not`` -- Invert the search results
+        
+        Returns:
+            A xapian.Query
+        """
         if ' ' in value:
             if is_not:
                 return xapian.Query(
@@ -975,6 +985,18 @@ class SearchQuery(BaseSearchQuery):
                 return self._term_query(value)
     
     def _filter_exact(self, value, field, is_not):
+        """
+        Private method that returns a xapian.Query that searches for `value`
+        in a specified `field`.
+        
+        Required arguments:
+            ``value`` -- The value to search for
+            ``field`` -- The field to search
+            ``is_not`` -- Invert the search results
+        
+        Returns:
+            A xapian.Query
+        """
         if ' ' in value:
             if is_not:
                 return xapian.Query(
@@ -989,6 +1011,18 @@ class SearchQuery(BaseSearchQuery):
                 return self._term_query(value, field)
     
     def _filter_in(self, value_list, field, is_not):
+        """
+        Private method that returns a xapian.Query that searches for any value
+        of `value_list` in a specified `field`.
+        
+        Required arguments:
+            ``value_list`` -- The values to search for
+            ``field`` -- The field to search
+            ``is_not`` -- Invert the search results
+        
+        Returns:
+            A xapian.Query
+        """
         query_list = []
         for value in value_list:
             if ' ' in value:
@@ -1009,9 +1043,26 @@ class SearchQuery(BaseSearchQuery):
             return xapian.Query(xapian.Query.OP_OR, query_list)
     
     def _all_query(self):
+        """
+        Private method that returns a xapian.Query that returns all documents,
+        
+        Returns:
+            A xapian.Query
+        """
         return xapian.Query('')
 
     def _term_query(self, value, field=None):
+        """
+        Private method that returns a term based xapian.Query that searches
+        for term `value`.
+        
+        Required arguments:
+            ``value`` -- The value to search for
+            ``field`` -- The field to search (If `None`, all fields)
+        
+        Returns:
+            A xapian.Query
+        """
         if field:
             return xapian.Query('%s%s%s' % (
                     DOCUMENT_CUSTOM_TERM_PREFIX, field.upper(), _marshal_value(value)
@@ -1021,6 +1072,17 @@ class SearchQuery(BaseSearchQuery):
             return xapian.Query(value)
 
     def _phrase_query(self, value_list, field=None):
+        """
+        Private method that returns a phrase based xapian.Query that searches
+        for terms in `value_list.
+        
+        Required arguments:
+            ``value_list`` -- The values to search for
+            ``field`` -- The field to search (If `None`, all fields)
+        
+        Returns:
+            A xapian.Query
+        """
         if field:
             return xapian.Query(
                 xapian.Query.OP_PHRASE, [
