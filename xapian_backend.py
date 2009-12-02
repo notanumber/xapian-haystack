@@ -127,7 +127,7 @@ class SearchBackend(BaseSearchBackend):
 
                 term_generator = xapian.TermGenerator()
                 term_generator.set_database(database)
-                term_generator.set_stemmer(self.language)
+                term_generator.set_stemmer(xapian.Stem(self.language))
                 if getattr(settings, 'HAYSTACK_INCLUDE_SPELLING', False) is True:
                     term_generator.set_flags(xapian.TermGenerator.FLAG_SPELLING)
                 term_generator.set_document(document)

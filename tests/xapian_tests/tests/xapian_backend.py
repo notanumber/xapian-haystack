@@ -109,22 +109,22 @@ class XapianSearchBackendTestCase(TestCase):
             document = match.get_document()
             app_label, module_name, pk, model_data = pickle.loads(document.get_data())
             for key, value in model_data.iteritems():
-                model_data[key] = self.sb._marshal_value(value)
+                model_data[key] = _marshal_value(value)
             model_data['id'] = u'%s.%s.%d' % (app_label, module_name, pk)
             document_list.append(model_data)
 
         return document_list
     
-    # def test_update(self):
-    #     self.sb.update(self.msi, self.sample_objs)
-    #     self.sb.update(self.msi, self.sample_objs) # Duplicates should be updated, not appended -- http://github.com/notanumber/xapian-haystack/issues/#issue/6
-    #     
-    #     self.assertEqual(len(self.xapian_search('')), 3)
-    #     self.assertEqual([dict(doc) for doc in self.xapian_search('')], [
-    #         {'flag': u't', 'name': u'david1', 'text': u'Indexed!\n1', 'sites': u"['1', '2', '3']", 'pub_date': u'20090224000000', 'value': u'000000000005', 'id': u'tests.xapianmockmodel.1', 'slug': u'http://example.com/1', 'popularity': '\xca\x84', 'django_id': u'1', 'django_ct': u'tests.xapianmockmodel'},
-    #         {'flag': u'f', 'name': u'david2', 'text': u'Indexed!\n2', 'sites': u"['2', '4', '6']", 'pub_date': u'20090223000000', 'value': u'000000000010', 'id': u'tests.xapianmockmodel.2', 'slug': u'http://e
-    #         {'flag': u't', 'name': u'david3', 'text': u'Indexed!\n3', 'sites': u"['3', '6', '9']", 'pub_date': u'20090222000000', 'value': u'000000000015', 'id': u'tests.xapianmockmodel.3', 'slug': u'http://example.com/3', 'popularity': '\xcb\x98', 'django_id': u'3', 'django_ct': u'tests.xapianmockmodel'}
-    #     ])
+    def test_update(self):
+        self.sb.update(self.msi, self.sample_objs)
+        self.sb.update(self.msi, self.sample_objs) # Duplicates should be updated, not appended -- http://github.com/notanumber/xapian-haystack/issues/#issue/6
+        
+        self.assertEqual(len(self.xapian_search('')), 3)
+        self.assertEqual([dict(doc) for doc in self.xapian_search('')], [
+            {'flag': u'true', 'name': u'david1', 'text': u'indexed!\n1', 'sites': u"['1', '2', '3']", 'pub_date': u'20090224000000', 'value': u'000000000005', 'id': u'tests.xapianmockmodel.1', 'slug': u'http://example.com/1', 'popularity': '\xca\x84', 'django_id': u'1', 'django_ct': u'tests.xapianmockmodel'},
+            {'flag': u'false', 'name': u'david2', 'text': u'indexed!\n2', 'sites': u"['2', '4', '6']", 'pub_date': u'20090223000000', 'value': u'000000000010', 'id': u'tests.xapianmockmodel.2', 'slug': u'http://example.com/2', 'popularity': '\xb4p', 'django_id': u'2', 'django_ct': u'tests.xapianmockmodel'},
+            {'flag': u'true', 'name': u'david3', 'text': u'indexed!\n3', 'sites': u"['3', '6', '9']", 'pub_date': u'20090222000000', 'value': u'000000000015', 'id': u'tests.xapianmockmodel.3', 'slug': u'http://example.com/3', 'popularity': '\xcb\x98', 'django_id': u'3', 'django_ct': u'tests.xapianmockmodel'}
+        ])
 
     # def test_remove(self):
     #     self.sb.update(self.msi, self.sample_objs)
@@ -133,8 +133,8 @@ class XapianSearchBackendTestCase(TestCase):
     #     self.sb.remove(self.sample_objs[0])
     #     self.assertEqual(len(self.xapian_search('')), 2)
     #     self.assertEqual([dict(doc) for doc in self.xapian_search('')], [
-    #         {'flag': u'f', 'name': u'david2', 'text': u'Indexed!\n2', 'sites': u"['2', '4', '6']", 'pub_date': u'20090223000000', 'value': u'000000000010', 'id': u'tests.xapianmockmodel.2', 'slug': u'http://e
-    #         {'flag': u't', 'name': u'david3', 'text': u'Indexed!\n3', 'sites': u"['3', '6', '9']", 'pub_date': u'20090222000000', 'value': u'000000000015', 'id': u'tests.xapianmockmodel.3', 'slug': u'http://example.com/3', 'popularity': '\xcb\x98', 'django_id': u'3', 'django_ct': u'tests.xapianmockmodel'}
+    #         {'flag': u'false', 'name': u'david2', 'text': u'Indexed!\n2', 'sites': u"['2', '4', '6']", 'pub_date': u'20090223000000', 'value': u'000000000010', 'id': u'tests.xapianmockmodel.2', 'slug': u'http://example.com/2', 'popularity': '\xb4p', 'django_id': u'2', 'django_ct': u'tests.xapianmockmodel'},
+    #         {'flag': u'true', 'name': u'david3', 'text': u'Indexed!\n3', 'sites': u"['3', '6', '9']", 'pub_date': u'20090222000000', 'value': u'000000000015', 'id': u'tests.xapianmockmodel.3', 'slug': u'http://example.com/3', 'popularity': '\xcb\x98', 'django_id': u'3', 'django_ct': u'tests.xapianmockmodel'}
     #     ])
     
     # def test_clear(self):
