@@ -8,7 +8,6 @@ import xapian
 
 from django.conf import settings
 from django.db import models
-from django.utils.encoding import force_unicode
 from django.test import TestCase
 
 from haystack import indexes, sites
@@ -117,7 +116,6 @@ class XapianSearchBackendTestCase(TestCase):
     
     def test_update(self):
         self.sb.update(self.msi, self.sample_objs)
-        self.sb.update(self.msi, self.sample_objs) # Duplicates should be updated, not appended -- http://github.com/notanumber/xapian-haystack/issues/#issue/6
         
         self.assertEqual(len(self.xapian_search('')), 3)
         self.assertEqual([dict(doc) for doc in self.xapian_search('')], [
@@ -125,6 +123,12 @@ class XapianSearchBackendTestCase(TestCase):
             {'flag': u'false', 'name': u'david2', 'text': u'indexed!\n2', 'sites': u"['2', '4', '6']", 'pub_date': u'20090223000000', 'value': u'000000000010', 'id': u'tests.xapianmockmodel.2', 'slug': u'http://example.com/2', 'popularity': '\xb4p', 'django_id': u'2', 'django_ct': u'tests.xapianmockmodel'},
             {'flag': u'true', 'name': u'david3', 'text': u'indexed!\n3', 'sites': u"['3', '6', '9']", 'pub_date': u'20090222000000', 'value': u'000000000015', 'id': u'tests.xapianmockmodel.3', 'slug': u'http://example.com/3', 'popularity': '\xcb\x98', 'django_id': u'3', 'django_ct': u'tests.xapianmockmodel'}
         ])
+
+    def test_duplicate_update(self):
+        self.sb.update(self.msi, self.sample_objs)
+        self.sb.update(self.msi, self.sample_objs) # Duplicates should be updated, not appended -- http://github.com/notanumber/xapian-haystack/issues/#issue/6
+        
+        self.assertEqual(len(self.xapian_search('')), 3)
 
     def test_remove(self):
         self.sb.update(self.msi, self.sample_objs)
@@ -295,18 +299,7 @@ class XapianSearchBackendTestCase(TestCase):
     #     results = self.sb.more_like_this(self.sample_objs[0], additional_query_string='david3')
     #     self.assertEqual(results['hits'], 1)
     #     self.assertEqual([result.pk for result in results['results']], [3])
-    
-    # def test_document_count(self):
-    #     self.sb.update(self.msi, self.sample_objs)
-    #     self.assertEqual(self.sb.document_count(), 3)
-    
-    # def test_delete_index(self):
-    #     self.sb.update(self.msi, self.sample_objs)
-    #     self.assert_(self.sb.document_count() > 0)
-    #     
-    #     self.sb.delete_index()
-    #     self.assertRaises(InvalidIndexError, self.sb.document_count)
-    
+
     # def test_order_by(self):
     #     self.sb.update(self.msi, self.sample_objs)
     #     

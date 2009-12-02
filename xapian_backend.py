@@ -17,7 +17,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.utils.encoding import smart_unicode, force_unicode
 
 from haystack.backends import BaseSearchBackend, BaseSearchQuery, SearchNode, log_query
-from haystack.exceptions import MissingDependency, HaystackError
+from haystack.exceptions import MissingDependency
 from haystack.fields import DateField, DateTimeField, IntegerField, FloatField, BooleanField, MultiValueField
 from haystack.models import SearchResult
 from haystack.utils import get_identifier
@@ -308,15 +308,6 @@ class SearchBackend(BaseSearchBackend):
             'facets': facets_dict,
             'spelling_suggestion': spelling_suggestion,
         }
-    
-    def delete_index(self):
-        """
-        Delete the index.
-        
-        This removes all indexes files and the `HAYSTACK_XAPIAN_PATH` folder.
-        """
-        if os.path.exists(settings.HAYSTACK_XAPIAN_PATH):
-            shutil.rmtree(settings.HAYSTACK_XAPIAN_PATH)
     
     def more_like_this(self, model_instance, additional_query_string=None,
                        start_offset=0, end_offset=None, 
@@ -613,7 +604,7 @@ class SearchBackend(BaseSearchBackend):
             database.set_metadata('content', pickle.dumps(self.content_field_name, pickle.HIGHEST_PROTOCOL))
         else:
             database = xapian.Database(settings.HAYSTACK_XAPIAN_PATH)
-            
+                
             self.schema = pickle.loads(database.get_metadata('schema'))
             self.content_field_name = pickle.loads(database.get_metadata('content'))
         
