@@ -137,27 +137,27 @@ class XapianSearchBackendTestCase(TestCase):
             {'flag': u'true', 'name': u'david3', 'text': u'indexed!\n3', 'sites': u"['3', '6', '9']", 'pub_date': u'20090222000000', 'value': u'000000000015', 'id': u'tests.xapianmockmodel.3', 'slug': u'http://example.com/3', 'popularity': '\xcb\x98', 'django_id': u'3', 'django_ct': u'tests.xapianmockmodel'}
         ])
     
-    # def test_clear(self):
-    #     self.sb.update(self.msi, self.sample_objs)
-    #     self.assertEqual(len(self.xapian_search('')), 3)
-    #     
-    #     self.sb.clear()
-    #     self.assertEqual(len(self.xapian_search('')), 0)
-    #     
-    #     self.sb.update(self.msi, self.sample_objs)
-    #     self.assertEqual(len(self.xapian_search('')), 3)
-    #     
-    #     self.sb.clear([AnotherMockModel])
-    #     self.assertEqual(len(self.xapian_search('')), 3)
-    #     
-    #     self.sb.clear([XapianMockModel])
-    #     self.assertEqual(len(self.xapian_search('')), 0)
-    #     
-    #     self.sb.update(self.msi, self.sample_objs)
-    #     self.assertEqual(len(self.xapian_search('')), 3)
-    #     
-    #     self.sb.clear([AnotherMockModel, XapianMockModel])
-    #     self.assertEqual(len(self.xapian_search('')), 0)
+    def test_clear(self):
+        self.sb.update(self.msi, self.sample_objs)
+        self.assertEqual(len(self.xapian_search('')), 3)
+        
+        self.sb.clear()
+        self.assertEqual(len(self.xapian_search('')), 0)
+        
+        self.sb.update(self.msi, self.sample_objs)
+        self.assertEqual(len(self.xapian_search('')), 3)
+        
+        self.sb.clear([AnotherMockModel])
+        self.assertEqual(len(self.xapian_search('')), 3)
+        
+        self.sb.clear([XapianMockModel])
+        self.assertEqual(len(self.xapian_search('')), 0)
+        
+        self.sb.update(self.msi, self.sample_objs)
+        self.assertEqual(len(self.xapian_search('')), 3)
+        
+        self.sb.clear([AnotherMockModel, XapianMockModel])
+        self.assertEqual(len(self.xapian_search('')), 0)
     
     # def test_search(self):
     #     self.sb.update(self.msi, self.sample_objs)
