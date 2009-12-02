@@ -163,30 +163,17 @@ class XapianSearchBackendTestCase(TestCase):
         self.sb.clear([AnotherMockModel, XapianMockModel])
         self.assertEqual(len(self.xapian_search('')), 0)
     
-    # def test_search(self):
-    #     self.sb.update(self.msi, self.sample_objs)
-    #     self.assertEqual(len(self.xapian_search('')), 3)
-    #     
-    #     # Empty query
-    #     self.assertEqual(self.sb.search(''), {'hits': 0, 'results': []})
-    #     
-    #     # Wildcard -- All
-    #     self.assertEqual(self.sb.search('*')['hits'], 3)
-    #     self.assertEqual([result.pk for result in self.sb.search('*')['results']], [1, 2, 3])
-    #     
-    #     # Exact match
-    #     self.assertEqual([result.pk for result in self.sb.search('name:david2')['results']], [2])
-    #     self.assertEqual([result.pk for result in self.sb.search('value:10')['results']], [2])
-    #     self.assertEqual([result.pk for result in self.sb.search('flag:false')['results']], [2])
-    #     self.assertEqual([result.pk for result in self.sb.search('popularity:35.5')['results']], [2])
-    #     
-    #     # NOT operator
-    #     self.assertEqual([result.pk for result in self.sb.search('NOT name:david1')['results']], [2, 3])
-    #     self.assertEqual([result.pk for result in self.sb.search('NOT name:david1 AND index')['results']], [2, 3])
-    #     self.assertEqual([result.pk for result in self.sb.search('index NOT name:david1')['results']], [2, 3])
-    #     self.assertEqual([result.pk for result in self.sb.search('index NOT name:david1 NOT name:david2')['results']], [3])
-    #     self.assertEqual([result.pk for result in self.sb.search('NOT name:david1 NOT name:david2')['results']], [3])
-    # 
+    def test_search(self):
+        self.sb.update(self.msi, self.sample_objs)
+        self.assertEqual(len(self.xapian_search('')), 3)
+        
+        # Empty query
+        self.assertEqual(self.sb.search(xapian.Query()), {'hits': 0, 'results': []})
+        
+        # Wildcard -- All
+        self.assertEqual(self.sb.search(xapian.Query(''))['hits'], 3)
+        self.assertEqual([result.pk for result in self.sb.search(xapian.Query(''))['results']], [1, 2, 3])
+        
     #     # Ranges
     #     self.assertEqual([result.pk for result in self.sb.search('index name:david2..david3')['results']], [2, 3])
     #     self.assertEqual([result.pk for result in self.sb.search('index name:..david2')['results']], [1, 2])

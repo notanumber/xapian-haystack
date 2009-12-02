@@ -186,7 +186,8 @@ class SearchBackend(BaseSearchBackend):
         database = self._database(writable=True)
         if not models:
             query = xapian.Query('')
-            enquire = self._enquire(database, query)
+            enquire = xapian.Enquire(database)
+            enquire.set_query(query)
             for match in enquire.get_mset(0, database.get_doccount()):
                 database.delete_document(match.docid)
         else:
@@ -246,31 +247,44 @@ class SearchBackend(BaseSearchBackend):
         and any suggestions for spell correction will be returned as well as
         the results.
         """
-        if not query:
+        if xapian.Query.empty(query):
             return {
                 'results': [],
                 'hits': 0,
             }
         
-        if limit_to_registered_models:
-            if narrow_queries is None:
-                 narrow_queries = set()
-            
-            registered_models = self.build_registered_models_list()
-            
-            if len(registered_models) > 0:
-                narrow_queries.add(
-                    ' '.join(['django_ct:%s' % model for model in registered_models])
-                )
+        # if limit_to_registered_models:
+        #     if narrow_queries is None:
+        #          narrow_queries = set()
+        #     
+        #     registered_models = self.build_registered_models_list()
+        #     
+        #     if len(registered_models) > 0:
+        #         narrow_queries.add(
+        #             ' '.join(['django_ct:%s' % model for model in registered_models])
+        #         )
         
         database = self._database()
-        query, spelling_suggestion = self._query(
-            database, query_string, narrow_queries, spelling_query
-        )
-        enquire = self._enquire(database, query)
+        
+        # query, spelling_suggestion = self._query(
+        #     database, query_string, narrow_queries, spelling_query
+        # )
+        spelling_suggestion = ''
+        
+        enquire = xapian.Enquire(database)
+        enquire.set_query(query)
         
         if sort_by:
-            sorter = self._sorter(sort_by)
+            sorter = xapian.MultiValueSorter()
+
+            for sort_field in sort_by:
+                if sort_field.startswith('-'):
+                    reverse = True
+                    sort_field = sort_field[1:] # Strip the '-'
+                else:
+                    reverse = False # Reverse is inverted in Xapian -- http://trac.xapian.org/ticket/311
+                sorter.add(self._value_column(sort_field), reverse)
+
             enquire.set_sort_by_key_then_relevance(sorter, True)
         
         results = []
@@ -279,8 +293,10 @@ class SearchBackend(BaseSearchBackend):
             'dates': {},
             'queries': {},
         }
+        
         if not end_offset:
             end_offset = database.get_doccount()
+            
         matches = enquire.get_mset(start_offset, (end_offset - start_offset))
         
         for match in matches:
@@ -343,13 +359,20 @@ class SearchBackend(BaseSearchBackend):
         Finally, processes the resulting matches and returns.
         """
         database = self._database()
+        
         query = xapian.Query(DOCUMENT_ID_TERM_PREFIX + get_identifier(model_instance))
-        enquire = self._enquire(database, query)
+
+        enquire = xapian.Enquire(database)
+        enquire.set_query(query)
+
         rset = xapian.RSet()
+        
         if not end_offset:
             end_offset = database.get_doccount()
+            
         for match in enquire.get_mset(0, end_offset):
             rset.add_document(match.docid)
+            
         query = xapian.Query(xapian.Query.OP_OR,
             [expand.term for expand in enquire.get_eset(match.document.termlist_count(), rset, XHExpandDecider())]
         )
@@ -609,45 +632,7 @@ class SearchBackend(BaseSearchBackend):
             self.content_field_name = pickle.loads(database.get_metadata('content'))
         
         return database
-    
-    def _sorter(self, sort_by):
-        """
-        Private method that takes a list of fields to sort by and returns a
-        xapian.MultiValueSorter
         
-        Required Arguments:
-            `sort_by` -- A list of fields to sort by
-        
-        Returns a xapian.MultiValueSorter instance
-        """
-        sorter = xapian.MultiValueSorter()
-        
-        for sort_field in sort_by:
-            if sort_field.startswith('-'):
-                reverse = True
-                sort_field = sort_field[1:] # Strip the '-'
-            else:
-                reverse = False # Reverse is inverted in Xapian -- http://trac.xapian.org/ticket/311
-            sorter.add(self._value_column(sort_field), reverse)
-        
-        return sorter
-        
-    def _enquire(self, database, query):
-        """
-        Private method that that returns a Xapian.Enquire instance for use with
-        the specifed `query`.
-        
-        Required Arguments:
-            `query` -- The query to run
-        
-        Returns a xapian.Enquire instance
-        """
-        enquire = xapian.Enquire(database)
-        enquire.set_query(query)
-        enquire.set_docid_order(enquire.ASCENDING)
-        
-        return enquire
-    
     def _value_column(self, field):
         """
         Private method that returns the column value slot in the database
