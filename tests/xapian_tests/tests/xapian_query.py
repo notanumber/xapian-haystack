@@ -49,7 +49,7 @@ class XapianSearchQueryTestCase(TestCase):
     
     def test_build_query_datetime(self):
         self.sq.add_filter(SQ(content=datetime.datetime(2009, 5, 8, 11, 28)))
-        self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query(20090508T112800Z)')
+        self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query(20090508112800)')
     
     def test_build_query_multiple_words_and(self):
         self.sq.add_filter(SQ(content='hello'))
@@ -100,11 +100,11 @@ class XapianSearchQueryTestCase(TestCase):
     # def test_build_query_multiple_filter_types(self):
     #     self.sq.add_filter(SQ(content='why'))
     #     self.sq.add_filter(SQ(pub_date__lte='2009-02-10 01:59:00'))
-    #     self.sq.add_filter(SQ(author__gt='daniel'))
+    #     self.sq.add_filter(SQ(author__gt='david'))
     #     self.sq.add_filter(SQ(created__lt='2009-02-12 12:13:00'))
     #     self.sq.add_filter(SQ(title__gte='B'))
     #     self.sq.add_filter(SQ(id__in=[1, 2, 3]))
-    #     self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query(why AND pub_date:[* TO "2009-02-10 01:59:00"] AND author:{daniel TO *} AND created:{* TO "2009-02-12 12:13:00"} AND title:[B TO *] AND (id:"1" OR id:"2" OR id:"3"))')
+    #     self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query(why AND pub_date:[* TO "2009-02-10 01:59:00"] AND author:{david TO *} AND created:{* TO "2009-02-12 12:13:00"} AND title:[B TO *] AND (id:"1" OR id:"2" OR id:"3"))')
     
     def test_build_query_in_filter_single_words(self):
         self.sq.add_filter(SQ(content='why'))
@@ -126,15 +126,15 @@ class XapianSearchQueryTestCase(TestCase):
         self.sq.add_filter(~SQ(title__in=["A Famous Paper", "An Infamous Article"]))
         self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query((why AND (<alldocuments> AND_NOT ((XTITLEa PHRASE 3 XTITLEfamous PHRASE 3 XTITLEpaper) OR (XTITLEan PHRASE 3 XTITLEinfamous PHRASE 3 XTITLEarticle)))))')
     
-    # def test_build_query_in_filter_datetime(self):
-    #     self.sq.add_filter(SQ(content='why'))
-    #     self.sq.add_filter(SQ(pub_date__in=[datetime.datetime(2009, 7, 6, 1, 56, 21)]))
-    #     self.assertEqual(self.sq.build_query(), u'(why AND (pub_date:"2009-07-06T01:56:21Z"))')
-    # 
+    def test_build_query_in_filter_datetime(self):
+        self.sq.add_filter(SQ(content='why'))
+        self.sq.add_filter(SQ(pub_date__in=[datetime.datetime(2009, 7, 6, 1, 56, 21)]))
+        self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query((why AND XPUB_DATE20090706015621))')
+    
     # def test_build_query_wildcard_filter_types(self):
     #     self.sq.add_filter(SQ(content='why'))
     #     self.sq.add_filter(SQ(title__startswith='haystack'))
-    #     self.assertEqual(self.sq.build_query(), u'(why AND title:haystack*)')
+    #     self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query(why AND XTITLEhaystack*)')
 
     def test_clean(self):
         self.assertEqual(self.sq.clean('hello world'), 'hello world')

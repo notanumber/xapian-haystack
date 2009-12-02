@@ -33,59 +33,6 @@ DOCUMENT_CUSTOM_TERM_PREFIX = 'X'
 DOCUMENT_CT_TERM_PREFIX = DOCUMENT_CUSTOM_TERM_PREFIX + 'CONTENTTYPE'
 
 
-class InvalidIndexError(HaystackError):
-    """Raised when an index can not be opened."""
-    pass
-
-
-class XHValueRangeProcessor(xapian.ValueRangeProcessor):
-    def __init__(self, sb):
-        self.sb = sb
-        xapian.ValueRangeProcessor.__init__(self)
-    
-    def __call__(self, begin, end):
-        """
-        Construct a tuple for value range processing.
-        
-        `begin` -- a string in the format '<field_name>:[low_range]'
-                   If 'low_range' is omitted, assume the smallest possible value.
-        `end` -- a string in the the format '[high_range|*]'.  If '*', assume
-                 the highest possible value.
-        
-        Return a tuple of three strings: (column, low, high)
-        """
-        colon = begin.find(':')
-        field_name = begin[:colon]
-        begin = begin[colon + 1:len(begin)]
-        for field_dict in self.sb.schema:
-            if field_dict['field_name'] == field_name:
-                if not begin:
-                    if field_dict['type'] == 'text':
-                        begin = u'a' # TODO: A better way of getting a min text value?
-                    elif field_dict['type'] == 'long':
-                        begin = -sys.maxint - 1
-                    elif field_dict['type'] == 'float':
-                        begin = float('-inf')
-                    elif field_dict['type'] == 'date' or field_dict['type'] == 'datetime':
-                        begin = u'00010101000000'
-                elif end == '*':
-                    if field_dict['type'] == 'text':
-                        end = u'z' * 100 # TODO: A better way of getting a max text value?
-                    elif field_dict['type'] == 'long':
-                        end = sys.maxint
-                    elif field_dict['type'] == 'float':
-                        end = float('inf')
-                    elif field_dict['type'] == 'date' or field_dict['type'] == 'datetime':
-                        end = u'99990101000000'
-                if field_dict['type'] == 'float':
-                    begin = _marshal_value(float(begin))
-                    end = _marshal_value(float(end))
-                elif field_dict['type'] == 'long':
-                    begin = _marshal_value(long(begin))
-                    end = _marshal_value(long(end))
-                return field_dict['column'], str(begin), str(end)
-
-
 class XHExpandDecider(xapian.ExpandDecider):
     def __call__(self, term):
         """
@@ -116,7 +63,7 @@ class SearchBackend(BaseSearchBackend):
     your settings.  This should point to a location where you would your
     indexes to reside.
     """
-    def __init__(self, site=None, stemming_language='english'):
+    def __init__(self, site=None, language='english'):
         """
         Instantiates an instance of `SearchBackend`.
         
@@ -134,7 +81,7 @@ class SearchBackend(BaseSearchBackend):
         if not os.path.exists(settings.HAYSTACK_XAPIAN_PATH):
             os.makedirs(settings.HAYSTACK_XAPIAN_PATH)
         
-        self.stemmer = xapian.Stem(stemming_language)
+        self.language = language
     
     def update(self, index, iterable):
         """
@@ -177,7 +124,14 @@ class SearchBackend(BaseSearchBackend):
         try:
             for obj in iterable:
                 document = xapian.Document()
-                term_generator = self._term_generator(database, document)
+
+                term_generator = xapian.TermGenerator()
+                term_generator.set_database(database)
+                term_generator.set_stemmer(self.language)
+                if getattr(settings, 'HAYSTACK_INCLUDE_SPELLING', False) is True:
+                    term_generator.set_flags(xapian.TermGenerator.FLAG_SPELLING)
+                term_generator.set_document(document)
+
                 document_id = DOCUMENT_ID_TERM_PREFIX + get_identifier(obj)
                 data = index.prepare(obj)
                 
@@ -231,9 +185,9 @@ class SearchBackend(BaseSearchBackend):
         """
         database = self._database(writable=True)
         if not models:
-            query, __unused__ = self._query(database, '*')
+            query = xapian.Query('')
             enquire = self._enquire(database, query)
-            for match in enquire.get_mset(0, self.document_count()):
+            for match in enquire.get_mset(0, database.get_doccount()):
                 database.delete_document(match.docid)
         else:
             for model in models:
@@ -326,7 +280,7 @@ class SearchBackend(BaseSearchBackend):
             'queries': {},
         }
         if not end_offset:
-            end_offset = self.document_count()
+            end_offset = database.get_doccount()
         matches = enquire.get_mset(start_offset, (end_offset - start_offset))
         
         for match in matches:
@@ -363,12 +317,6 @@ class SearchBackend(BaseSearchBackend):
         """
         if os.path.exists(settings.HAYSTACK_XAPIAN_PATH):
             shutil.rmtree(settings.HAYSTACK_XAPIAN_PATH)
-    
-    def document_count(self):
-        """
-        Retrieves the total document count for the search index.
-        """
-        return self._database().get_doccount()
     
     def more_like_this(self, model_instance, additional_query_string=None,
                        start_offset=0, end_offset=None, 
@@ -408,7 +356,7 @@ class SearchBackend(BaseSearchBackend):
         enquire = self._enquire(database, query)
         rset = xapian.RSet()
         if not end_offset:
-            end_offset = self.document_count()
+            end_offset = database.get_doccount()
         for match in enquire.get_mset(0, end_offset):
             rset.add_document(match.docid)
         query = xapian.Query(xapian.Query.OP_OR,
@@ -530,6 +478,7 @@ class SearchBackend(BaseSearchBackend):
         """
         facet_dict = {}
         
+        # DS_TODO: Improve this algorithm.  Currently, runs in O(N^3), ouch.
         for field in field_facets:
             facet_list = {}
             
@@ -663,102 +612,12 @@ class SearchBackend(BaseSearchBackend):
             database.set_metadata('schema', pickle.dumps(self.schema, pickle.HIGHEST_PROTOCOL))
             database.set_metadata('content', pickle.dumps(self.content_field_name, pickle.HIGHEST_PROTOCOL))
         else:
-            try:
-                database = xapian.Database(settings.HAYSTACK_XAPIAN_PATH)
-            except xapian.DatabaseOpeningError:
-                raise InvalidIndexError(u'Unable to open index at %s' % settings.HAYSTACK_XAPIAN_PATH)
+            database = xapian.Database(settings.HAYSTACK_XAPIAN_PATH)
             
             self.schema = pickle.loads(database.get_metadata('schema'))
             self.content_field_name = pickle.loads(database.get_metadata('content'))
         
         return database
-    
-    def _term_generator(self, database, document):
-        """
-        Private method that returns a Xapian.TermGenerator
-        
-        Required Argument:
-            `document` -- The document to be indexed
-        
-        Returns a Xapian.TermGenerator instance.  If `HAYSTACK_INCLUDE_SPELLING`
-        is True, then the term generator will have spell-checking enabled.
-        """
-        term_generator = xapian.TermGenerator()
-        term_generator.set_database(database)
-        term_generator.set_stemmer(self.stemmer)
-        if getattr(settings, 'HAYSTACK_INCLUDE_SPELLING', False) is True:
-            term_generator.set_flags(xapian.TermGenerator.FLAG_SPELLING)
-        term_generator.set_document(document)
-        return term_generator
-    
-    def _query(self, database, query_string, narrow_queries=None, spelling_query=None):
-        """
-        Private method that takes a query string and returns a xapian.Query.
-        
-        Required arguments:
-            `database` -- The database to query
-            `query_string` -- The query string to parse
-        
-        Optional arguments:
-            `narrow_queries` -- A list of queries to narrow the query with
-            `spelling_query` -- An optional query to execute spelling suggestion on
-        
-        Returns a xapian.Query instance with prefixes and ranges properly
-        setup as pulled from the `query_string`.
-        """
-        spelling_suggestion = None
-        qp = None
-        
-        if query_string == '*':
-            query = xapian.Query('') # Make '*' match everything
-        else:
-            qp = self._query_parser(database)
-            vrp = XHValueRangeProcessor(self)
-            qp.add_valuerangeprocessor(vrp)
-            query = qp.parse_query(query_string, self._flags(query_string))
-            if getattr(settings, 'HAYSTACK_INCLUDE_SPELLING', False) is True:
-                if spelling_query:
-                    qp.parse_query(spelling_query, self._flags(spelling_query))
-                    spelling_suggestion = qp.get_corrected_query_string()
-                else:
-                    spelling_suggestion = qp.get_corrected_query_string()
-        
-        if narrow_queries:
-            if qp is None:
-                qp = self._query_parser(database)
-            subqueries = [
-                qp.parse_query(
-                    narrow_query, self._flags(narrow_query)
-                ) for narrow_query in narrow_queries
-            ]
-            query = xapian.Query(
-                xapian.Query.OP_FILTER,
-                query, xapian.Query(xapian.Query.OP_AND, subqueries)
-            )
-        
-        return query, spelling_suggestion
-    
-    def _flags(self, query_string):
-        """
-        Private method that returns an appropriate xapian.QueryParser flags
-        set given a `query_string`.
-        
-        Required Arguments:
-            `query_string` -- The query string to be parsed.
-        
-        Returns a xapian.QueryParser flag set (an integer)
-        """
-        flags = xapian.QueryParser.FLAG_PARTIAL \
-              | xapian.QueryParser.FLAG_PHRASE \
-              | xapian.QueryParser.FLAG_BOOLEAN \
-              | xapian.QueryParser.FLAG_LOVEHATE
-        if '*' in query_string:
-            flags = flags | xapian.QueryParser.FLAG_WILDCARD
-        if 'NOT' in query_string.upper():
-            flags = flags | xapian.QueryParser.FLAG_PURE_NOT
-        if getattr(settings, 'HAYSTACK_INCLUDE_SPELLING', False) is True:
-            flags = flags | xapian.QueryParser.FLAG_SPELLING_CORRECTION
-        return flags
     
     def _sorter(self, sort_by):
         """
@@ -781,29 +640,7 @@ class SearchBackend(BaseSearchBackend):
             sorter.add(self._value_column(sort_field), reverse)
         
         return sorter
-    
-    def _query_parser(self, database):
-        """
-        Private method that returns a Xapian.QueryParser instance.
         
-        Required arguments:
-            `database` -- The database to be queried
-        
-        The query parser returned will have stemming enabled, a boolean prefix
-        for `django_ct`, and prefixes for all of the fields in the `self.schema`.
-        """
-        qp = xapian.QueryParser()
-        qp.set_database(database)
-        qp.set_stemmer(self.stemmer)
-        qp.set_stemming_strategy(xapian.QueryParser.STEM_SOME)
-        qp.add_boolean_prefix('django_ct', DOCUMENT_CT_TERM_PREFIX)
-        for field_dict in self.schema:
-            qp.add_prefix(
-                field_dict['field_name'],
-                DOCUMENT_CUSTOM_TERM_PREFIX + field_dict['field_name'].upper()
-            )
-        return qp
-    
     def _enquire(self, database, query):
         """
         Private method that that returns a Xapian.Enquire instance for use with
@@ -1011,6 +848,7 @@ class SearchQuery(BaseSearchQuery):
         """
         query_list = []
         for value in value_list:
+            value = _marshal_value(value)
             if ' ' in value:
                 query_list.append(
                     xapian.Query(
@@ -1087,17 +925,17 @@ def _marshal_value(value):
     """
     if isinstance(value, datetime.datetime):
         if value.microsecond:
-            value = u'%04d%02d%02dT%02d%02d%02d%06dZ' % (
+            value = u'%04d%02d%02d%02d%02d%02d%06d' % (
                 value.year, value.month, value.day, value.hour,
                 value.minute, value.second, value.microsecond
             )
         else:
-            value = u'%04d%02d%02dT%02d%02d%02dZ' % (
+            value = u'%04d%02d%02d%02d%02d%02d' % (
                 value.year, value.month, value.day, value.hour,
                 value.minute, value.second
             )
     elif isinstance(value, datetime.date):
-        value = u'%04d%02d%02dT000000Z' % (value.year, value.month, value.day)
+        value = u'%04d%02d%02d000000' % (value.year, value.month, value.day)
     elif isinstance(value, bool):
         if value:
             value = u'true'
