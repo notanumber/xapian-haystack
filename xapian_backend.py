@@ -734,10 +734,10 @@ class SearchQuery(BaseSearchQuery):
                 expression, term = child
                 field, filter_type = search_node.split_expression(expression)
 
-                if not isinstance(term, (list, tuple)):
-                    term = _marshal_term(term)
-                else:
+                if isinstance(term, (list, tuple)):
                     term = [_marshal_term(t) for t in term]
+                else:
+                    term = _marshal_term(term)
 
                 if field == 'content':
                     query_list.append(self._content_field(term, is_not))
@@ -928,11 +928,11 @@ def _marshal_term(term):
         term = _marshal_datetime(term)
     elif isinstance(term, datetime.date):
         term = _marshal_date(term)
-    elif isinstance(term, bool):
-        if term:
-            term = u'true'
-        else:
-            term = u'false'
+    # elif isinstance(term, bool):
+    #     if term:
+    #         term = u'true'
+    #     else:
+    #         term = u'false'
     else:
         term = force_unicode(term).lower()
     return term

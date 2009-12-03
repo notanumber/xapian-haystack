@@ -47,6 +47,10 @@ class XapianSearchQueryTestCase(TestCase):
         self.sq.add_filter(SQ(content=True))
         self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query(true)')
     
+    def test_build_query_date(self):
+        self.sq.add_filter(SQ(content=datetime.date(2009, 5, 8)))
+        self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query(20090508000000)')
+
     def test_build_query_datetime(self):
         self.sq.add_filter(SQ(content=datetime.datetime(2009, 5, 8, 11, 28)))
         self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query(20090508112800)')
