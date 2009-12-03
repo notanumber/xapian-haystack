@@ -301,10 +301,10 @@ class SearchBackend(BaseSearchBackend):
         
         for match in matches:
             app_label, module_name, pk, model_data = pickle.loads(match.document.get_data())
-            if highlight and (len(query_string) > 0):
+            if highlight:
                 model_data['highlighted'] = {
                     self.content_field_name: self._do_highlight(
-                        model_data.get(self.content_field_name), query_string
+                        model_data.get(self.content_field_name), query
                     )
                 }
             results.append(
@@ -461,9 +461,9 @@ class SearchBackend(BaseSearchBackend):
         
         return (content_field_name, schema_fields)
     
-    def _do_highlight(self, content, text, tag='em'):
+    def _do_highlight(self, content, query, tag='em'):
         """
-        Highlight `text` in `content` with html `tag`.
+        Highlight `query` terms in `content` with html `tag`.
         
         This method assumes that the input text (`content`) does not contain
         any special formatting.  That is, it does not contain any html tags
@@ -473,10 +473,11 @@ class SearchBackend(BaseSearchBackend):
             `content` -- Content to search for instances of `text`
             `text` -- The text to be highlighted
         """
-        for term in [term.replace('*', '') for term in text.split()]:
-            if term not in self.RESERVED_WORDS:
-                term_re = re.compile(re.escape(term), re.IGNORECASE)
-                content = term_re.sub('<%s>%s</%s>' % (tag, term, tag), content)
+        for term in query:
+            for match in re.findall('[^A-Z]+', term): # Ignore field identifiers 
+                match_re = re.compile(match, re.I)
+                content = match_re.sub('<%s>%s</%s>' % (tag, term, tag), content)
+
         return content
     
     def _do_field_facets(self, results, field_facets):
@@ -627,7 +628,12 @@ class SearchBackend(BaseSearchBackend):
             else:
                 return database.get_spelling_suggestion(spelling_query)
         
-        return ' '.join([database.get_spelling_suggestion(term) for term in query])
+        term_list = []
+        for term in query:
+            for match in re.findall('[^A-Z]+', term): # Ignore field identifiers 
+                term_list.append(database.get_spelling_suggestion(match))
+            
+        return ' '.join(term_list)
     
     def _database(self, writable=False):
         """

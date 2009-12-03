@@ -241,13 +241,13 @@ class XapianSearchBackendTestCase(TestCase):
     #     results = self.sb.search('index', narrow_queries=set(['name:david1']))
     #     self.assertEqual(results['hits'], 1)
     
-    # def test_highlight(self):
-    #     self.sb.update(self.msi, self.sample_objs)
-    #     self.assertEqual(len(self.xapian_search('')), 3)
-    #     
-    #     self.assertEqual(self.sb.search('', highlight=True), {'hits': 0, 'results': []})
-    #     self.assertEqual(self.sb.search('Index', highlight=True)['hits'], 3)
-    #     self.assertEqual([result.highlighted['text'] for result in self.sb.search('Index', highlight=True)['results']], ['<em>Index</em>ed!\n1', '<em>Index</em>ed!\n2', '<em>Index</em>ed!\n3'])
+    def test_highlight(self):
+        self.sb.update(self.msi, self.sample_objs)
+        self.assertEqual(len(self.xapian_search('')), 3)
+        
+        self.assertEqual(self.sb.search(xapian.Query(), highlight=True), {'hits': 0, 'results': []})
+        self.assertEqual(self.sb.search(xapian.Query('indexed'), highlight=True)['hits'], 3)
+        self.assertEqual([result.highlighted['text'] for result in self.sb.search(xapian.Query('indexed'), highlight=True)['results']], ['<em>indexed</em>!\n1', '<em>indexed</em>!\n2', '<em>indexed</em>!\n3'])
     
     def test_spelling_suggestion(self):
         self.sb.update(self.msi, self.sample_objs)
@@ -259,8 +259,12 @@ class XapianSearchBackendTestCase(TestCase):
         self.assertEqual(self.sb.search(xapian.Query('indxed'))['hits'], 0)
         self.assertEqual(self.sb.search(xapian.Query('indxed'))['spelling_suggestion'], 'indexed')
         
-        self.assertEqual(self.sb.search(xapian.Query('indx'))['hits'], 0)
-        self.assertEqual(self.sb.search(xapian.Query('indx'), spelling_query='indexy')['spelling_suggestion'], 'indexed')
+        self.assertEqual(self.sb.search(xapian.Query('foo'))['hits'], 0)
+        self.assertEqual(self.sb.search(xapian.Query('foo'), spelling_query='indexy')['spelling_suggestion'], 'indexed')
+
+        self.assertEqual(self.sb.search(xapian.Query('XNAMEdavid'))['hits'], 0)
+        self.assertEqual(self.sb.search(xapian.Query('XNAMEdavid'))['spelling_suggestion'], 'david1')
+        
 
     # def test_more_like_this(self):
     #     self.sb.update(self.msi, self.sample_objs)
