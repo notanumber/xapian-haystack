@@ -139,8 +139,8 @@ class SearchBackend(BaseSearchBackend):
                     if field['field_name'] in data.keys():
                         prefix = DOCUMENT_CUSTOM_TERM_PREFIX + field['field_name'].upper()
                         value = data[field['field_name']]
-                        term_generator.index_text(force_unicode(value))
-                        term_generator.index_text(force_unicode(value), 1, prefix)
+                        term_generator.index_text(_marshal_term(value))
+                        term_generator.index_text(_marshal_term(value), 1, prefix)
                         document.add_value(field['column'], _marshal_value(value))
                 
                 document.set_data(pickle.dumps(
@@ -266,10 +266,10 @@ class SearchBackend(BaseSearchBackend):
         
         database = self._database()
         
-        # query, spelling_suggestion = self._query(
-        #     database, query_string, narrow_queries, spelling_query
-        # )
-        spelling_suggestion = ''
+        if getattr(settings, 'HAYSTACK_INCLUDE_SPELLING', False) is True:
+            spelling_suggestion = self._do_spelling_suggestion(database, query, spelling_query)
+        else:
+            spelling_suggestion = ''
         
         enquire = xapian.Enquire(database)
         enquire.set_query(query)
@@ -609,6 +609,26 @@ class SearchBackend(BaseSearchBackend):
         
         return facet_dict
     
+    def _do_spelling_suggestion(self, database, query, spelling_query):
+        """
+        Private method that returns a single spelling suggestion based on
+        `spelling_query` or `query`.
+        
+        Required arguments:
+            `database` -- The database to check spelling against
+            `query` -- The query to check
+            `spelling_query` -- If not None, this will be checked instead of `query`
+
+        Returns a string with a suggested spelling
+        """
+        if spelling_query:
+            if ' ' in spelling_query:
+                return ' '.join([database.get_spelling_suggestion(term) for term in spelling_query.split()])
+            else:
+                return database.get_spelling_suggestion(spelling_query)
+        
+        return ' '.join([database.get_spelling_suggestion(term) for term in query])
+    
     def _database(self, writable=False):
         """
         Private method that returns a xapian.Database for use and sets up
@@ -753,7 +773,7 @@ class SearchQuery(BaseSearchQuery):
                     elif filter_type == 'lte':
                         pass
                     elif filter_type == 'startswith':
-                        pass
+                        query_list.append(self._filter_startswith(term, field, is_not))
                     elif filter_type == 'in':
                         query_list.append(self._filter_in(term, field, is_not))
                     
@@ -845,6 +865,26 @@ class SearchQuery(BaseSearchQuery):
         else:
             return xapian.Query(xapian.Query.OP_OR, query_list)
     
+    def _filter_startswith(self, term, field, is_not):
+        """
+        Private method that returns a xapian.Query that searches for any term
+        that begins with `term` in a specified `field`.
+
+        Required arguments:
+            ``term`` -- The terms to search for
+            ``field`` -- The field to search
+            ``is_not`` -- Invert the search results
+
+        Returns:
+            A xapian.Query
+        """
+        sb = SearchBackend()
+        for t in sb._database().allterms():
+            print t
+        term_list = [term, 'foo']
+        return self._filter_in(term_list, field, is_not)
+
+
     def _all_query(self):
         """
         Private method that returns a xapian.Query that returns all documents,
@@ -928,11 +968,6 @@ def _marshal_term(term):
         term = _marshal_datetime(term)
     elif isinstance(term, datetime.date):
         term = _marshal_date(term)
-    # elif isinstance(term, bool):
-    #     if term:
-    #         term = u'true'
-    #     else:
-    #         term = u'false'
     else:
         term = force_unicode(term).lower()
     return term
