@@ -1,4 +1,4 @@
-# Copyright (C) 2009 David Sauve, Trapeze
+# Copyright (C) 2009 David Sauve, Trapeze.  All rights reserved.
 
 import datetime
 import os
@@ -51,6 +51,10 @@ class XapianSearchQueryTestCase(TestCase):
         self.sq.add_filter(SQ(content=datetime.datetime(2009, 5, 8, 11, 28)))
         self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query(20090508112800)')
     
+    def test_build_query_float(self):
+        self.sq.add_filter(SQ(content=25.52))
+        self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query(25.52)')
+
     def test_build_query_multiple_words_and(self):
         self.sq.add_filter(SQ(content='hello'))
         self.sq.add_filter(SQ(content='world'))
@@ -136,6 +140,10 @@ class XapianSearchQueryTestCase(TestCase):
     #     self.sq.add_filter(SQ(title__startswith='haystack'))
     #     self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query(why AND XTITLEhaystack*)')
 
+    # def test_stem_single_word(self):
+    #     self.sq.add_filter(SQ(content='testing'))
+    #     self.assertEqual(self.sq.build_query().get_description(), 'Xapian.Query(Ztest)')
+    # 
     def test_clean(self):
         self.assertEqual(self.sq.clean('hello world'), 'hello world')
         self.assertEqual(self.sq.clean('hello AND world'), 'hello AND world')

@@ -1,1 +1,1 @@
-# Copyright (C) 2009 David Sauve, Trapeze
+# Copyright (C) 2009 David Sauve, Trapeze.  All rights reserved.
