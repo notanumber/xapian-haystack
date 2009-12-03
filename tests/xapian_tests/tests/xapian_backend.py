@@ -277,6 +277,10 @@ class XapianSearchBackendTestCase(TestCase):
         self.assertEqual(results['hits'], 1)
         self.assertEqual([result.pk for result in results['results']], [3])
 
+        results = self.sb.more_like_this(self.sample_objs[0], limit_to_registered_models=True)
+        self.assertEqual(results['hits'], 2)
+        self.assertEqual([result.pk for result in results['results']], [3, 2])
+
     # def test_order_by(self):
     #     self.sb.update(self.msi, self.sample_objs)
     #     

@@ -378,15 +378,19 @@ class SearchBackend(BaseSearchBackend):
         query = xapian.Query(
             xapian.Query.OP_AND_NOT, [query, DOCUMENT_ID_TERM_PREFIX + get_identifier(model_instance)]
         )
-        # narrow_queries = None
-        # if limit_to_registered_models:
-        #     registered_models = self.build_registered_models_list()
-        #     
-        #     if len(registered_models) > 0:
-        #         narrow_queries = set()
-        #         narrow_queries.add(
-        #             ' '.join(['django_ct:%s' % model for model in registered_models])
-        #         )
+        narrow_queries = []
+        if limit_to_registered_models:
+            registered_models = self.build_registered_models_list()
+            
+            if len(registered_models) > 0:
+                query = xapian.Query(
+                    xapian.Query.OP_AND, query, 
+                    xapian.Query(
+                        xapian.Query.OP_OR,  [
+                            xapian.Query('%s%s' % (DOCUMENT_CT_TERM_PREFIX, model)) for model in registered_models
+                        ]
+                    )
+                )
         if additional_query:
             query = xapian.Query(
                 xapian.Query.OP_AND, query, additional_query
