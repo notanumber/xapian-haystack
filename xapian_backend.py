@@ -325,7 +325,7 @@ class SearchBackend(BaseSearchBackend):
             'spelling_suggestion': spelling_suggestion,
         }
     
-    def more_like_this(self, model_instance, additional_query_string=None,
+    def more_like_this(self, model_instance, additional_query=None,
                        start_offset=0, end_offset=None, 
                        limit_to_registered_models=True, **kwargs):
         """
@@ -336,8 +336,7 @@ class SearchBackend(BaseSearchBackend):
                                 retrieving similar documents.
         
         Optional arguments:
-            `additional_query_string` -- An additional query string to narrow
-                                         results
+            `additional_query` -- An additional query to narrow results
             `start_offset` -- The starting offset (default=0)
             `end_offset` -- The ending offset (default=None), if None, then all documents
             `limit_to_registered_models` -- Limit returned results to models registered in the current `SearchSite` (default = True)
@@ -379,19 +378,16 @@ class SearchBackend(BaseSearchBackend):
         query = xapian.Query(
             xapian.Query.OP_AND_NOT, [query, DOCUMENT_ID_TERM_PREFIX + get_identifier(model_instance)]
         )
-        narrow_queries = None
-        if limit_to_registered_models:
-            registered_models = self.build_registered_models_list()
-            
-            if len(registered_models) > 0:
-                narrow_queries = set()
-                narrow_queries.add(
-                    ' '.join(['django_ct:%s' % model for model in registered_models])
-                )
-        if additional_query_string:
-            additional_query, __unused__ = self._query(
-                database, additional_query_string, narrow_queries
-            )
+        # narrow_queries = None
+        # if limit_to_registered_models:
+        #     registered_models = self.build_registered_models_list()
+        #     
+        #     if len(registered_models) > 0:
+        #         narrow_queries = set()
+        #         narrow_queries.add(
+        #             ' '.join(['django_ct:%s' % model for model in registered_models])
+        #         )
+        if additional_query:
             query = xapian.Query(
                 xapian.Query.OP_AND, query, additional_query
             )

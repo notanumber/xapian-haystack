@@ -264,19 +264,18 @@ class XapianSearchBackendTestCase(TestCase):
 
         self.assertEqual(self.sb.search(xapian.Query('XNAMEdavid'))['hits'], 0)
         self.assertEqual(self.sb.search(xapian.Query('XNAMEdavid'))['spelling_suggestion'], 'david1')
-        
 
-    # def test_more_like_this(self):
-    #     self.sb.update(self.msi, self.sample_objs)
-    #     self.assertEqual(len(self.xapian_search('')), 3)
-    #     
-    #     results = self.sb.more_like_this(self.sample_objs[0])
-    #     self.assertEqual(results['hits'], 2)
-    #     self.assertEqual([result.pk for result in results['results']], [3, 2])
-    # 
-    #     results = self.sb.more_like_this(self.sample_objs[0], additional_query_string='david3')
-    #     self.assertEqual(results['hits'], 1)
-    #     self.assertEqual([result.pk for result in results['results']], [3])
+    def test_more_like_this(self):
+        self.sb.update(self.msi, self.sample_objs)
+        self.assertEqual(len(self.xapian_search('')), 3)
+        
+        results = self.sb.more_like_this(self.sample_objs[0])
+        self.assertEqual(results['hits'], 2)
+        self.assertEqual([result.pk for result in results['results']], [3, 2])
+    
+        results = self.sb.more_like_this(self.sample_objs[0], additional_query=xapian.Query('david3'))
+        self.assertEqual(results['hits'], 1)
+        self.assertEqual([result.pk for result in results['results']], [3])
 
     # def test_order_by(self):
     #     self.sb.update(self.msi, self.sample_objs)
