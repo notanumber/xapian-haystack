@@ -228,18 +228,18 @@ class XapianSearchBackendTestCase(TestCase):
     #     self.sb.update(self.msi, self.sample_objs)
     #     self.assertEqual(len(self.xapian_search('')), 3)
     # 
-    #     self.assertEqual(self.sb.search('', query_facets={'name': 'da*'}), {'hits': 0, 'results': []})
-    #     results = self.sb.search('index', query_facets={'name': 'da*'})
+    #     self.assertEqual(self.sb.search(xapian.Query(), query_facets={'name': 'da*', {'hits': 0, 'results': []})
+    #     results = self.sb.search(xapian.Query('index'), query_facets={'name': 'da*'})
     #     self.assertEqual(results['hits'], 3)
     #     self.assertEqual(results['facets']['queries']['name'], ('da*', 3))
     
-    # def test_narrow_queries(self):
-    #     self.sb.update(self.msi, self.sample_objs)
-    #     self.assertEqual(len(self.xapian_search('')), 3)
-    #     
-    #     self.assertEqual(self.sb.search('', narrow_queries=set(['name:david1'])), {'hits': 0, 'results': []})
-    #     results = self.sb.search('index', narrow_queries=set(['name:david1']))
-    #     self.assertEqual(results['hits'], 1)
+    def test_narrow_queries(self):
+        self.sb.update(self.msi, self.sample_objs)
+        self.assertEqual(len(self.xapian_search('')), 3)
+        
+        self.assertEqual(self.sb.search(xapian.Query(), narrow_queries=set([xapian.Query('XNAMEdavid1')])), {'hits': 0, 'results': []})
+        results = self.sb.search(xapian.Query('indexed'), narrow_queries=set([xapian.Query('XNAMEdavid1')]))
+        self.assertEqual(results['hits'], 1)
     
     def test_highlight(self):
         self.sb.update(self.msi, self.sample_objs)
@@ -281,38 +281,38 @@ class XapianSearchBackendTestCase(TestCase):
         self.assertEqual(results['hits'], 2)
         self.assertEqual([result.pk for result in results['results']], [3, 2])
 
-    # def test_order_by(self):
-    #     self.sb.update(self.msi, self.sample_objs)
-    #     
-    #     results = self.sb.search('*', sort_by=['pub_date'])
-    #     self.assertEqual([result.pk for result in results['results']], [3, 2, 1])
-    #     
-    #     results = self.sb.search('*', sort_by=['-pub_date'])
-    #     self.assertEqual([result.pk for result in results['results']], [1, 2, 3])
-    # 
-    #     results = self.sb.search('*', sort_by=['id'])
-    #     self.assertEqual([result.pk for result in results['results']], [1, 2, 3])
-    # 
-    #     results = self.sb.search('*', sort_by=['-id'])
-    #     self.assertEqual([result.pk for result in results['results']], [3, 2, 1])
-    # 
-    #     results = self.sb.search('*', sort_by=['value'])
-    #     self.assertEqual([result.pk for result in results['results']], [1, 2, 3])
-    # 
-    #     results = self.sb.search('*', sort_by=['-value'])
-    #     self.assertEqual([result.pk for result in results['results']], [3, 2, 1])
-    # 
-    #     results = self.sb.search('*', sort_by=['popularity'])
-    #     self.assertEqual([result.pk for result in results['results']], [2, 1, 3])
-    # 
-    #     results = self.sb.search('*', sort_by=['-popularity'])
-    #     self.assertEqual([result.pk for result in results['results']], [3, 1, 2])
-    # 
-    #     results = self.sb.search('*', sort_by=['flag', 'id'])
-    #     self.assertEqual([result.pk for result in results['results']], [2, 1, 3])
-    # 
-    #     results = self.sb.search('*', sort_by=['flag', '-id'])
-    #     self.assertEqual([result.pk for result in results['results']], [2, 3, 1])
+    def test_order_by(self):
+        self.sb.update(self.msi, self.sample_objs)
+        
+        results = self.sb.search(xapian.Query(''), sort_by=['pub_date'])
+        self.assertEqual([result.pk for result in results['results']], [3, 2, 1])
+        
+        results = self.sb.search(xapian.Query(''), sort_by=['-pub_date'])
+        self.assertEqual([result.pk for result in results['results']], [1, 2, 3])
+    
+        results = self.sb.search(xapian.Query(''), sort_by=['id'])
+        self.assertEqual([result.pk for result in results['results']], [1, 2, 3])
+    
+        results = self.sb.search(xapian.Query(''), sort_by=['-id'])
+        self.assertEqual([result.pk for result in results['results']], [3, 2, 1])
+    
+        results = self.sb.search(xapian.Query(''), sort_by=['value'])
+        self.assertEqual([result.pk for result in results['results']], [1, 2, 3])
+    
+        results = self.sb.search(xapian.Query(''), sort_by=['-value'])
+        self.assertEqual([result.pk for result in results['results']], [3, 2, 1])
+    
+        results = self.sb.search(xapian.Query(''), sort_by=['popularity'])
+        self.assertEqual([result.pk for result in results['results']], [2, 1, 3])
+    
+        results = self.sb.search(xapian.Query(''), sort_by=['-popularity'])
+        self.assertEqual([result.pk for result in results['results']], [3, 1, 2])
+    
+        results = self.sb.search(xapian.Query(''), sort_by=['flag', 'id'])
+        self.assertEqual([result.pk for result in results['results']], [2, 1, 3])
+    
+        results = self.sb.search(xapian.Query(''), sort_by=['flag', '-id'])
+        self.assertEqual([result.pk for result in results['results']], [2, 3, 1])
 
     # def test_boost(self):
     #     self.sb.update(self.msi, self.sample_objs)
