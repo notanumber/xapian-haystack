@@ -388,6 +388,10 @@ class LiveXapianSearchQueryTestCase(TestCase):
         self.sq.add_filter(SQ(name__gt='a'))
         self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query(VALUE_RANGE 2 a zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz)')
 
+    def test_build_query_lt(self):
+        self.sq.add_filter(SQ(name__lt='m'))
+        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query(VALUE_RANGE 2 a m)')
+
     def test_build_query_multiple_filter_types(self):
         self.sq.add_filter(SQ(content='why'))
     #     self.sq.add_filter(SQ(pub_date__lte='2009-02-10 01:59:00'))

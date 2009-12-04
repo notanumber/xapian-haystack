@@ -864,7 +864,7 @@ class SearchQuery(BaseSearchQuery):
                     elif filter_type == 'gte':
                         pass
                     elif filter_type == 'lt':
-                        pass
+                        query_list.append(self._filter_lt(term, field, is_not))
                     elif filter_type == 'lte':
                         pass
                     elif filter_type == 'startswith':
@@ -983,13 +983,22 @@ class SearchQuery(BaseSearchQuery):
     
     def _filter_gt(self, term, field, is_not):
         """
-        Private methos that returns a xapian.Query that searches for any term
+        Private method that returns a xapian.Query that searches for any term
         that is greater than `term` in a specified `field`.
         """
         vrp = XHValueRangeProcessor(self.backend)
         pos, begin, end = vrp('%s:%s' % (field, term), '*')
         return xapian.Query(xapian.Query.OP_VALUE_RANGE, pos, begin, end)
     
+    def _filter_lt(self, term, field, is_not):
+        """
+        Private method that returns a xapian.Query that searches for any term
+        that is less than `term` in a specified `field`.
+        """
+        vrp = XHValueRangeProcessor(self.backend)
+        pos, begin, end = vrp('%s:' % field, '%s' % term)
+        return xapian.Query(xapian.Query.OP_VALUE_RANGE, pos, begin, end)
+
     def _all_query(self):
         """
         Private method that returns a xapian.Query that returns all documents,
