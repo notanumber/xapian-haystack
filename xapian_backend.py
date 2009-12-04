@@ -134,7 +134,7 @@ class SearchBackend(BaseSearchBackend):
 
                 document_id = DOCUMENT_ID_TERM_PREFIX + get_identifier(obj)
                 data = index.prepare(obj)
-                
+
                 for field in self.schema:
                     if field['field_name'] in data.keys():
                         prefix = DOCUMENT_CUSTOM_TERM_PREFIX + field['field_name'].upper()
@@ -636,9 +636,9 @@ class SearchBackend(BaseSearchBackend):
         
         term_list = []
         for term in query:
-            for match in re.findall('[^A-Z]+', term): # Ignore field identifiers 
+            for match in re.findall('[^A-Z]+', term): # Ignore field identifiers
                 term_list.append(database.get_spelling_suggestion(match))
-            
+
         return ' '.join(term_list)
     
     def _database(self, writable=False):
@@ -653,7 +653,7 @@ class SearchBackend(BaseSearchBackend):
         """
         if writable:
             self.content_field_name, self.schema = self.build_schema(self.site.all_searchfields())
-            
+
             database = xapian.WritableDatabase(settings.HAYSTACK_XAPIAN_PATH, xapian.DB_CREATE_OR_OPEN)
             database.set_metadata('schema', pickle.dumps(self.schema, pickle.HIGHEST_PROTOCOL))
             database.set_metadata('content', pickle.dumps(self.content_field_name, pickle.HIGHEST_PROTOCOL))

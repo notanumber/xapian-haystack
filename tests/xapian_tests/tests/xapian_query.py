@@ -139,12 +139,6 @@ class XapianSearchQueryTestCase(TestCase):
         self.sq.add_filter(SQ(pub_date__in=[datetime.datetime(2009, 7, 6, 1, 56, 21)]))
         self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query((why AND XPUB_DATE20090706015621))')
     
-    # def test_build_query_wildcard_filter_types(self):
-    #     self.sq.add_filter(SQ(content='why'))
-    #     self.sq.add_filter(SQ(title__startswith='haystack'))
-    #     self.assertEqual(self.sq.build_query().get_description(), 'Xapian::Query((why AND XTITLEhaystack))')
-        # Because wildcards are expanded using existing documents, a more thorough test for this is performed in SearchBackend tests
-
     # def test_stem_single_word(self):
     #     self.sq.add_filter(SQ(content='testing'))
     #     self.assertEqual(self.sq.build_query().get_description(), 'Xapian.Query(Ztest)')
