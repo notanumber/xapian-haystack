@@ -33,6 +33,52 @@ DOCUMENT_CUSTOM_TERM_PREFIX = 'X'
 DOCUMENT_CT_TERM_PREFIX = DOCUMENT_CUSTOM_TERM_PREFIX + 'CONTENTTYPE'
 
 
+class XHValueRangeProcessor(xapian.ValueRangeProcessor):
+    def __init__(self, sb):
+        self.sb = sb
+        xapian.ValueRangeProcessor.__init__(self)
+    
+    def __call__(self, begin, end):
+        """
+        Construct a tuple for value range processing.
+        `begin` -- a string in the format '<field_name>:[low_range]'
+        If 'low_range' is omitted, assume the smallest possible value.
+        `end` -- a string in the the format '[high_range|*]'. If '*', assume
+        the highest possible value.
+        Return a tuple of three strings: (column, low, high)
+        """
+        colon = begin.find(':')
+        field_name = begin[:colon]
+        begin = begin[colon + 1:len(begin)]
+        for field_dict in self.sb.schema:
+            if field_dict['field_name'] == field_name:
+                if not begin:
+                    if field_dict['type'] == 'text':
+                        begin = u'a' # TODO: A better way of getting a min text value?
+                    elif field_dict['type'] == 'long':
+                        begin = -sys.maxint - 1
+                    elif field_dict['type'] == 'float':
+                        begin = float('-inf')
+                    elif field_dict['type'] == 'date' or field_dict['type'] == 'datetime':
+                        begin = u'00010101000000'
+                elif end == '*':
+                    if field_dict['type'] == 'text':
+                        end = u'z' * 100 # TODO: A better way of getting a max text value?
+                    elif field_dict['type'] == 'long':
+                        end = sys.maxint
+                    elif field_dict['type'] == 'float':
+                        end = float('inf')
+                    elif field_dict['type'] == 'date' or field_dict['type'] == 'datetime':
+                        end = u'99990101000000'
+                if field_dict['type'] == 'float':
+                    begin = _marshal_value(float(begin))
+                    end = _marshal_value(float(end))
+                elif field_dict['type'] == 'long':
+                    begin = _marshal_value(long(begin))
+                    end = _marshal_value(long(end))
+                return field_dict['column'], str(begin), str(end)
+
+
 class XHExpandDecider(xapian.ExpandDecider):
     def __call__(self, term):
         """
@@ -424,6 +470,38 @@ class SearchBackend(BaseSearchBackend):
             },
             'spelling_suggestion': None,
         }
+    
+    def parse_query(self, query_string):
+        """
+        Given a `query_string`, will attempt to return a xapian.Query
+        
+        Required arguments:
+            ``query_string`` -- A query string to parse
+            
+        Returns a xapian.Query
+        """
+        flags = xapian.QueryParser.FLAG_PARTIAL \
+              | xapian.QueryParser.FLAG_PHRASE \
+              | xapian.QueryParser.FLAG_BOOLEAN \
+              | xapian.QueryParser.FLAG_LOVEHATE \
+              | xapian.QueryParser.FLAG_WILDCARD \
+              | xapian.QueryParser.FLAG_PURE_NOT
+        qp = xapian.QueryParser()
+        qp.set_database(self._database())
+        qp.set_stemmer(xapian.Stem(self.language))
+        qp.set_stemming_strategy(xapian.QueryParser.STEM_SOME)
+        qp.add_boolean_prefix('django_ct', DOCUMENT_CT_TERM_PREFIX)
+    
+        for field_dict in self.schema:
+            qp.add_prefix(
+                field_dict['field_name'],
+                DOCUMENT_CUSTOM_TERM_PREFIX + field_dict['field_name'].upper()
+            )
+        
+        vrp = XHValueRangeProcessor(self)
+        qp.add_valuerangeprocessor(vrp)
+        
+        return qp.parse_query(query_string, flags)
     
     def build_schema(self, fields):
         """
