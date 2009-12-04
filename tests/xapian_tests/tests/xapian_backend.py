@@ -184,45 +184,45 @@ class XapianSearchBackendTestCase(TestCase):
         self.assertEqual(self.sb.search(xapian.Query(''))['hits'], 3)
         self.assertEqual([result.pk for result in self.sb.search(xapian.Query(''))['results']], [1, 2, 3])
         
-    # def test_field_facets(self):
-    #     self.sb.update(self.msi, self.sample_objs)
-    #     self.assertEqual(len(self.xapian_search('')), 3)
-    #     
-    #     self.assertEqual(self.sb.search('', facets=['name']), {'hits': 0, 'results': []})
-    #     results = self.sb.search('index', facets=['name'])
-    #     self.assertEqual(results['hits'], 3)
-    #     self.assertEqual(results['facets']['fields']['name'], [('david1', 1), ('david2', 1), ('david3', 1)])
-    # 
-    #     results = self.sb.search('index', facets=['flag'])
-    #     self.assertEqual(results['hits'], 3)
-    #     self.assertEqual(results['facets']['fields']['flag'], [(False, 1), (True, 2)])
-    #     
-    #     results = self.sb.search('index', facets=['sites'])
-    #     self.assertEqual(results['hits'], 3)
-    #     self.assertEqual(results['facets']['fields']['sites'], [('1', 1), ('3', 2), ('2', 2), ('4', 1), ('6', 2), ('9', 1)])
+    def test_field_facets(self):
+        self.sb.update(self.msi, self.sample_objs)
+        self.assertEqual(len(self.xapian_search('')), 3)
+        
+        self.assertEqual(self.sb.search(xapian.Query(), facets=['name']), {'hits': 0, 'results': []})
+        results = self.sb.search(xapian.Query('indexed'), facets=['name'])
+        self.assertEqual(results['hits'], 3)
+        self.assertEqual(results['facets']['fields']['name'], [('david1', 1), ('david2', 1), ('david3', 1)])
+    
+        results = self.sb.search(xapian.Query('indexed'), facets=['flag'])
+        self.assertEqual(results['hits'], 3)
+        self.assertEqual(results['facets']['fields']['flag'], [(False, 1), (True, 2)])
+        
+        results = self.sb.search(xapian.Query('indexed'), facets=['sites'])
+        self.assertEqual(results['hits'], 3)
+        self.assertEqual(results['facets']['fields']['sites'], [('1', 1), ('3', 2), ('2', 2), ('4', 1), ('6', 2), ('9', 1)])
             
-    # def test_date_facets(self):
-    #     self.sb.update(self.msi, self.sample_objs)
-    #     self.assertEqual(len(self.xapian_search('')), 3)
-    # 
-    #     self.assertEqual(self.sb.search('', date_facets={'pub_date': {'start_date': datetime.datetime(2008, 10, 26), 'end_date': datetime.datetime(2009, 3, 26), 'gap_by': 'month'}}), {'hits': 0, 'results': []})
-    #     results = self.sb.search('index', date_facets={'pub_date': {'start_date': datetime.datetime(2008, 10, 26), 'end_date': datetime.datetime(2009, 3, 26), 'gap_by': 'month'}})
-    #     self.assertEqual(results['hits'], 3)
-    #     self.assertEqual(results['facets']['dates']['pub_date'], [
-    #         ('2009-02-26T00:00:00', 0),
-    #         ('2009-01-26T00:00:00', 3),
-    #         ('2008-12-26T00:00:00', 0),
-    #         ('2008-11-26T00:00:00', 0),
-    #         ('2008-10-26T00:00:00', 0),
-    #     ])
-    # 
-    #     results = self.sb.search('index', date_facets={'pub_date': {'start_date': datetime.datetime(2009, 02, 01), 'end_date': datetime.datetime(2009, 3, 15), 'gap_by': 'day', 'gap_amount': 15}})
-    #     self.assertEqual(results['hits'], 3)
-    #     self.assertEqual(results['facets']['dates']['pub_date'], [
-    #         ('2009-03-03T00:00:00', 0),
-    #         ('2009-02-16T00:00:00', 3),
-    #         ('2009-02-01T00:00:00', 0)
-    #     ])
+    def test_date_facets(self):
+        self.sb.update(self.msi, self.sample_objs)
+        self.assertEqual(len(self.xapian_search('')), 3)
+    
+        self.assertEqual(self.sb.search(xapian.Query(), date_facets={'pub_date': {'start_date': datetime.datetime(2008, 10, 26), 'end_date': datetime.datetime(2009, 3, 26), 'gap_by': 'month'}}), {'hits': 0, 'results': []})
+        results = self.sb.search(xapian.Query('indexed'), date_facets={'pub_date': {'start_date': datetime.datetime(2008, 10, 26), 'end_date': datetime.datetime(2009, 3, 26), 'gap_by': 'month'}})
+        self.assertEqual(results['hits'], 3)
+        self.assertEqual(results['facets']['dates']['pub_date'], [
+            ('2009-02-26T00:00:00', 0),
+            ('2009-01-26T00:00:00', 3),
+            ('2008-12-26T00:00:00', 0),
+            ('2008-11-26T00:00:00', 0),
+            ('2008-10-26T00:00:00', 0),
+        ])
+    
+        results = self.sb.search(xapian.Query('indexed'), date_facets={'pub_date': {'start_date': datetime.datetime(2009, 02, 01), 'end_date': datetime.datetime(2009, 3, 15), 'gap_by': 'day', 'gap_amount': 15}})
+        self.assertEqual(results['hits'], 3)
+        self.assertEqual(results['facets']['dates']['pub_date'], [
+            ('2009-03-03T00:00:00', 0),
+            ('2009-02-16T00:00:00', 3),
+            ('2009-02-01T00:00:00', 0)
+        ])
 
     # def test_query_facets(self):
     #     self.sb.update(self.msi, self.sample_objs)
