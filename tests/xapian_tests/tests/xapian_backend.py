@@ -355,6 +355,9 @@ class LiveXapianMockSearchIndex(indexes.SearchIndex):
 
 
 class LiveXapianSearchQueryTestCase(TestCase):
+    """
+    SearchQuery specific tests
+    """
     fixtures = ['initial_data.json']
 
     def setUp(self):
@@ -380,6 +383,19 @@ class LiveXapianSearchQueryTestCase(TestCase):
         self.sq = SearchQuery(backend=SearchBackend())
         self.sq.add_filter(SQ(name__startswith='daniel1'))
         self.assertEqual([result.pk for result in self.sq.get_results()], [1])
+
+    def test_build_query_gt(self):
+        self.sq.add_filter(SQ(name__gt='a'))
+        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query(VALUE_RANGE 2 a zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz)')
+
+    def test_build_query_multiple_filter_types(self):
+        self.sq.add_filter(SQ(content='why'))
+    #     self.sq.add_filter(SQ(pub_date__lte='2009-02-10 01:59:00'))
+        self.sq.add_filter(SQ(name__gt='david'))
+    #     self.sq.add_filter(SQ(created__lt='2009-02-12 12:13:00'))
+    #     self.sq.add_filter(SQ(title__gte='B'))
+        self.sq.add_filter(SQ(id__in=[1, 2, 3]))
+        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query((why AND VALUE_RANGE 2 david zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz AND (XID1 OR XID2 OR XID3)))')
 
     def test_log_query(self):
         backends.reset_search_queries()
