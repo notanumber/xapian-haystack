@@ -373,6 +373,14 @@ class LiveXapianSearchQueryTestCase(TestCase):
         self.assertEqual(self.sq.get_spelling_suggestion(), u'indexed')
         self.assertEqual(self.sq.get_spelling_suggestion('indxd'), u'indexed')
 
+    def test_startswith(self):
+        self.sq.add_filter(SQ(name__startswith='da*'))
+        self.assertEqual([result.pk for result in self.sq.get_results()], [1, 2, 3])
+
+        self.sq = SearchQuery(backend=SearchBackend())
+        self.sq.add_filter(SQ(name__startswith='daniel1'))
+        self.assertEqual([result.pk for result in self.sq.get_results()], [1])
+
     def test_log_query(self):
         backends.reset_search_queries()
         self.assertEqual(len(backends.queries), 0)

@@ -480,6 +480,11 @@ class SearchBackend(BaseSearchBackend):
             
         Returns a xapian.Query
         """
+        if query_string == '*':
+            return xapian.Query('') # Match everything
+        elif query_string == '':
+            return xapian.Query()   # Match nothing
+
         flags = xapian.QueryParser.FLAG_PARTIAL \
               | xapian.QueryParser.FLAG_PHRASE \
               | xapian.QueryParser.FLAG_BOOLEAN \
@@ -969,10 +974,12 @@ class SearchQuery(BaseSearchQuery):
             A xapian.Query
         """
         sb = SearchBackend()
+        term_list = set()
         for t in sb._database().allterms():
-            print t
-        term_list = [term, 'foo']
-        return self._filter_in(term_list, field, is_not)
+            if t.term.startswith(term.rstrip('*')):
+                term_list.add(t.term)
+
+        return self._filter_in(list(term_list), field, is_not)
 
 
     def _all_query(self):
