@@ -640,9 +640,10 @@ class SearchBackend(BaseSearchBackend):
                         year=date_range.year + int(gap_value)
                     )
                 elif gap_type == 'month':
-                    if date_range.month == 12:
+                    if date_range.month + int(gap_value) > 12:
                         date_range = date_range.replace(
-                            month=1, year=date_range.year + int(gap_value)
+                            month=((date_range.month + int(gap_value)) % 12),
+                            year=(date_range.year + (date_range.month + int(gap_value)) / 12)
                         )
                     else:
                         date_range = date_range.replace(
