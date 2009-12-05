@@ -220,21 +220,21 @@ class XapianSearchBackendTestCase(TestCase):
             ('2009-02-01T00:00:00', 0)
         ])
 
-    # def test_query_facets(self):
-    #     self.backend.update(self.index, self.sample_objs)
-    #     self.assertEqual(len(self.xapian_search('')), 3)
-    # 
-    #     self.assertEqual(self.backend.search(xapian.Query(), query_facets={'name': 'da*', {'hits': 0, 'results': []})
-    #     results = self.backend.search(xapian.Query('index'), query_facets={'name': 'da*'})
-    #     self.assertEqual(results['hits'], 3)
-    #     self.assertEqual(results['facets']['queries']['name'], ('da*', 3))
+    def test_query_facets(self):
+        self.backend.update(self.index, self.sample_objs)
+        self.assertEqual(len(self.xapian_search('')), 3)
+    
+        self.assertEqual(self.backend.search(xapian.Query(), query_facets={'name': 'da*'}), {'hits': 0, 'results': []})
+        results = self.backend.search(xapian.Query('indexed'), query_facets={'name': 'da*'})
+        self.assertEqual(results['hits'], 3)
+        self.assertEqual(results['facets']['queries']['name'], ('da*', 3))
     
     def test_narrow_queries(self):
         self.backend.update(self.index, self.sample_objs)
         self.assertEqual(len(self.xapian_search('')), 3)
         
-        self.assertEqual(self.backend.search(xapian.Query(), narrow_queries=set([xapian.Query('XNAMEdavid1')])), {'hits': 0, 'results': []})
-        results = self.backend.search(xapian.Query('indexed'), narrow_queries=set([xapian.Query('XNAMEdavid1')]))
+        self.assertEqual(self.backend.search(xapian.Query(), narrow_queries=set(['name:david1'])), {'hits': 0, 'results': []})
+        results = self.backend.search(xapian.Query('indexed'), narrow_queries=set(['name:david1']))
         self.assertEqual(results['hits'], 1)
     
     def test_highlight(self):

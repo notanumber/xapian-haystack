@@ -308,7 +308,9 @@ class SearchBackend(BaseSearchBackend):
         
         if narrow_queries is not None:
             query = xapian.Query(
-                xapian.Query.OP_AND, query, xapian.Query(xapian.Query.OP_OR, list(narrow_queries))
+                xapian.Query.OP_AND, query, xapian.Query(
+                    xapian.Query.OP_OR, [self.parse_query(narrow_query) for narrow_query in narrow_queries]
+                )
             )
         
         if limit_to_registered_models:
@@ -696,8 +698,8 @@ class SearchBackend(BaseSearchBackend):
         facet_dict = {}
         
         for field, query in query_facets.iteritems():
-            facet_dict[field] = (query, self.search(query)['hits'])
-        
+            facet_dict[field] = (query, self.search(self.parse_query(query))['hits'])
+
         return facet_dict
     
     def _do_spelling_suggestion(self, database, query, spelling_query):
