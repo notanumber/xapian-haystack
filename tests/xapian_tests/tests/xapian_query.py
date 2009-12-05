@@ -29,68 +29,68 @@ class XapianSearchQueryTestCase(TestCase):
     
     def test_build_query_single_word(self):
         self.sq.add_filter(SQ(content='hello'))
-        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query(hello)')
+        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query((Zhello OR hello))')
     
     def test_build_query_single_word_not(self):
         self.sq.add_filter(~SQ(content='hello'))
-        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query((<alldocuments> AND_NOT hello))')
+        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query((<alldocuments> AND_NOT (Zhello OR hello)))')
     
     def test_build_query_single_word_field_exact(self):
         self.sq.add_filter(SQ(foo='hello'))
-        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query(XFOOhello)')
+        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query((ZXFOOhello OR XFOOhello))')
     
     def test_build_query_single_word_field_exact_not(self):
         self.sq.add_filter(~SQ(foo='hello'))
-        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query((<alldocuments> AND_NOT XFOOhello))')
+        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query((<alldocuments> AND_NOT (ZXFOOhello OR XFOOhello)))')
     
     def test_build_query_boolean(self):
         self.sq.add_filter(SQ(content=True))
-        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query(true)')
+        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query((Ztrue OR true))')
     
     def test_build_query_date(self):
         self.sq.add_filter(SQ(content=datetime.date(2009, 5, 8)))
-        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query(20090508000000)')
+        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query((Z20090508000000 OR 20090508000000))')
     
     def test_build_query_datetime(self):
         self.sq.add_filter(SQ(content=datetime.datetime(2009, 5, 8, 11, 28)))
-        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query(20090508112800)')
+        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query((Z20090508112800 OR 20090508112800))')
     
     def test_build_query_float(self):
         self.sq.add_filter(SQ(content=25.52))
-        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query(25.52)')
+        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query((Z25.52 OR 25.52))')
     
     def test_build_query_multiple_words_and(self):
         self.sq.add_filter(SQ(content='hello'))
         self.sq.add_filter(SQ(content='world'))
-        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query((hello AND world))')
+        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query(((Zhello OR hello) AND (Zworld OR world)))')
     
     def test_build_query_multiple_words_not(self):
         self.sq.add_filter(~SQ(content='hello'))
         self.sq.add_filter(~SQ(content='world'))
-        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query(((<alldocuments> AND_NOT hello) AND (<alldocuments> AND_NOT world)))')
+        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query(((<alldocuments> AND_NOT (Zhello OR hello)) AND (<alldocuments> AND_NOT (Zworld OR world))))')
     
     def test_build_query_multiple_words_or(self):
         self.sq.add_filter(SQ(content='hello') | SQ(content='world'))
-        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query((hello OR world))')
+        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query((Zhello OR hello OR Zworld OR world))')
     
     def test_build_query_multiple_words_or_not(self):
         self.sq.add_filter(~SQ(content='hello') | ~SQ(content='world'))
-        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query(((<alldocuments> AND_NOT hello) OR (<alldocuments> AND_NOT world)))')
+        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query(((<alldocuments> AND_NOT (Zhello OR hello)) OR (<alldocuments> AND_NOT (Zworld OR world))))')
     
     def test_build_query_multiple_words_mixed(self):
         self.sq.add_filter(SQ(content='why') | SQ(content='hello'))
         self.sq.add_filter(~SQ(content='world'))
-        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query(((why OR hello) AND (<alldocuments> AND_NOT world)))')
+        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query(((Zwhy OR why OR Zhello OR hello) AND (<alldocuments> AND_NOT (Zworld OR world))))')
     
     def test_build_query_multiple_word_field_exact(self):
         self.sq.add_filter(SQ(foo='hello'))
         self.sq.add_filter(SQ(bar='world'))
-        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query((XFOOhello AND XBARworld))')
+        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query(((ZXFOOhello OR XFOOhello) AND (ZXBARworld OR XBARworld)))')
     
     def test_build_query_multiple_word_field_exact_not(self):
         self.sq.add_filter(~SQ(foo='hello'))
         self.sq.add_filter(~SQ(bar='world'))
-        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query(((<alldocuments> AND_NOT XFOOhello) AND (<alldocuments> AND_NOT XBARworld)))')
+        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query(((<alldocuments> AND_NOT (ZXFOOhello OR XFOOhello)) AND (<alldocuments> AND_NOT (ZXBARworld OR XBARworld))))')
     
     def test_build_query_phrase(self):
         self.sq.add_filter(SQ(content='hello world'))
@@ -103,37 +103,33 @@ class XapianSearchQueryTestCase(TestCase):
     def test_build_query_boost(self):
         self.sq.add_filter(SQ(content='hello'))
         self.sq.add_boost('world', 5)
-        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query((hello OR 5 * world))')
+        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query((Zhello OR hello OR 5 * world))')
     
     def test_build_query_in_filter_single_words(self):
         self.sq.add_filter(SQ(content='why'))
         self.sq.add_filter(SQ(title__in=["Dune", "Jaws"]))
-        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query((why AND (XTITLEdune OR XTITLEjaws)))')
+        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query(((Zwhy OR why) AND (ZXTITLEdune OR XTITLEdune OR ZXTITLEjaw OR XTITLEjaws)))')
     
     def test_build_query_not_in_filter_single_words(self):
         self.sq.add_filter(SQ(content='why'))
         self.sq.add_filter(~SQ(title__in=["Dune", "Jaws"]))
-        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query((why AND (<alldocuments> AND_NOT (XTITLEdune OR XTITLEjaws))))')
+        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query(((Zwhy OR why) AND (<alldocuments> AND_NOT (ZXTITLEdune OR XTITLEdune OR ZXTITLEjaw OR XTITLEjaws))))')
     
     def test_build_query_in_filter_multiple_words(self):
         self.sq.add_filter(SQ(content='why'))
         self.sq.add_filter(SQ(title__in=["A Famous Paper", "An Infamous Article"]))
-        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query((why AND ((XTITLEa PHRASE 3 XTITLEfamous PHRASE 3 XTITLEpaper) OR (XTITLEan PHRASE 3 XTITLEinfamous PHRASE 3 XTITLEarticle))))')
+        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query(((Zwhy OR why) AND ((XTITLEa PHRASE 3 XTITLEfamous PHRASE 3 XTITLEpaper) OR (XTITLEan PHRASE 3 XTITLEinfamous PHRASE 3 XTITLEarticle))))')
     
     def test_build_query_not_in_filter_multiple_words(self):
         self.sq.add_filter(SQ(content='why'))
         self.sq.add_filter(~SQ(title__in=["A Famous Paper", "An Infamous Article"]))
-        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query((why AND (<alldocuments> AND_NOT ((XTITLEa PHRASE 3 XTITLEfamous PHRASE 3 XTITLEpaper) OR (XTITLEan PHRASE 3 XTITLEinfamous PHRASE 3 XTITLEarticle)))))')
+        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query(((Zwhy OR why) AND (<alldocuments> AND_NOT ((XTITLEa PHRASE 3 XTITLEfamous PHRASE 3 XTITLEpaper) OR (XTITLEan PHRASE 3 XTITLEinfamous PHRASE 3 XTITLEarticle)))))')
     
     def test_build_query_in_filter_datetime(self):
         self.sq.add_filter(SQ(content='why'))
         self.sq.add_filter(SQ(pub_date__in=[datetime.datetime(2009, 7, 6, 1, 56, 21)]))
-        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query((why AND XPUB_DATE20090706015621))')
+        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query(((Zwhy OR why) AND (ZXPUB_DATE20090706015621 OR XPUB_DATE20090706015621)))')
     
-    # def test_stem_single_word(self):
-    #     self.sq.add_filter(SQ(content='testing'))
-    #     self.assertEqual(self.sq.build_query().get_description(), 'Xapian.Query(Ztest)')
-    #
     def test_clean(self):
         self.assertEqual(self.sq.clean('hello world'), 'hello world')
         self.assertEqual(self.sq.clean('hello AND world'), 'hello AND world')
@@ -143,7 +139,7 @@ class XapianSearchQueryTestCase(TestCase):
     def test_build_query_with_models(self):
         self.sq.add_filter(SQ(content='hello'))
         self.sq.add_model(MockModel)
-        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query((hello AND 0 * XCONTENTTYPEcore.mockmodel))')
+        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query(((Zhello OR hello) AND 0 * XCONTENTTYPEcore.mockmodel))')
         
         self.sq.add_model(AnotherMockModel)
-        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query((hello AND (0 * XCONTENTTYPEcore.anothermockmodel OR 0 * XCONTENTTYPEcore.mockmodel)))')
+        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query(((Zhello OR hello) AND (0 * XCONTENTTYPEcore.anothermockmodel OR 0 * XCONTENTTYPEcore.mockmodel)))')

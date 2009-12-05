@@ -720,12 +720,12 @@ class SearchBackend(BaseSearchBackend):
             else:
                 return database.get_spelling_suggestion(spelling_query)
         
-        term_list = []
+        term_set = set()
         for term in query:
             for match in re.findall('[^A-Z]+', term): # Ignore field identifiers
-                term_list.append(database.get_spelling_suggestion(match))
+                term_set.add(database.get_spelling_suggestion(match))
         
-        return ' '.join(term_list)
+        return ' '.join(term_set)
     
     def _database(self, writable=False):
         """
@@ -1039,13 +1039,25 @@ class SearchQuery(BaseSearchQuery):
         Returns:
             A xapian.Query
         """
+        stem = xapian.Stem(self.backend.language)
         if field:
-            return xapian.Query('%s%s%s' % (
-                    DOCUMENT_CUSTOM_TERM_PREFIX, field.upper(), term
+            return xapian.Query(
+                xapian.Query.OP_OR, 
+                xapian.Query('Z%s%s%s' % (
+                        DOCUMENT_CUSTOM_TERM_PREFIX, field.upper(), stem(term)
+                    )
+                ),
+                xapian.Query('%s%s%s' % (
+                        DOCUMENT_CUSTOM_TERM_PREFIX, field.upper(), term
+                    )
                 )
             )
         else:
-            return xapian.Query(term)
+            return xapian.Query(
+                xapian.Query.OP_OR,
+                xapian.Query('Z%s' % term),
+                xapian.Query(term)
+            )
     
     def _phrase_query(self, term_list, field=None):
         """
