@@ -862,11 +862,11 @@ class SearchQuery(BaseSearchQuery):
                     elif filter_type == 'gt':
                         query_list.append(self._filter_gt(term, field, is_not))
                     elif filter_type == 'gte':
-                        pass
+                        query_list.append(self._filter_gte(term, field, is_not))
                     elif filter_type == 'lt':
                         query_list.append(self._filter_lt(term, field, is_not))
                     elif filter_type == 'lte':
-                        pass
+                        query_list.append(self._filter_lte(term, field, is_not))
                     elif filter_type == 'startswith':
                         query_list.append(self._filter_startswith(term, field, is_not))
                     elif filter_type == 'in':
@@ -982,21 +982,37 @@ class SearchQuery(BaseSearchQuery):
         return self._filter_in(list(term_list), field, is_not)
     
     def _filter_gt(self, term, field, is_not):
+        return self._filter_lte(term, field, is_not=(is_not != True))
+    
+    def _filter_lt(self, term, field, is_not):
+        return self._filter_gte(term, field, is_not=(is_not != True))
+
+    def _filter_gte(self, term, field, is_not):
         """
         Private method that returns a xapian.Query that searches for any term
         that is greater than `term` in a specified `field`.
         """
         vrp = XHValueRangeProcessor(self.backend)
-        pos, begin, end = vrp('%s:%s' % (field, term), '*')
+        pos, begin, end = vrp('%s:%s' % (field, _marshal_value(term)), '*')
+        if is_not:
+            return xapian.Query(xapian.Query.OP_AND_NOT,
+                self._all_query(),
+                xapian.Query(xapian.Query.OP_VALUE_RANGE, pos, begin, end)
+            )
         return xapian.Query(xapian.Query.OP_VALUE_RANGE, pos, begin, end)
     
-    def _filter_lt(self, term, field, is_not):
+    def _filter_lte(self, term, field, is_not):
         """
         Private method that returns a xapian.Query that searches for any term
         that is less than `term` in a specified `field`.
         """
         vrp = XHValueRangeProcessor(self.backend)
-        pos, begin, end = vrp('%s:' % field, '%s' % term)
+        pos, begin, end = vrp('%s:' % field, '%s' % _marshal_value(term))
+        if is_not:
+            return xapian.Query(xapian.Query.OP_AND_NOT,
+                self._all_query(),
+                xapian.Query(xapian.Query.OP_VALUE_RANGE, pos, begin, end)
+            )
         return xapian.Query(xapian.Query.OP_VALUE_RANGE, pos, begin, end)
 
     def _all_query(self):
