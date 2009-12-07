@@ -17,8 +17,8 @@ setup(
         'Framework :: Django',
     ],
     author='David Sauve',
-    author_email='david.sauve@bag-of-holding.com',
+    author_email='dsauve@trapeze.com',
     url='http://github.com/notanumber/xapian-haystack',
-    license='GPL2',
+    license='GPL3',
     py_modules=['xapian_backend'],
 )
