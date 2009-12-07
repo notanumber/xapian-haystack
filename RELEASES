@@ -1,0 +1,51 @@
+xapian-haystack-1.1.0BETA
+=========================
+
+Tagged on December 6, 2009 by David Sauve <dsauve@trapeze.com>
+
+Major Code Changes
+------------------
+* `SearchBackend.search` now takes a Xapian::Query instead of a query_string.
+* `SearchQuery.build_query` now returns a Xapian::Query
+* `SearchBackend` now includes an extra `parse_query` method that takes a query string and returns a Xapian::Query
+
+Known Issues
+------------
+* `SearchBackend.search` with `highlight=True` converts terms to lowercase in result content.
+
+* * *
+
+xapian-haystack-1.0.1BETA
+=========================
+
+Tagged on September 11, 2009 by David Sauve <dsauve@trapeze.com>
+
+* * *
+
+xapian-haystack-1.0.0BETA
+=========================
+
+Tagged on August 11, 2009 by David Sauve <dsauve@trapeze.com>
+
+* * *
+
+xapian-haystack-0.7.0ALPHA
+==========================
+
+Tagged on August 2, 2009 by David Sauve <dsauve@trapeze.com>
+
+* * *
+
+xapian-haystack-0.6.0ALPHA
+==========================
+
+Tagged on July 31, 2009 by David Sauve <dsauve@trapeze.com>
+
+* * *
+
+xapian-haystack-0.5.0ALPHA
+==========================
+
+Tagged on July 27, 2009 by David Sauve <dsauve@trapeze.com>
+
+* * *
