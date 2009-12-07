@@ -1,18 +1,5 @@
-# Copyright (C) 2009 David Sauve
-#
-# This program is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 2 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License along
-# with this program; if not, write to the Free Software Foundation, Inc.,
-# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+# Copyright (C) 2009 David Sauve, Trapeze.  All rights reserved.
+# Based on original code by Daniel Lindsley as part of the Haystack test suite.
 
 import cPickle as pickle
 import datetime
@@ -22,13 +9,15 @@ import xapian
 
 from django.conf import settings
 from django.db import models
-from django.utils.encoding import force_unicode
 from django.test import TestCase
 
-from haystack import indexes, sites
-from haystack.backends.xapian_backend import SearchBackend, InvalidIndexError
+from haystack import indexes, sites, backends
+from haystack.backends.xapian_backend import SearchBackend, SearchQuery, _marshal_value
+from haystack.exceptions import HaystackError
+from haystack.query import SearchQuerySet, SQ
+from haystack.sites import SearchSite
 
-from core.models import MockTag, AnotherMockModel
+from core.models import MockTag, MockModel, AnotherMockModel
 
 
 class XapianMockModel(models.Model):
@@ -70,17 +59,13 @@ class XapianMockSearchIndex(indexes.SearchIndex):
         return ['%d' % (i * obj.id) for i in xrange(1, 4)]
 
 
-class XapianSearchSite(sites.SearchSite):
-    pass
-
-
 class XapianSearchBackendTestCase(TestCase):
     def setUp(self):
         super(XapianSearchBackendTestCase, self).setUp()
         
-        self.site = XapianSearchSite()
-        self.sb = SearchBackend(site=self.site)
-        self.msi = XapianMockSearchIndex(XapianMockModel, backend=self.sb)
+        self.site = SearchSite()
+        self.backend = SearchBackend(site=self.site)
+        self.index = XapianMockSearchIndex(XapianMockModel, backend=self.backend)
         self.site.register(XapianMockModel, XapianMockSearchIndex)
         
         self.sample_objs = []
@@ -123,116 +108,101 @@ class XapianSearchBackendTestCase(TestCase):
             document = match.get_document()
             app_label, module_name, pk, model_data = pickle.loads(document.get_data())
             for key, value in model_data.iteritems():
-                model_data[key] = self.sb._marshal_value(value)
+                model_data[key] = _marshal_value(value)
             model_data['id'] = u'%s.%s.%d' % (app_label, module_name, pk)
             document_list.append(model_data)
 
         return document_list
     
+    def silly_test(self):
+        
+        self.backend.update(self.index, self.sample_objs)
+        
+        self.assertEqual(len(self.xapian_search('indexed')), 3)
+        self.assertEqual(len(self.xapian_search('Indexed')), 3)
+    
     def test_update(self):
-        self.sb.update(self.msi, self.sample_objs)
-        self.sb.update(self.msi, self.sample_objs) # Duplicates should be updated, not appended -- http://github.com/notanumber/xapian-haystack/issues/#issue/6
+        self.backend.update(self.index, self.sample_objs)
         
         self.assertEqual(len(self.xapian_search('')), 3)
         self.assertEqual([dict(doc) for doc in self.xapian_search('')], [
-            {'flag': u't', 'name': u'david1', 'text': u'Indexed!\n1', 'sites': u"['1', '2', '3']", 'pub_date': u'20090224000000', 'value': u'000000000005', 'id': u'tests.xapianmockmodel.1', 'slug': u'http://example.com/1', 'popularity': '\xca\x84', 'django_id': u'1', 'django_ct': u'tests.xapianmockmodel'},
-            {'flag': u'f', 'name': u'david2', 'text': u'Indexed!\n2', 'sites': u"['2', '4', '6']", 'pub_date': u'20090223000000', 'value': u'000000000010', 'id': u'tests.xapianmockmodel.2', 'slug': u'http://example.com/2', 'popularity': '\xb4p', 'django_id': u'2', 'django_ct': u'tests.xapianmockmodel'},
-            {'flag': u't', 'name': u'david3', 'text': u'Indexed!\n3', 'sites': u"['3', '6', '9']", 'pub_date': u'20090222000000', 'value': u'000000000015', 'id': u'tests.xapianmockmodel.3', 'slug': u'http://example.com/3', 'popularity': '\xcb\x98', 'django_id': u'3', 'django_ct': u'tests.xapianmockmodel'}
+            {'flag': u't', 'name': u'david1', 'text': u'indexed!\n1', 'sites': u"['1', '2', '3']", 'pub_date': u'20090224000000', 'value': u'000000000005', 'id': u'tests.xapianmockmodel.1', 'slug': u'http://example.com/1', 'popularity': '\xca\x84', 'django_id': u'1', 'django_ct': u'tests.xapianmockmodel'},
+            {'flag': u'f', 'name': u'david2', 'text': u'indexed!\n2', 'sites': u"['2', '4', '6']", 'pub_date': u'20090223000000', 'value': u'000000000010', 'id': u'tests.xapianmockmodel.2', 'slug': u'http://example.com/2', 'popularity': '\xb4p', 'django_id': u'2', 'django_ct': u'tests.xapianmockmodel'},
+            {'flag': u't', 'name': u'david3', 'text': u'indexed!\n3', 'sites': u"['3', '6', '9']", 'pub_date': u'20090222000000', 'value': u'000000000015', 'id': u'tests.xapianmockmodel.3', 'slug': u'http://example.com/3', 'popularity': '\xcb\x98', 'django_id': u'3', 'django_ct': u'tests.xapianmockmodel'}
         ])
 
+    def test_duplicate_update(self):
+        self.backend.update(self.index, self.sample_objs)
+        self.backend.update(self.index, self.sample_objs) # Duplicates should be updated, not appended -- http://github.com/notanumber/xapian-haystack/issues/#issue/6
+        
+        self.assertEqual(len(self.xapian_search('')), 3)
+
     def test_remove(self):
-        self.sb.update(self.msi, self.sample_objs)
+        self.backend.update(self.index, self.sample_objs)
         self.assertEqual(len(self.xapian_search('')), 3)
         
-        self.sb.remove(self.sample_objs[0])
+        self.backend.remove(self.sample_objs[0])
         self.assertEqual(len(self.xapian_search('')), 2)
         self.assertEqual([dict(doc) for doc in self.xapian_search('')], [
-            {'flag': u'f', 'name': u'david2', 'text': u'Indexed!\n2', 'sites': u"['2', '4', '6']", 'pub_date': u'20090223000000', 'value': u'000000000010', 'id': u'tests.xapianmockmodel.2', 'slug': u'http://example.com/2', 'popularity': '\xb4p', 'django_id': u'2', 'django_ct': u'tests.xapianmockmodel'},
-            {'flag': u't', 'name': u'david3', 'text': u'Indexed!\n3', 'sites': u"['3', '6', '9']", 'pub_date': u'20090222000000', 'value': u'000000000015', 'id': u'tests.xapianmockmodel.3', 'slug': u'http://example.com/3', 'popularity': '\xcb\x98', 'django_id': u'3', 'django_ct': u'tests.xapianmockmodel'}
+            {'flag': u'f', 'name': u'david2', 'text': u'indexed!\n2', 'sites': u"['2', '4', '6']", 'pub_date': u'20090223000000', 'value': u'000000000010', 'id': u'tests.xapianmockmodel.2', 'slug': u'http://example.com/2', 'popularity': '\xb4p', 'django_id': u'2', 'django_ct': u'tests.xapianmockmodel'},
+            {'flag': u't', 'name': u'david3', 'text': u'indexed!\n3', 'sites': u"['3', '6', '9']", 'pub_date': u'20090222000000', 'value': u'000000000015', 'id': u'tests.xapianmockmodel.3', 'slug': u'http://example.com/3', 'popularity': '\xcb\x98', 'django_id': u'3', 'django_ct': u'tests.xapianmockmodel'}
         ])
     
     def test_clear(self):
-        self.sb.update(self.msi, self.sample_objs)
+        self.backend.update(self.index, self.sample_objs)
         self.assertEqual(len(self.xapian_search('')), 3)
         
-        self.sb.clear()
+        self.backend.clear()
         self.assertEqual(len(self.xapian_search('')), 0)
         
-        self.sb.update(self.msi, self.sample_objs)
+        self.backend.update(self.index, self.sample_objs)
         self.assertEqual(len(self.xapian_search('')), 3)
         
-        self.sb.clear([AnotherMockModel])
+        self.backend.clear([AnotherMockModel])
         self.assertEqual(len(self.xapian_search('')), 3)
         
-        self.sb.clear([XapianMockModel])
+        self.backend.clear([XapianMockModel])
         self.assertEqual(len(self.xapian_search('')), 0)
         
-        self.sb.update(self.msi, self.sample_objs)
+        self.backend.update(self.index, self.sample_objs)
         self.assertEqual(len(self.xapian_search('')), 3)
         
-        self.sb.clear([AnotherMockModel, XapianMockModel])
+        self.backend.clear([AnotherMockModel, XapianMockModel])
         self.assertEqual(len(self.xapian_search('')), 0)
     
     def test_search(self):
-        self.sb.update(self.msi, self.sample_objs)
+        self.backend.update(self.index, self.sample_objs)
         self.assertEqual(len(self.xapian_search('')), 3)
         
-        # Empty query
-        self.assertEqual(self.sb.search(''), {'hits': 0, 'results': []})
+        self.assertEqual(self.backend.search(xapian.Query()), {'hits': 0, 'results': []})
+        self.assertEqual(self.backend.search(xapian.Query(''))['hits'], 3)
+        self.assertEqual([result.pk for result in self.backend.search(xapian.Query(''))['results']], [1, 2, 3])
+        self.assertEqual(self.backend.search(xapian.Query('indexed'))['hits'], 3)
+        self.assertEqual([result.pk for result in self.backend.search(xapian.Query(''))['results']], [1, 2, 3])
         
-        # Wildcard -- All
-        self.assertEqual(self.sb.search('*')['hits'], 3)
-        self.assertEqual([result.pk for result in self.sb.search('*')['results']], [1, 2, 3])
-        
-        # Exact match
-        self.assertEqual([result.pk for result in self.sb.search('name:david2')['results']], [2])
-        self.assertEqual([result.pk for result in self.sb.search('value:10')['results']], [2])
-        self.assertEqual([result.pk for result in self.sb.search('flag:false')['results']], [2])
-        self.assertEqual([result.pk for result in self.sb.search('popularity:35.5')['results']], [2])
-
-        # NOT operator
-        self.assertEqual([result.pk for result in self.sb.search('NOT name:david1')['results']], [2, 3])
-        self.assertEqual([result.pk for result in self.sb.search('NOT name:david1 AND index')['results']], [2, 3])
-        self.assertEqual([result.pk for result in self.sb.search('index NOT name:david1')['results']], [2, 3])
-        self.assertEqual([result.pk for result in self.sb.search('index NOT name:david1 NOT name:david2')['results']], [3])
-        self.assertEqual([result.pk for result in self.sb.search('NOT name:david1 NOT name:david2')['results']], [3])
-
-        # Ranges
-        self.assertEqual([result.pk for result in self.sb.search('index name:david2..david3')['results']], [2, 3])
-        self.assertEqual([result.pk for result in self.sb.search('index name:..david2')['results']], [1, 2])
-        self.assertEqual([result.pk for result in self.sb.search('index name:david2..*')['results']], [2, 3])
-        self.assertEqual([result.pk for result in self.sb.search('index pub_date:20090222000000..20090223000000')['results']], [2, 3])        
-        self.assertEqual([result.pk for result in self.sb.search('index pub_date:..20090223000000')['results']], [2, 3])        
-        self.assertEqual([result.pk for result in self.sb.search('index pub_date:20090223000000..*')['results']], [1, 2])        
-        self.assertEqual([result.pk for result in self.sb.search('index value:10..15')['results']], [2, 3])
-        self.assertEqual([result.pk for result in self.sb.search('index value:..10')['results']], [1, 2])
-        self.assertEqual([result.pk for result in self.sb.search('index value:10..*')['results']], [2, 3])
-        self.assertEqual([result.pk for result in self.sb.search('index popularity:..100.0')['results']], [2])
-        self.assertEqual([result.pk for result in self.sb.search('index popularity:100.0..*')['results']], [1, 3])
-
     def test_field_facets(self):
-        self.sb.update(self.msi, self.sample_objs)
+        self.backend.update(self.index, self.sample_objs)
         self.assertEqual(len(self.xapian_search('')), 3)
         
-        self.assertEqual(self.sb.search('', facets=['name']), {'hits': 0, 'results': []})
-        results = self.sb.search('index', facets=['name'])
+        self.assertEqual(self.backend.search(xapian.Query(), facets=['name']), {'hits': 0, 'results': []})
+        results = self.backend.search(xapian.Query('indexed'), facets=['name'])
         self.assertEqual(results['hits'], 3)
         self.assertEqual(results['facets']['fields']['name'], [('david1', 1), ('david2', 1), ('david3', 1)])
-
-        results = self.sb.search('index', facets=['flag'])
+    
+        results = self.backend.search(xapian.Query('indexed'), facets=['flag'])
         self.assertEqual(results['hits'], 3)
         self.assertEqual(results['facets']['fields']['flag'], [(False, 1), (True, 2)])
         
-        results = self.sb.search('index', facets=['sites'])
+        results = self.backend.search(xapian.Query('indexed'), facets=['sites'])
         self.assertEqual(results['hits'], 3)
         self.assertEqual(results['facets']['fields']['sites'], [('1', 1), ('3', 2), ('2', 2), ('4', 1), ('6', 2), ('9', 1)])
             
     def test_date_facets(self):
-        self.sb.update(self.msi, self.sample_objs)
+        self.backend.update(self.index, self.sample_objs)
         self.assertEqual(len(self.xapian_search('')), 3)
-
-        self.assertEqual(self.sb.search('', date_facets={'pub_date': {'start_date': datetime.datetime(2008, 10, 26), 'end_date': datetime.datetime(2009, 3, 26), 'gap_by': 'month'}}), {'hits': 0, 'results': []})
-        results = self.sb.search('index', date_facets={'pub_date': {'start_date': datetime.datetime(2008, 10, 26), 'end_date': datetime.datetime(2009, 3, 26), 'gap_by': 'month'}})
+    
+        self.assertEqual(self.backend.search(xapian.Query(), date_facets={'pub_date': {'start_date': datetime.datetime(2008, 10, 26), 'end_date': datetime.datetime(2009, 3, 26), 'gap_by': 'month'}}), {'hits': 0, 'results': []})
+        results = self.backend.search(xapian.Query('indexed'), date_facets={'pub_date': {'start_date': datetime.datetime(2008, 10, 26), 'end_date': datetime.datetime(2009, 3, 26), 'gap_by': 'month'}})
         self.assertEqual(results['hits'], 3)
         self.assertEqual(results['facets']['dates']['pub_date'], [
             ('2009-02-26T00:00:00', 0),
@@ -241,8 +211,8 @@ class XapianSearchBackendTestCase(TestCase):
             ('2008-11-26T00:00:00', 0),
             ('2008-10-26T00:00:00', 0),
         ])
-
-        results = self.sb.search('index', date_facets={'pub_date': {'start_date': datetime.datetime(2009, 02, 01), 'end_date': datetime.datetime(2009, 3, 15), 'gap_by': 'day', 'gap_amount': 15}})
+    
+        results = self.backend.search(xapian.Query('indexed'), date_facets={'pub_date': {'start_date': datetime.datetime(2009, 02, 01), 'end_date': datetime.datetime(2009, 3, 15), 'gap_by': 'day', 'gap_amount': 15}})
         self.assertEqual(results['hits'], 3)
         self.assertEqual(results['facets']['dates']['pub_date'], [
             ('2009-03-03T00:00:00', 0),
@@ -251,134 +221,110 @@ class XapianSearchBackendTestCase(TestCase):
         ])
 
     def test_query_facets(self):
-        self.sb.update(self.msi, self.sample_objs)
+        self.backend.update(self.index, self.sample_objs)
         self.assertEqual(len(self.xapian_search('')), 3)
-
-        self.assertEqual(self.sb.search('', query_facets={'name': 'da*'}), {'hits': 0, 'results': []})
-        results = self.sb.search('index', query_facets={'name': 'da*'})
+    
+        self.assertEqual(self.backend.search(xapian.Query(), query_facets={'name': 'da*'}), {'hits': 0, 'results': []})
+        results = self.backend.search(xapian.Query('indexed'), query_facets={'name': 'da*'})
         self.assertEqual(results['hits'], 3)
         self.assertEqual(results['facets']['queries']['name'], ('da*', 3))
     
     def test_narrow_queries(self):
-        self.sb.update(self.msi, self.sample_objs)
+        self.backend.update(self.index, self.sample_objs)
         self.assertEqual(len(self.xapian_search('')), 3)
         
-        self.assertEqual(self.sb.search('', narrow_queries=set(['name:david1'])), {'hits': 0, 'results': []})
-        results = self.sb.search('index', narrow_queries=set(['name:david1']))
+        self.assertEqual(self.backend.search(xapian.Query(), narrow_queries=set(['name:david1'])), {'hits': 0, 'results': []})
+        results = self.backend.search(xapian.Query('indexed'), narrow_queries=set(['name:david1']))
         self.assertEqual(results['hits'], 1)
     
     def test_highlight(self):
-        self.sb.update(self.msi, self.sample_objs)
+        self.backend.update(self.index, self.sample_objs)
         self.assertEqual(len(self.xapian_search('')), 3)
         
-        self.assertEqual(self.sb.search('', highlight=True), {'hits': 0, 'results': []})
-        self.assertEqual(self.sb.search('Index', highlight=True)['hits'], 3)
-        self.assertEqual([result.highlighted['text'] for result in self.sb.search('Index', highlight=True)['results']], ['<em>Index</em>ed!\n1', '<em>Index</em>ed!\n2', '<em>Index</em>ed!\n3'])
+        self.assertEqual(self.backend.search(xapian.Query(), highlight=True), {'hits': 0, 'results': []})
+        self.assertEqual(self.backend.search(xapian.Query('indexed'), highlight=True)['hits'], 3)
+        self.assertEqual([result.highlighted['text'] for result in self.backend.search(xapian.Query('indexed'), highlight=True)['results']], ['<em>indexed</em>!\n1', '<em>indexed</em>!\n2', '<em>indexed</em>!\n3'])
     
     def test_spelling_suggestion(self):
-        self.sb.update(self.msi, self.sample_objs)
+        self.backend.update(self.index, self.sample_objs)
         self.assertEqual(len(self.xapian_search('')), 3)
         
-        self.assertEqual(self.sb.search('indxe')['hits'], 0)
-        self.assertEqual(self.sb.search('indxe')['spelling_suggestion'], 'indexed')
+        self.assertEqual(self.backend.search(xapian.Query('indxe'))['hits'], 0)
+        self.assertEqual(self.backend.search(xapian.Query('indxe'))['spelling_suggestion'], 'indexed')
         
-        self.assertEqual(self.sb.search('indxed')['hits'], 0)
-        self.assertEqual(self.sb.search('indxed')['spelling_suggestion'], 'indexed')
+        self.assertEqual(self.backend.search(xapian.Query('indxed'))['hits'], 0)
+        self.assertEqual(self.backend.search(xapian.Query('indxed'))['spelling_suggestion'], 'indexed')
         
-        self.assertEqual(self.sb.search('indx')['hits'], 0)
-        self.assertEqual(self.sb.search('indx', spelling_query='indexy')['spelling_suggestion'], 'indexed')
-        
-    def test_stemming(self):
-        self.sb.update(self.msi, self.sample_objs)
-        self.assertEqual(len(self.xapian_search('')), 3)
-        
-        results = self.sb.search('index')
-        self.assertEqual(results['hits'], 3)
-        
-        results = self.sb.search('indexing')
-        self.assertEqual(results['hits'], 3)
-    
+        self.assertEqual(self.backend.search(xapian.Query('foo'))['hits'], 0)
+        self.assertEqual(self.backend.search(xapian.Query('foo'), spelling_query='indexy')['spelling_suggestion'], 'indexed')
+
+        self.assertEqual(self.backend.search(xapian.Query('XNAMEdavid'))['hits'], 0)
+        self.assertEqual(self.backend.search(xapian.Query('XNAMEdavid'))['spelling_suggestion'], 'david1')
+
     def test_more_like_this(self):
-        self.sb.update(self.msi, self.sample_objs)
+        self.backend.update(self.index, self.sample_objs)
         self.assertEqual(len(self.xapian_search('')), 3)
         
-        results = self.sb.more_like_this(self.sample_objs[0])
+        results = self.backend.more_like_this(self.sample_objs[0])
+        self.assertEqual(results['hits'], 2)
+        self.assertEqual([result.pk for result in results['results']], [3, 2])
+    
+        results = self.backend.more_like_this(self.sample_objs[0], additional_query=xapian.Query('david3'))
+        self.assertEqual(results['hits'], 1)
+        self.assertEqual([result.pk for result in results['results']], [3])
+
+        results = self.backend.more_like_this(self.sample_objs[0], limit_to_registered_models=True)
         self.assertEqual(results['hits'], 2)
         self.assertEqual([result.pk for result in results['results']], [3, 2])
 
-        results = self.sb.more_like_this(self.sample_objs[0], additional_query_string='david3')
-        self.assertEqual(results['hits'], 1)
-        self.assertEqual([result.pk for result in results['results']], [3])
-    
-    def test_document_count(self):
-        self.sb.update(self.msi, self.sample_objs)
-        self.assertEqual(self.sb.document_count(), 3)
-    
-    def test_delete_index(self):
-        self.sb.update(self.msi, self.sample_objs)
-        self.assert_(self.sb.document_count() > 0)
-        
-        self.sb.delete_index()
-        self.assertRaises(InvalidIndexError, self.sb.document_count)
-    
     def test_order_by(self):
-        self.sb.update(self.msi, self.sample_objs)
+        self.backend.update(self.index, self.sample_objs)
         
-        results = self.sb.search('*', sort_by=['pub_date'])
+        results = self.backend.search(xapian.Query(''), sort_by=['pub_date'])
         self.assertEqual([result.pk for result in results['results']], [3, 2, 1])
         
-        results = self.sb.search('*', sort_by=['-pub_date'])
+        results = self.backend.search(xapian.Query(''), sort_by=['-pub_date'])
         self.assertEqual([result.pk for result in results['results']], [1, 2, 3])
-
-        results = self.sb.search('*', sort_by=['id'])
+    
+        results = self.backend.search(xapian.Query(''), sort_by=['id'])
         self.assertEqual([result.pk for result in results['results']], [1, 2, 3])
-
-        results = self.sb.search('*', sort_by=['-id'])
+    
+        results = self.backend.search(xapian.Query(''), sort_by=['-id'])
         self.assertEqual([result.pk for result in results['results']], [3, 2, 1])
-
-        results = self.sb.search('*', sort_by=['value'])
+    
+        results = self.backend.search(xapian.Query(''), sort_by=['value'])
         self.assertEqual([result.pk for result in results['results']], [1, 2, 3])
-
-        results = self.sb.search('*', sort_by=['-value'])
+    
+        results = self.backend.search(xapian.Query(''), sort_by=['-value'])
         self.assertEqual([result.pk for result in results['results']], [3, 2, 1])
-
-        results = self.sb.search('*', sort_by=['popularity'])
+    
+        results = self.backend.search(xapian.Query(''), sort_by=['popularity'])
         self.assertEqual([result.pk for result in results['results']], [2, 1, 3])
-
-        results = self.sb.search('*', sort_by=['-popularity'])
+    
+        results = self.backend.search(xapian.Query(''), sort_by=['-popularity'])
         self.assertEqual([result.pk for result in results['results']], [3, 1, 2])
-
-        results = self.sb.search('*', sort_by=['flag', 'id'])
+    
+        results = self.backend.search(xapian.Query(''), sort_by=['flag', 'id'])
         self.assertEqual([result.pk for result in results['results']], [2, 1, 3])
-
-        results = self.sb.search('*', sort_by=['flag', '-id'])
+    
+        results = self.backend.search(xapian.Query(''), sort_by=['flag', '-id'])
         self.assertEqual([result.pk for result in results['results']], [2, 3, 1])
 
-    def test_boost(self):
-        self.sb.update(self.msi, self.sample_objs)
-
-         # TODO: Need a better test case here.  Possibly better test data?
-        results = self.sb.search('*', boost={'true': 2})
-        self.assertEqual([result.pk for result in results['results']], [1, 3, 2])
-
-        results = self.sb.search('*', boost={'true': 1.5})
-        self.assertEqual([result.pk for result in results['results']], [1, 3, 2])
-
     def test__marshal_value(self):
-        self.assertEqual(self.sb._marshal_value('abc'), u'abc')
-        self.assertEqual(self.sb._marshal_value(1), '000000000001')
-        self.assertEqual(self.sb._marshal_value(2653), '000000002653')
-        self.assertEqual(self.sb._marshal_value(25.5), '\xb2`')
-        self.assertEqual(self.sb._marshal_value([1, 2, 3]), u'[1, 2, 3]')
-        self.assertEqual(self.sb._marshal_value((1, 2, 3)), u'(1, 2, 3)')
-        self.assertEqual(self.sb._marshal_value({'a': 1, 'c': 3, 'b': 2}), u"{'a': 1, 'c': 3, 'b': 2}")
-        self.assertEqual(self.sb._marshal_value(datetime.datetime(2009, 5, 9, 16, 14)), u'20090509161400')
-        self.assertEqual(self.sb._marshal_value(datetime.datetime(2009, 5, 9, 0, 0)), u'20090509000000')
-        self.assertEqual(self.sb._marshal_value(datetime.datetime(1899, 5, 18, 0, 0)), u'18990518000000')
-        self.assertEqual(self.sb._marshal_value(datetime.datetime(2009, 5, 18, 1, 16, 30, 250)), u'20090518011630000250')
+        self.assertEqual(_marshal_value('abc'), u'abc')
+        self.assertEqual(_marshal_value(1), '000000000001')
+        self.assertEqual(_marshal_value(2653), '000000002653')
+        self.assertEqual(_marshal_value(25.5), '\xb2`')
+        self.assertEqual(_marshal_value([1, 2, 3]), u'[1, 2, 3]')
+        self.assertEqual(_marshal_value((1, 2, 3)), u'(1, 2, 3)')
+        self.assertEqual(_marshal_value({'a': 1, 'c': 3, 'b': 2}), u"{'a': 1, 'c': 3, 'b': 2}")
+        self.assertEqual(_marshal_value(datetime.datetime(2009, 5, 9, 16, 14)), u'20090509161400')
+        self.assertEqual(_marshal_value(datetime.datetime(2009, 5, 9, 0, 0)), u'20090509000000')
+        self.assertEqual(_marshal_value(datetime.datetime(1899, 5, 18, 0, 0)), u'18990518000000')
+        self.assertEqual(_marshal_value(datetime.datetime(2009, 5, 18, 1, 16, 30, 250)), u'20090518011630000250')
 
     def test_build_schema(self):
-        (content_field_name, fields) = self.sb.build_schema(self.site.all_searchfields())
+        (content_field_name, fields) = self.backend.build_schema(self.site.all_searchfields())
         self.assertEqual(content_field_name, 'text')
         self.assertEqual(len(fields), 7)
         self.assertEqual(fields, [
@@ -390,3 +336,108 @@ class XapianSearchBackendTestCase(TestCase):
             {'column': 5, 'field_name': 'flag', 'type': 'boolean', 'multi_valued': 'false'},
             {'column': 6, 'field_name': 'pub_date', 'type': 'date', 'multi_valued': 'false'},
         ])
+
+    def test_parse_query(self):
+        self.backend.update(self.index, self.sample_objs)
+        self.assertEqual(self.backend.parse_query('indexed').get_description(), 'Xapian::Query((indexed:(pos=1) OR Zindex:(pos=1)))')
+        self.assertEqual(self.backend.parse_query('name:david').get_description(), 'Xapian::Query((XNAMEdavid1:(pos=1) OR XNAMEdavid2:(pos=1) OR XNAMEdavid3:(pos=1) OR ZXNAMEdavid:(pos=1)))')
+        self.assertEqual(self.backend.parse_query('name:david1..david2').get_description(), 'Xapian::Query(VALUE_RANGE 0 david1 david2)')
+        self.assertEqual(self.backend.parse_query('value:0..10').get_description(), 'Xapian::Query(VALUE_RANGE 4 000000000000 000000000010)')
+        self.assertEqual(self.backend.parse_query('value:..10').get_description(), 'Xapian::Query(VALUE_RANGE 4 -02147483648 000000000010)')
+        self.assertEqual(self.backend.parse_query('value:10..*').get_description(), 'Xapian::Query(VALUE_RANGE 4 000000000010 002147483647)')
+        self.assertEqual(self.backend.parse_query('popularity:25.5..100.0').get_description(), 'Xapian::Query(VALUE_RANGE 2 \xb2` \xba@)')
+
+
+class LiveXapianMockSearchIndex(indexes.SearchIndex):
+    text = indexes.CharField(document=True, use_template=True)
+    name = indexes.CharField(model_attr='author')
+    pub_date = indexes.DateField(model_attr='pub_date')
+    created = indexes.DateField()
+    title = indexes.CharField()
+
+
+class LiveXapianSearchQueryTestCase(TestCase):
+    """
+    SearchQuery specific tests
+    """
+    fixtures = ['initial_data.json']
+
+    def setUp(self):
+        super(LiveXapianSearchQueryTestCase, self).setUp()
+
+        site = SearchSite()
+        backend = SearchBackend(site=site)
+        index = LiveXapianMockSearchIndex(MockModel, backend=backend)
+        site.register(MockModel, LiveXapianMockSearchIndex)
+        backend.update(index, MockModel.objects.all())
+
+        self.sq = SearchQuery(backend=backend)
+
+    def test_get_spelling(self):
+        self.sq.add_filter(SQ(content='indxd'))
+        self.assertEqual(self.sq.get_spelling_suggestion(), u'indexed')
+        self.assertEqual(self.sq.get_spelling_suggestion('indxd'), u'indexed')
+
+    def test_startswith(self):
+        self.sq.add_filter(SQ(name__startswith='da*'))
+        self.assertEqual([result.pk for result in self.sq.get_results()], [1, 2, 3])
+
+        self.sq = SearchQuery(backend=SearchBackend())
+        self.sq.add_filter(SQ(name__startswith='daniel1'))
+        self.assertEqual([result.pk for result in self.sq.get_results()], [1])
+
+    def test_build_query_gt(self):
+        self.sq.add_filter(SQ(name__gt='m'))
+        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query((<alldocuments> AND_NOT VALUE_RANGE 3 a m))')
+
+    def test_build_query_gte(self):
+        self.sq.add_filter(SQ(name__gte='m'))
+        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query(VALUE_RANGE 3 m zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz)')
+
+    def test_build_query_lt(self):
+        self.sq.add_filter(SQ(name__lt='m'))
+        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query((<alldocuments> AND_NOT VALUE_RANGE 3 m zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz))')
+
+    def test_build_query_lte(self):
+        self.sq.add_filter(SQ(name__lte='m'))
+        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query(VALUE_RANGE 3 a m)')
+
+    def test_build_query_multiple_filter_types(self):
+        self.sq.add_filter(SQ(content='why'))
+        self.sq.add_filter(SQ(pub_date__lte=datetime.datetime(2009, 2, 10, 1, 59, 0)))
+        self.sq.add_filter(SQ(name__gt='david'))
+        self.sq.add_filter(SQ(created__lt=datetime.datetime(2009, 2, 12, 12, 13, 0)))
+        self.sq.add_filter(SQ(title__gte='B'))
+        self.sq.add_filter(SQ(id__in=[1, 2, 3]))
+        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query(((Zwhy OR why) AND VALUE_RANGE 2 00010101000000 20090210015900 AND (<alldocuments> AND_NOT VALUE_RANGE 3 a david) AND (<alldocuments> AND_NOT VALUE_RANGE 4 20090212121300 99990101000000) AND VALUE_RANGE 1 b zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz AND (ZXID1 OR XID1 OR ZXID2 OR XID2 OR ZXID3 OR XID3)))')
+
+    def test_log_query(self):
+        backends.reset_search_queries()
+        self.assertEqual(len(backends.queries), 0)
+    
+        # Stow.
+        old_debug = settings.DEBUG
+        settings.DEBUG = False
+    
+        len(self.sq.get_results())
+        self.assertEqual(len(backends.queries), 0)
+    
+        settings.DEBUG = True
+        # Redefine it to clear out the cached results.
+        self.sq = SearchQuery(backend=SearchBackend())
+        self.sq.add_filter(SQ(name='bar'))
+        len(self.sq.get_results())
+        self.assertEqual(len(backends.queries), 1)
+        self.assertEqual(backends.queries[0]['query_string'].get_description(), u'Xapian::Query((ZXNAMEbar OR XNAMEbar))')
+    
+        # And again, for good measure.
+        self.sq = SearchQuery(backend=SearchBackend())
+        self.sq.add_filter(SQ(name='bar'))
+        self.sq.add_filter(SQ(text='moof'))
+        len(self.sq.get_results())
+        self.assertEqual(len(backends.queries), 2)
+        self.assertEqual(backends.queries[0]['query_string'].get_description(), u'Xapian::Query((ZXNAMEbar OR XNAMEbar))')
+        self.assertEqual(backends.queries[1]['query_string'].get_description(), u'Xapian::Query(((ZXNAMEbar OR XNAMEbar) AND (ZXTEXTmoof OR XTEXTmoof)))')
+    
+        # Restore.
+        settings.DEBUG = old_debug

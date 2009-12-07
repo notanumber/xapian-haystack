@@ -1,21 +1,7 @@
-# Copyright (C) 2009 David Sauve
-#
-# This program is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 2 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License along
-# with this program; if not, write to the Free Software Foundation, Inc.,
-# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+# Copyright (C) 2009 David Sauve, Trapeze
 
 __author__ = 'David Sauve'
-__version__ = (1, 0, 0, 'beta')
+__version__ = (2, 0, 0, 'alpha')
 
 import time
 import datetime
@@ -30,8 +16,8 @@ from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.utils.encoding import smart_unicode, force_unicode
 
-from haystack.backends import BaseSearchBackend, BaseSearchQuery, log_query
-from haystack.exceptions import MissingDependency, HaystackError
+from haystack.backends import BaseSearchBackend, BaseSearchQuery, SearchNode, log_query
+from haystack.exceptions import MissingDependency
 from haystack.fields import DateField, DateTimeField, IntegerField, FloatField, BooleanField, MultiValueField
 from haystack.models import SearchResult
 from haystack.utils import get_identifier
@@ -47,11 +33,6 @@ DOCUMENT_CUSTOM_TERM_PREFIX = 'X'
 DOCUMENT_CT_TERM_PREFIX = DOCUMENT_CUSTOM_TERM_PREFIX + 'CONTENTTYPE'
 
 
-class InvalidIndexError(HaystackError):
-    """Raised when an index can not be opened."""
-    pass
-
-
 class XHValueRangeProcessor(xapian.ValueRangeProcessor):
     def __init__(self, sb):
         self.sb = sb
@@ -60,12 +41,10 @@ class XHValueRangeProcessor(xapian.ValueRangeProcessor):
     def __call__(self, begin, end):
         """
         Construct a tuple for value range processing.
-        
         `begin` -- a string in the format '<field_name>:[low_range]'
-                   If 'low_range' is omitted, assume the smallest possible value.
-        `end` -- a string in the the format '[high_range|*]'.  If '*', assume
-                 the highest possible value.
-        
+        If 'low_range' is omitted, assume the smallest possible value.
+        `end` -- a string in the the format '[high_range|*]'. If '*', assume
+        the highest possible value.
         Return a tuple of three strings: (column, low, high)
         """
         colon = begin.find(':')
@@ -92,11 +71,11 @@ class XHValueRangeProcessor(xapian.ValueRangeProcessor):
                     elif field_dict['type'] == 'date' or field_dict['type'] == 'datetime':
                         end = u'99990101000000'
                 if field_dict['type'] == 'float':
-                    begin = self.sb._marshal_value(float(begin))
-                    end = self.sb._marshal_value(float(end))
+                    begin = _marshal_value(float(begin))
+                    end = _marshal_value(float(end))
                 elif field_dict['type'] == 'long':
-                    begin = self.sb._marshal_value(long(begin))
-                    end = self.sb._marshal_value(long(end))
+                    begin = _marshal_value(long(begin))
+                    end = _marshal_value(long(end))
                 return field_dict['column'], str(begin), str(end)
 
 
@@ -130,21 +109,7 @@ class SearchBackend(BaseSearchBackend):
     your settings.  This should point to a location where you would your
     indexes to reside.
     """
-    RESERVED_WORDS = (
-        'AND',
-        'NOT',
-        'OR',
-        'XOR',
-        'NEAR',
-        'ADJ',
-    )
-    
-    RESERVED_CHARACTERS = (
-        '\\', '+', '-', '&&', '||', '!', '(', ')', '{', '}',
-        '[', ']', '^', '"', '~', '*', '?', ':',
-    )
-    
-    def __init__(self, site=None, stemming_language='english'):
+    def __init__(self, site=None, language='english'):
         """
         Instantiates an instance of `SearchBackend`.
         
@@ -162,7 +127,7 @@ class SearchBackend(BaseSearchBackend):
         if not os.path.exists(settings.HAYSTACK_XAPIAN_PATH):
             os.makedirs(settings.HAYSTACK_XAPIAN_PATH)
         
-        self.stemmer = xapian.Stem(stemming_language)
+        self.language = language
     
     def update(self, index, iterable):
         """
@@ -205,7 +170,14 @@ class SearchBackend(BaseSearchBackend):
         try:
             for obj in iterable:
                 document = xapian.Document()
-                term_generator = self._term_generator(database, document)
+                
+                term_generator = xapian.TermGenerator()
+                term_generator.set_database(database)
+                term_generator.set_stemmer(xapian.Stem(self.language))
+                if getattr(settings, 'HAYSTACK_INCLUDE_SPELLING', False) is True:
+                    term_generator.set_flags(xapian.TermGenerator.FLAG_SPELLING)
+                term_generator.set_document(document)
+                
                 document_id = DOCUMENT_ID_TERM_PREFIX + get_identifier(obj)
                 data = index.prepare(obj)
                 
@@ -213,9 +185,9 @@ class SearchBackend(BaseSearchBackend):
                     if field['field_name'] in data.keys():
                         prefix = DOCUMENT_CUSTOM_TERM_PREFIX + field['field_name'].upper()
                         value = data[field['field_name']]
-                        term_generator.index_text(force_unicode(value))
-                        term_generator.index_text(force_unicode(value), 1, prefix)
-                        document.add_value(field['column'], self._marshal_value(value))
+                        term_generator.index_text(_marshal_term(value))
+                        term_generator.index_text(_marshal_term(value), 1, prefix)
+                        document.add_value(field['column'], _marshal_value(value))
                 
                 document.set_data(pickle.dumps(
                     (obj._meta.app_label, obj._meta.module_name, obj.pk, data),
@@ -259,9 +231,10 @@ class SearchBackend(BaseSearchBackend):
         """
         database = self._database(writable=True)
         if not models:
-            query, __unused__ = self._query(database, '*')
-            enquire = self._enquire(database, query)
-            for match in enquire.get_mset(0, self.document_count()):
+            query = xapian.Query('')
+            enquire = xapian.Enquire(database)
+            enquire.set_query(query)
+            for match in enquire.get_mset(0, database.get_doccount()):
                 database.delete_document(match.docid)
         else:
             for model in models:
@@ -270,21 +243,20 @@ class SearchBackend(BaseSearchBackend):
                     (model._meta.app_label, model._meta.module_name)
                 )
     @log_query
-    def search(self, query_string, sort_by=None, start_offset=0, 
-               end_offset=0, fields='', highlight=False, 
-               facets=None, date_facets=None, query_facets=None,
-               narrow_queries=None, boost=None, spelling_query=None, 
+    def search(self, query, sort_by=None, start_offset=0, end_offset=None,
+               fields='', highlight=False, facets=None, date_facets=None,
+               query_facets=None, narrow_queries=None, spelling_query=None,
                limit_to_registered_models=True, **kwargs):
         """
         Executes the search as defined in `query_string`.
         
         Required arguments:
-            `query_string` -- Search query to execute
+            `query` -- Search query to execute
         
         Optional arguments:
             `sort_by` -- Sort results by specified field (default = None)
             `start_offset` -- Slice results from `start_offset` (default = 0)
-            `end_offset` -- Slice results at `end_offset` (default = 0), if 0, then all documents
+            `end_offset` -- Slice results at `end_offset` (default = None), if None, then all documents
             `fields` -- Filter results on `fields` (default = '')
             `highlight` -- Highlight terms in results (default = False)
             `facets` -- Facet results on fields (default = None)
@@ -292,9 +264,8 @@ class SearchBackend(BaseSearchBackend):
             `query_facets` -- Facet results on queries (default = None)
             `narrow_queries` -- Narrow queries (default = None)
             `spelling_query` -- An optional query to execute spelling suggestion on
-            `boost` -- Dictionary of terms and weights to boost results
             `limit_to_registered_models` -- Limit returned results to models registered in the current `SearchSite` (default = True)
-            
+        
         Returns:
             A dictionary with the following keys:
                 `results` -- A list of `SearchResult`
@@ -322,31 +293,53 @@ class SearchBackend(BaseSearchBackend):
         and any suggestions for spell correction will be returned as well as
         the results.
         """
-        if not query_string:
+        if xapian.Query.empty(query):
             return {
                 'results': [],
                 'hits': 0,
             }
         
+        database = self._database()
+        
+        if getattr(settings, 'HAYSTACK_INCLUDE_SPELLING', False) is True:
+            spelling_suggestion = self._do_spelling_suggestion(database, query, spelling_query)
+        else:
+            spelling_suggestion = ''
+        
+        if narrow_queries is not None:
+            query = xapian.Query(
+                xapian.Query.OP_AND, query, xapian.Query(
+                    xapian.Query.OP_OR, [self.parse_query(narrow_query) for narrow_query in narrow_queries]
+                )
+            )
+        
         if limit_to_registered_models:
-            if narrow_queries is None:
-                 narrow_queries = set()
-            
             registered_models = self.build_registered_models_list()
             
             if len(registered_models) > 0:
-                narrow_queries.add(
-                    ' '.join(['django_ct:%s' % model for model in registered_models])
+                query = xapian.Query(
+                    xapian.Query.OP_AND, query,
+                    xapian.Query(
+                        xapian.Query.OP_OR,  [
+                            xapian.Query('%s%s' % (DOCUMENT_CT_TERM_PREFIX, model)) for model in registered_models
+                        ]
+                    )
                 )
         
-        database = self._database()
-        query, spelling_suggestion = self._query(
-            database, query_string, narrow_queries, spelling_query, boost
-        )
-        enquire = self._enquire(database, query)
+        enquire = xapian.Enquire(database)
+        enquire.set_query(query)
         
         if sort_by:
-            sorter = self._sorter(sort_by)
+            sorter = xapian.MultiValueSorter()
+            
+            for sort_field in sort_by:
+                if sort_field.startswith('-'):
+                    reverse = True
+                    sort_field = sort_field[1:] # Strip the '-'
+                else:
+                    reverse = False # Reverse is inverted in Xapian -- http://trac.xapian.org/ticket/311
+                sorter.add(self._value_column(sort_field), reverse)
+            
             enquire.set_sort_by_key_then_relevance(sorter, True)
         
         results = []
@@ -355,16 +348,18 @@ class SearchBackend(BaseSearchBackend):
             'dates': {},
             'queries': {},
         }
+        
         if not end_offset:
-            end_offset = self.document_count()
+            end_offset = database.get_doccount()
+        
         matches = enquire.get_mset(start_offset, (end_offset - start_offset))
         
         for match in matches:
             app_label, module_name, pk, model_data = pickle.loads(match.document.get_data())
-            if highlight and (len(query_string) > 0):
+            if highlight:
                 model_data['highlighted'] = {
                     self.content_field_name: self._do_highlight(
-                        model_data.get(self.content_field_name), query_string
+                        model_data.get(self.content_field_name), query
                     )
                 }
             results.append(
@@ -385,23 +380,8 @@ class SearchBackend(BaseSearchBackend):
             'spelling_suggestion': spelling_suggestion,
         }
     
-    def delete_index(self):
-        """
-        Delete the index.
-        
-        This removes all indexes files and the `HAYSTACK_XAPIAN_PATH` folder.
-        """
-        if os.path.exists(settings.HAYSTACK_XAPIAN_PATH):
-            shutil.rmtree(settings.HAYSTACK_XAPIAN_PATH)
-    
-    def document_count(self):
-        """
-        Retrieves the total document count for the search index.
-        """
-        return self._database().get_doccount()
-    
-    def more_like_this(self, model_instance, additional_query_string=None,
-                       start_offset=0, end_offset=0, 
+    def more_like_this(self, model_instance, additional_query=None,
+                       start_offset=0, end_offset=None,
                        limit_to_registered_models=True, **kwargs):
         """
         Given a model instance, returns a result set of similar documents.
@@ -411,10 +391,9 @@ class SearchBackend(BaseSearchBackend):
                                 retrieving similar documents.
         
         Optional arguments:
-            `additional_query_string` -- An additional query string to narrow
-                                         results
+            `additional_query` -- An additional query to narrow results
             `start_offset` -- The starting offset (default=0)
-            `end_offset` -- The ending offset (default=0), if 0, then all documents
+            `end_offset` -- The ending offset (default=None), if None, then all documents
             `limit_to_registered_models` -- Limit returned results to models registered in the current `SearchSite` (default = True)
         
         Returns:
@@ -434,36 +413,43 @@ class SearchBackend(BaseSearchBackend):
         Finally, processes the resulting matches and returns.
         """
         database = self._database()
+        
         query = xapian.Query(DOCUMENT_ID_TERM_PREFIX + get_identifier(model_instance))
-        enquire = self._enquire(database, query)
+        
+        enquire = xapian.Enquire(database)
+        enquire.set_query(query)
+        
         rset = xapian.RSet()
+        
         if not end_offset:
-            end_offset = self.document_count()
+            end_offset = database.get_doccount()
+        
         for match in enquire.get_mset(0, end_offset):
             rset.add_document(match.docid)
+        
         query = xapian.Query(xapian.Query.OP_OR,
             [expand.term for expand in enquire.get_eset(match.document.termlist_count(), rset, XHExpandDecider())]
         )
         query = xapian.Query(
             xapian.Query.OP_AND_NOT, [query, DOCUMENT_ID_TERM_PREFIX + get_identifier(model_instance)]
         )
-        narrow_queries = None
         if limit_to_registered_models:
             registered_models = self.build_registered_models_list()
             
             if len(registered_models) > 0:
-                narrow_queries = set()
-                narrow_queries.add(
-                    ' '.join(['django_ct:%s' % model for model in registered_models])
+                query = xapian.Query(
+                    xapian.Query.OP_AND, query,
+                    xapian.Query(
+                        xapian.Query.OP_OR,  [
+                            xapian.Query('%s%s' % (DOCUMENT_CT_TERM_PREFIX, model)) for model in registered_models
+                        ]
+                    )
                 )
-        if additional_query_string:
-            additional_query, __unused__ = self._query(
-                database, additional_query_string, narrow_queries
-            )
+        if additional_query:
             query = xapian.Query(
                 xapian.Query.OP_AND, query, additional_query
             )
-
+        
         enquire.set_query(query)
         
         results = []
@@ -486,6 +472,43 @@ class SearchBackend(BaseSearchBackend):
             },
             'spelling_suggestion': None,
         }
+    
+    def parse_query(self, query_string):
+        """
+        Given a `query_string`, will attempt to return a xapian.Query
+        
+        Required arguments:
+            ``query_string`` -- A query string to parse
+        
+        Returns a xapian.Query
+        """
+        if query_string == '*':
+            return xapian.Query('') # Match everything
+        elif query_string == '':
+            return xapian.Query()   # Match nothing
+        
+        flags = xapian.QueryParser.FLAG_PARTIAL \
+              | xapian.QueryParser.FLAG_PHRASE \
+              | xapian.QueryParser.FLAG_BOOLEAN \
+              | xapian.QueryParser.FLAG_LOVEHATE \
+              | xapian.QueryParser.FLAG_WILDCARD \
+              | xapian.QueryParser.FLAG_PURE_NOT
+        qp = xapian.QueryParser()
+        qp.set_database(self._database())
+        qp.set_stemmer(xapian.Stem(self.language))
+        qp.set_stemming_strategy(xapian.QueryParser.STEM_SOME)
+        qp.add_boolean_prefix('django_ct', DOCUMENT_CT_TERM_PREFIX)
+        
+        for field_dict in self.schema:
+            qp.add_prefix(
+                field_dict['field_name'],
+                DOCUMENT_CUSTOM_TERM_PREFIX + field_dict['field_name'].upper()
+            )
+        
+        vrp = XHValueRangeProcessor(self)
+        qp.add_valuerangeprocessor(vrp)
+        
+        return qp.parse_query(query_string, flags)
     
     def build_schema(self, fields):
         """
@@ -529,9 +552,9 @@ class SearchBackend(BaseSearchBackend):
         
         return (content_field_name, schema_fields)
     
-    def _do_highlight(self, content, text, tag='em'):
+    def _do_highlight(self, content, query, tag='em'):
         """
-        Highlight `text` in `content` with html `tag`.
+        Highlight `query` terms in `content` with html `tag`.
         
         This method assumes that the input text (`content`) does not contain
         any special formatting.  That is, it does not contain any html tags
@@ -541,17 +564,18 @@ class SearchBackend(BaseSearchBackend):
             `content` -- Content to search for instances of `text`
             `text` -- The text to be highlighted
         """
-        for term in [term.replace('*', '') for term in text.split()]:
-            if term not in self.RESERVED_WORDS:
-                term_re = re.compile(re.escape(term), re.IGNORECASE)
-                content = term_re.sub('<%s>%s</%s>' % (tag, term, tag), content)
+        for term in query:
+            for match in re.findall('[^A-Z]+', term): # Ignore field identifiers
+                match_re = re.compile(match, re.I)
+                content = match_re.sub('<%s>%s</%s>' % (tag, term, tag), content)
+        
         return content
     
     def _do_field_facets(self, results, field_facets):
         """
         Private method that facets a document by field name.
         
-        Fields of type MultiValueField will be faceted on each item in the 
+        Fields of type MultiValueField will be faceted on each item in the
         (containing) list.
         
         Required arguments:
@@ -560,6 +584,7 @@ class SearchBackend(BaseSearchBackend):
         """
         facet_dict = {}
         
+        # DS_TODO: Improve this algorithm.  Currently, runs in O(N^3), ouch.
         for field in field_facets:
             facet_list = {}
             
@@ -617,9 +642,10 @@ class SearchBackend(BaseSearchBackend):
                         year=date_range.year + int(gap_value)
                     )
                 elif gap_type == 'month':
-                    if date_range.month == 12:
+                    if date_range.month + int(gap_value) > 12:
                         date_range = date_range.replace(
-                            month=1, year=date_range.year + int(gap_value)
+                            month=((date_range.month + int(gap_value)) % 12),
+                            year=(date_range.year + (date_range.month + int(gap_value)) / 12)
                         )
                     else:
                         date_range = date_range.replace(
@@ -672,39 +698,34 @@ class SearchBackend(BaseSearchBackend):
         facet_dict = {}
         
         for field, query in query_facets.iteritems():
-            facet_dict[field] = (query, self.search(query)['hits'])
-        
+            facet_dict[field] = (query, self.search(self.parse_query(query))['hits'])
+
         return facet_dict
     
-    def _marshal_value(self, value):
+    def _do_spelling_suggestion(self, database, query, spelling_query):
         """
-        Private method that converts Python values to a string for Xapian values.
+        Private method that returns a single spelling suggestion based on
+        `spelling_query` or `query`.
+        
+        Required arguments:
+            `database` -- The database to check spelling against
+            `query` -- The query to check
+            `spelling_query` -- If not None, this will be checked instead of `query`
+        
+        Returns a string with a suggested spelling
         """
-        if isinstance(value, datetime.datetime):
-            if value.microsecond:
-                value = u'%04d%02d%02d%02d%02d%02d%06d' % (
-                    value.year, value.month, value.day, value.hour,
-                    value.minute, value.second, value.microsecond
-                )
+        if spelling_query:
+            if ' ' in spelling_query:
+                return ' '.join([database.get_spelling_suggestion(term) for term in spelling_query.split()])
             else:
-                value = u'%04d%02d%02d%02d%02d%02d' % (
-                    value.year, value.month, value.day, value.hour,
-                    value.minute, value.second
-                )
-        elif isinstance(value, datetime.date):
-            value = u'%04d%02d%02d000000' % (value.year, value.month, value.day)
-        elif isinstance(value, bool):
-            if value:
-                value = u't'
-            else:
-                value = u'f'
-        elif isinstance(value, float):
-            value = xapian.sortable_serialise(value)
-        elif isinstance(value, (int, long)):
-            value = u'%012d' % value
-        else:
-            value = force_unicode(value)
-        return value
+                return database.get_spelling_suggestion(spelling_query)
+        
+        term_set = set()
+        for term in query:
+            for match in re.findall('[^A-Z]+', term): # Ignore field identifiers
+                term_set.add(database.get_spelling_suggestion(match))
+        
+        return ' '.join(term_set)
     
     def _database(self, writable=False):
         """
@@ -718,178 +739,17 @@ class SearchBackend(BaseSearchBackend):
         """
         if writable:
             self.content_field_name, self.schema = self.build_schema(self.site.all_searchfields())
-        
+            
             database = xapian.WritableDatabase(settings.HAYSTACK_XAPIAN_PATH, xapian.DB_CREATE_OR_OPEN)
             database.set_metadata('schema', pickle.dumps(self.schema, pickle.HIGHEST_PROTOCOL))
             database.set_metadata('content', pickle.dumps(self.content_field_name, pickle.HIGHEST_PROTOCOL))
         else:
-            try:
-                database = xapian.Database(settings.HAYSTACK_XAPIAN_PATH)
+            database = xapian.Database(settings.HAYSTACK_XAPIAN_PATH)
             
-                self.schema = pickle.loads(database.get_metadata('schema'))
-                self.content_field_name = pickle.loads(database.get_metadata('content'))
-            except xapian.DatabaseOpeningError:
-                raise InvalidIndexError(u'Unable to open index at %s' % settings.HAYSTACK_XAPIAN_PATH)
+            self.schema = pickle.loads(database.get_metadata('schema'))
+            self.content_field_name = pickle.loads(database.get_metadata('content'))
         
         return database
-    
-    def _term_generator(self, database, document):
-        """
-        Private method that returns a Xapian.TermGenerator
-        
-        Required Argument:
-            `document` -- The document to be indexed
-        
-        Returns a Xapian.TermGenerator instance.  If `HAYSTACK_INCLUDE_SPELLING`
-        is True, then the term generator will have spell-checking enabled.
-        """
-        term_generator = xapian.TermGenerator()
-        term_generator.set_database(database)
-        term_generator.set_stemmer(self.stemmer)
-        if getattr(settings, 'HAYSTACK_INCLUDE_SPELLING', False) is True:
-            term_generator.set_flags(xapian.TermGenerator.FLAG_SPELLING)
-        term_generator.set_document(document)
-        return term_generator
-    
-    def _query(self, database, query_string, narrow_queries=None, spelling_query=None, boost=None):
-        """
-        Private method that takes a query string and returns a xapian.Query.
-        
-        Required arguments:
-            `database` -- The database to query
-            `query_string` -- The query string to parse
-        
-        Optional arguments:
-            `narrow_queries` -- A list of queries to narrow the query with
-            `spelling_query` -- An optional query to execute spelling suggestion on
-            `boost` -- A dictionary of terms to boost with values
-        
-        Returns a xapian.Query instance with prefixes and ranges properly
-        setup as pulled from the `query_string`.
-        """
-        spelling_suggestion = None
-        qp = None
-        
-        if query_string == '*':
-            query = xapian.Query('') # Make '*' match everything
-        else:
-            qp = self._query_parser(database)
-            vrp = XHValueRangeProcessor(self)
-            qp.add_valuerangeprocessor(vrp)
-            query = qp.parse_query(query_string, self._flags(query_string))
-            if getattr(settings, 'HAYSTACK_INCLUDE_SPELLING', False) is True:
-                if spelling_query:
-                    qp.parse_query(spelling_query, self._flags(spelling_query))
-                    spelling_suggestion = qp.get_corrected_query_string()
-                else:
-                    spelling_suggestion = qp.get_corrected_query_string()
-        
-        if narrow_queries:
-            if qp is None:
-                qp = self._query_parser(database)
-            subqueries = [
-                qp.parse_query(
-                    narrow_query, self._flags(narrow_query)
-                ) for narrow_query in narrow_queries
-            ]
-            query = xapian.Query(
-                xapian.Query.OP_FILTER,
-                query, xapian.Query(xapian.Query.OP_AND, subqueries)
-            )
-        if boost:
-            subqueries = [
-                xapian.Query(
-                    xapian.Query.OP_SCALE_WEIGHT, xapian.Query(term), value
-                ) for term, value in boost.iteritems()
-            ]
-            query = xapian.Query(
-                xapian.Query.OP_OR, query,
-                xapian.Query(xapian.Query.OP_AND, subqueries)
-            )
-        
-        return query, spelling_suggestion
-    
-    def _flags(self, query_string):
-        """
-        Private method that returns an appropriate xapian.QueryParser flags
-        set given a `query_string`.
-        
-        Required Arguments:
-            `query_string` -- The query string to be parsed.
-        
-        Returns a xapian.QueryParser flag set (an integer)
-        """
-        flags = xapian.QueryParser.FLAG_PARTIAL \
-              | xapian.QueryParser.FLAG_PHRASE \
-              | xapian.QueryParser.FLAG_BOOLEAN \
-              | xapian.QueryParser.FLAG_LOVEHATE
-        if '*' in query_string:
-            flags = flags | xapian.QueryParser.FLAG_WILDCARD
-        if 'NOT' in query_string.upper():
-            flags = flags | xapian.QueryParser.FLAG_PURE_NOT
-        if getattr(settings, 'HAYSTACK_INCLUDE_SPELLING', False) is True:
-            flags = flags | xapian.QueryParser.FLAG_SPELLING_CORRECTION
-        return flags
-    
-    def _sorter(self, sort_by):
-        """
-        Private method that takes a list of fields to sort by and returns a
-        xapian.MultiValueSorter
-        
-        Required Arguments:
-            `sort_by` -- A list of fields to sort by
-        
-        Returns a xapian.MultiValueSorter instance
-        """
-        sorter = xapian.MultiValueSorter()
-        
-        for sort_field in sort_by:
-            if sort_field.startswith('-'):
-                reverse = True
-                sort_field = sort_field[1:] # Strip the '-'
-            else:
-                reverse = False # Reverse is inverted in Xapian -- http://trac.xapian.org/ticket/311
-            sorter.add(self._value_column(sort_field), reverse)
-        
-        return sorter
-    
-    def _query_parser(self, database):
-        """
-        Private method that returns a Xapian.QueryParser instance.
-        
-        Required arguments:
-            `database` -- The database to be queried
-        
-        The query parser returned will have stemming enabled, a boolean prefix
-        for `django_ct`, and prefixes for all of the fields in the `self.schema`.
-        """
-        qp = xapian.QueryParser()
-        qp.set_database(database)
-        qp.set_stemmer(self.stemmer)
-        qp.set_stemming_strategy(xapian.QueryParser.STEM_SOME)
-        qp.add_boolean_prefix('django_ct', DOCUMENT_CT_TERM_PREFIX)
-        for field_dict in self.schema:
-            qp.add_prefix(
-                field_dict['field_name'],
-                DOCUMENT_CUSTOM_TERM_PREFIX + field_dict['field_name'].upper()
-            )
-        return qp
-    
-    def _enquire(self, database, query):
-        """
-        Private method that that returns a Xapian.Enquire instance for use with
-        the specifed `query`.
-        
-        Required Arguments:
-            `query` -- The query to run
-        
-        Returns a xapian.Enquire instance
-        """
-        enquire = xapian.Enquire(database)
-        enquire.set_query(query)
-        enquire.set_docid_order(enquire.ASCENDING)
-        
-        return enquire
     
     def _value_column(self, field):
         """
@@ -905,7 +765,7 @@ class SearchBackend(BaseSearchBackend):
             if field_dict['field_name'] == field:
                 return field_dict['column']
         return 0
-
+    
     def _multi_value_field(self, field):
         """
         Private method that returns `True` if a field is multi-valued, else
@@ -939,42 +799,337 @@ class SearchQuery(BaseSearchQuery):
         super(SearchQuery, self).__init__(backend=backend)
         self.backend = backend or SearchBackend()
     
-    def build_query_fragment(self, field, filter_type, value):
-        """
-        Builds a search query fragment from a field, filter type and value.
-        Returns:
-        A query string fragment suitable for parsing by Xapian.
-        """
-        result = ''
-
-        if not isinstance(value, (list, tuple)):
-            # Convert whatever we find to what xapian wants.
-            value = self.backend._marshal_value(value)
-
-        # Check to see if it's a phrase for an exact match.
-        if ' ' in value:
-            value = '"%s"' % value
-
-        # 'content' is a special reserved word, much like 'pk' in
-        # Django's ORM layer. It indicates 'no special field'.
-        if field == 'content':
-            result = value
+    def build_query(self):
+        # DS_TODO: How does stemming work with this new refactor?
+        
+        if not self.query_filter:
+            query = xapian.Query('')
         else:
-            filter_types = {
-                'exact': '%s:%s',
-                'gte': '%s:%s..*',
-                'gt': 'NOT %s:..%s',
-                'lte': '%s:..%s',
-                'lt': 'NOT %s:%s..*',
-                'startswith': '%s:%s*',
-            }
-
-            if filter_type != 'in':
-                result = filter_types[filter_type] % (field, value)
+            query = self._query_from_search_node(self.query_filter)
+        
+        if self.models:
+            subqueries = [
+                xapian.Query(
+                    xapian.Query.OP_SCALE_WEIGHT, xapian.Query('%s%s.%s' % (
+                            DOCUMENT_CT_TERM_PREFIX,
+                            model._meta.app_label, model._meta.module_name
+                        )
+                    ), 0 # Pure boolean sub-query
+                ) for model in self.models
+            ]
+            query = xapian.Query(
+                xapian.Query.OP_AND, query,
+                xapian.Query(xapian.Query.OP_OR, subqueries)
+            )
+        
+        if self.boost:
+            subqueries = [
+                xapian.Query(
+                    xapian.Query.OP_SCALE_WEIGHT, xapian.Query(term), value
+                ) for term, value in self.boost.iteritems()
+            ]
+            query = xapian.Query(
+                xapian.Query.OP_OR, query,
+                xapian.Query(xapian.Query.OP_AND, subqueries)
+            )
+        
+        return query
+    
+    def _query_from_search_node(self, search_node, is_not=False):
+        query_list = []
+        
+        for child in search_node.children:
+            if isinstance(child, SearchNode):
+                query_list.append(
+                    xapian.Query(
+                        xapian.Query.OP_AND,
+                        self._query_from_search_node(
+                            child, child.negated
+                        )
+                    )
+                )
             else:
-                in_options = []
-                for possible_value in value:
-                    in_options.append('%s:%s' % (field, possible_value))
-                result = '(%s)' % ' OR '.join(in_options)
+                expression, term = child
+                field, filter_type = search_node.split_expression(expression)
+                
+                if isinstance(term, (list, tuple)):
+                    term = [_marshal_term(t) for t in term]
+                else:
+                    term = _marshal_term(term)
+                
+                if field == 'content':
+                    query_list.append(self._content_field(term, is_not))
+                else:
+                    if filter_type == 'exact':
+                        query_list.append(self._filter_exact(term, field, is_not))
+                    elif filter_type == 'gt':
+                        query_list.append(self._filter_gt(term, field, is_not))
+                    elif filter_type == 'gte':
+                        query_list.append(self._filter_gte(term, field, is_not))
+                    elif filter_type == 'lt':
+                        query_list.append(self._filter_lt(term, field, is_not))
+                    elif filter_type == 'lte':
+                        query_list.append(self._filter_lte(term, field, is_not))
+                    elif filter_type == 'startswith':
+                        query_list.append(self._filter_startswith(term, field, is_not))
+                    elif filter_type == 'in':
+                        query_list.append(self._filter_in(term, field, is_not))
+        
+        if search_node.connector == 'OR':
+            return xapian.Query(xapian.Query.OP_OR, query_list)
+        else:
+            return xapian.Query(xapian.Query.OP_AND, query_list)
+    
+    def _content_field(self, term, is_not):
+        """
+        Private method that returns a xapian.Query that searches for `value`
+        in all fields.
+        
+        Required arguments:
+            ``term`` -- The term to search for
+            ``is_not`` -- Invert the search results
+        
+        Returns:
+            A xapian.Query
+        """
+        if ' ' in term:
+            if is_not:
+                return xapian.Query(
+                    xapian.Query.OP_AND_NOT, self._all_query(), self._phrase_query(term.split())
+                )
+            else:
+                return self._phrase_query(term.split())
+        else:
+            if is_not:
+                return xapian.Query(xapian.Query.OP_AND_NOT, self._all_query(), self._term_query(term))
+            else:
+                return self._term_query(term)
+    
+    def _filter_exact(self, term, field, is_not):
+        """
+        Private method that returns a xapian.Query that searches for `term`
+        in a specified `field`.
+        
+        Required arguments:
+            ``term`` -- The term to search for
+            ``field`` -- The field to search
+            ``is_not`` -- Invert the search results
+        
+        Returns:
+            A xapian.Query
+        """
+        if ' ' in term:
+            if is_not:
+                return xapian.Query(
+                    xapian.Query.OP_AND_NOT, self._all_query(), self._phrase_query(term.split(), field)
+                )
+            else:
+                return self._phrase_query(term.split(), field)
+        else:
+            if is_not:
+                return xapian.Query(xapian.Query.OP_AND_NOT, self._all_query(), self._term_query(term, field))
+            else:
+                return self._term_query(term, field)
+    
+    def _filter_in(self, term_list, field, is_not):
+        """
+        Private method that returns a xapian.Query that searches for any term
+        of `value_list` in a specified `field`.
+        
+        Required arguments:
+            ``term_list`` -- The terms to search for
+            ``field`` -- The field to search
+            ``is_not`` -- Invert the search results
+        
+        Returns:
+            A xapian.Query
+        """
+        query_list = []
+        for term in term_list:
+            if ' ' in term:
+                query_list.append(
+                    xapian.Query(
+                        xapian.Query.OP_OR, self._phrase_query(term.split(), field)
+                    )
+                )
+            else:
+                query_list.append(
+                    xapian.Query(
+                        xapian.Query.OP_OR, self._term_query(term, field)
+                    )
+                )
+        if is_not:
+            return xapian.Query(xapian.Query.OP_AND_NOT, self._all_query(), xapian.Query(xapian.Query.OP_OR, query_list))
+        else:
+            return xapian.Query(xapian.Query.OP_OR, query_list)
+    
+    def _filter_startswith(self, term, field, is_not):
+        """
+        Private method that returns a xapian.Query that searches for any term
+        that begins with `term` in a specified `field`.
+        
+        Required arguments:
+            ``term`` -- The terms to search for
+            ``field`` -- The field to search
+            ``is_not`` -- Invert the search results
+        
+        Returns:
+            A xapian.Query
+        """
+        sb = SearchBackend()
+        term_list = set()
+        for t in sb._database().allterms():
+            if t.term.startswith(term.rstrip('*')):
+                term_list.add(t.term)
+        
+        return self._filter_in(list(term_list), field, is_not)
+    
+    def _filter_gt(self, term, field, is_not):
+        return self._filter_lte(term, field, is_not=(is_not != True))
+    
+    def _filter_lt(self, term, field, is_not):
+        return self._filter_gte(term, field, is_not=(is_not != True))
 
-        return result
+    def _filter_gte(self, term, field, is_not):
+        """
+        Private method that returns a xapian.Query that searches for any term
+        that is greater than `term` in a specified `field`.
+        """
+        vrp = XHValueRangeProcessor(self.backend)
+        pos, begin, end = vrp('%s:%s' % (field, _marshal_value(term)), '*')
+        if is_not:
+            return xapian.Query(xapian.Query.OP_AND_NOT,
+                self._all_query(),
+                xapian.Query(xapian.Query.OP_VALUE_RANGE, pos, begin, end)
+            )
+        return xapian.Query(xapian.Query.OP_VALUE_RANGE, pos, begin, end)
+    
+    def _filter_lte(self, term, field, is_not):
+        """
+        Private method that returns a xapian.Query that searches for any term
+        that is less than `term` in a specified `field`.
+        """
+        vrp = XHValueRangeProcessor(self.backend)
+        pos, begin, end = vrp('%s:' % field, '%s' % _marshal_value(term))
+        if is_not:
+            return xapian.Query(xapian.Query.OP_AND_NOT,
+                self._all_query(),
+                xapian.Query(xapian.Query.OP_VALUE_RANGE, pos, begin, end)
+            )
+        return xapian.Query(xapian.Query.OP_VALUE_RANGE, pos, begin, end)
+
+    def _all_query(self):
+        """
+        Private method that returns a xapian.Query that returns all documents,
+        
+        Returns:
+            A xapian.Query
+        """
+        return xapian.Query('')
+    
+    def _term_query(self, term, field=None):
+        """
+        Private method that returns a term based xapian.Query that searches
+        for `term`.
+        
+        Required arguments:
+            ``term`` -- The term to search for
+            ``field`` -- The field to search (If `None`, all fields)
+        
+        Returns:
+            A xapian.Query
+        """
+        stem = xapian.Stem(self.backend.language)
+        if field:
+            return xapian.Query(
+                xapian.Query.OP_OR, 
+                xapian.Query('Z%s%s%s' % (
+                        DOCUMENT_CUSTOM_TERM_PREFIX, field.upper(), stem(term)
+                    )
+                ),
+                xapian.Query('%s%s%s' % (
+                        DOCUMENT_CUSTOM_TERM_PREFIX, field.upper(), term
+                    )
+                )
+            )
+        else:
+            return xapian.Query(
+                xapian.Query.OP_OR,
+                xapian.Query('Z%s' % term),
+                xapian.Query(term)
+            )
+    
+    def _phrase_query(self, term_list, field=None):
+        """
+        Private method that returns a phrase based xapian.Query that searches
+        for terms in `term_list.
+        
+        Required arguments:
+            ``term_list`` -- The terms to search for
+            ``field`` -- The field to search (If `None`, all fields)
+        
+        Returns:
+            A xapian.Query
+        """
+        if field:
+            return xapian.Query(
+                xapian.Query.OP_PHRASE, [
+                    '%s%s%s' % (
+                        DOCUMENT_CUSTOM_TERM_PREFIX, field.upper(), term
+                    ) for term in term_list
+                ]
+            )
+        else:
+            return xapian.Query(xapian.Query.OP_PHRASE, term_list)
+
+
+def _marshal_value(value):
+    """
+    Private utility method that converts Python values to a string for Xapian values.
+    """
+    if isinstance(value, datetime.datetime):
+        value = _marshal_datetime(value)
+    elif isinstance(value, datetime.date):
+        value = _marshal_date(value)
+    elif isinstance(value, bool):
+        if value:
+            value = u't'
+        else:
+            value = u'f'
+    elif isinstance(value, float):
+        value = xapian.sortable_serialise(value)
+    elif isinstance(value, (int, long)):
+        value = u'%012d' % value
+    else:
+        value = force_unicode(value).lower()
+    return value
+
+
+def _marshal_term(term):
+    """
+    Private utility method that converts Python terms to a string for Xapian terms.
+    """
+    if isinstance(term, datetime.datetime):
+        term = _marshal_datetime(term)
+    elif isinstance(term, datetime.date):
+        term = _marshal_date(term)
+    else:
+        term = force_unicode(term).lower()
+    return term
+
+
+def _marshal_date(d):
+    return u'%04d%02d%02d000000' % (d.year, d.month, d.day)
+
+
+def _marshal_datetime(dt):
+    if dt.microsecond:
+        return u'%04d%02d%02d%02d%02d%02d%06d' % (
+            dt.year, dt.month, dt.day, dt.hour,
+            dt.minute, dt.second, dt.microsecond
+        )
+    else:
+        return u'%04d%02d%02d%02d%02d%02d' % (
+            dt.year, dt.month, dt.day, dt.hour,
+            dt.minute, dt.second
+        )
