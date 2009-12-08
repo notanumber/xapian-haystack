@@ -1,7 +1,7 @@
 # Copyright (C) 2009 David Sauve, Trapeze
 
 __author__ = 'David Sauve'
-__version__ = (1, 1, 0, 'beta')
+__version__ = (2, 0, 0, 'alpha')
 
 import time
 import datetime
@@ -248,7 +248,7 @@ class SearchBackend(BaseSearchBackend):
                query_facets=None, narrow_queries=None, spelling_query=None,
                limit_to_registered_models=True, **kwargs):
         """
-        Executes the search as defined in `query_string`.
+        Executes the Xapian::query as defined in `query`.
         
         Required arguments:
             `query` -- Search query to execute
@@ -276,17 +276,7 @@ class SearchBackend(BaseSearchBackend):
                     `queries` -- A list of query facets
             If faceting was not used, the `facets` key will not be present
         
-        If `query_string` is empty, returns no results.
-        
-        Otherwise, loads the available fields from the database meta data schema
-        and sets up prefixes for each one along with a prefix for `django_ct`,
-        used to filter by model, and loads the current stemmer instance.
-        
-        Afterwards, executes the Xapian query parser to create a query from
-        `query_string` that is then passed to a new `enquire` instance.
-        
-        The resulting match set is passed to :method:`_process_results` for
-        further processing prior to returning a dictionary with the results.
+        If `query` is None, returns no results.
         
         If `HAYSTACK_INCLUDE_SPELLING` was enabled in `settings.py`, the
         extra flag `FLAG_SPELLING_CORRECTION` will be passed to the query parser
@@ -584,7 +574,7 @@ class SearchBackend(BaseSearchBackend):
         """
         facet_dict = {}
         
-        # DS_TODO: Improve this algorithm.  Currently, runs in O(N^3), ouch.
+        # DS_TODO: Improve this algorithm.  Currently, runs in O(N^2), ouch.
         for field in field_facets:
             facet_list = {}
             
