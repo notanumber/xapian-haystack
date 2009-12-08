@@ -172,7 +172,7 @@ class XapianSearchBackendTestCase(TestCase):
         self.assertEqual([result.pk for result in self.backend.search(xapian.Query(''))['results']], [1, 2, 3])
         self.assertEqual(self.backend.search(xapian.Query('indexed'))['hits'], 3)
         self.assertEqual([result.pk for result in self.backend.search(xapian.Query(''))['results']], [1, 2, 3])
-        
+
     def test_field_facets(self):
         self.backend.update(self.index, self.sample_objs)
         self.assertEqual(len(self.xapian_search('')), 3)

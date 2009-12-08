@@ -1,7 +1,7 @@
 # Copyright (C) 2009 David Sauve, Trapeze
 
 __author__ = 'David Sauve'
-__version__ = (1, 1, 0, 'beta')
+__version__ = (2, 0, 0, 'alpha')
 
 import time
 import datetime
@@ -17,7 +17,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.utils.encoding import smart_unicode, force_unicode
 
 from haystack.backends import BaseSearchBackend, BaseSearchQuery, SearchNode, log_query
-from haystack.exceptions import HaystackError, MissingDependency
+from haystack.exceptions import MissingDependency
 from haystack.fields import DateField, DateTimeField, IntegerField, FloatField, BooleanField, MultiValueField
 from haystack.models import SearchResult
 from haystack.utils import get_identifier
@@ -31,11 +31,6 @@ except ImportError:
 DOCUMENT_ID_TERM_PREFIX = 'Q'
 DOCUMENT_CUSTOM_TERM_PREFIX = 'X'
 DOCUMENT_CT_TERM_PREFIX = DOCUMENT_CUSTOM_TERM_PREFIX + 'CONTENTTYPE'
-
-
-class InvalidIndexError(HaystackError):
-    """Raised when an index can not be opened."""
-    pass
 
 
 class XHValueRangeProcessor(xapian.ValueRangeProcessor):
@@ -131,6 +126,9 @@ class SearchBackend(BaseSearchBackend):
         
         if not os.path.exists(settings.HAYSTACK_XAPIAN_PATH):
             os.makedirs(settings.HAYSTACK_XAPIAN_PATH)
+        
+        if not os.access(settings.HAYSTACK_XAPIAN_PATH, os.W_OK):
+            raise IOError("The path to your Xapian index '%s' is not writable for the current user/group." % settings.HAYSTACK_XAPIAN_PATH)
         
         self.language = language
     
@@ -739,10 +737,7 @@ class SearchBackend(BaseSearchBackend):
             database.set_metadata('schema', pickle.dumps(self.schema, pickle.HIGHEST_PROTOCOL))
             database.set_metadata('content', pickle.dumps(self.content_field_name, pickle.HIGHEST_PROTOCOL))
         else:
-            try:
-                database = xapian.Database(settings.HAYSTACK_XAPIAN_PATH)
-            except xapian.DatabaseOpeningError:
-                raise InvalidIndexError(u'Unable to open index at %s' % settings.HAYSTACK_XAPIAN_PATH)
+            database = xapian.Database(settings.HAYSTACK_XAPIAN_PATH)
             
             self.schema = pickle.loads(database.get_metadata('schema'))
             self.content_field_name = pickle.loads(database.get_metadata('content'))
