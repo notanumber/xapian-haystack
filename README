@@ -19,7 +19,7 @@ Requirements
 Notes
 -----
 
-- Due to an issue with mod_python possibly causing deadlocks with Xapian (http://trac.xapian.org/ticket/185), when the Python is not invoked through the "main interpreter", mod_python is not supported with xapian-haystack.  It may work, with some tweaking, but your mileage will vary.
+- Due to an issue with mod_python possibly causing deadlocks with Xapian (http://trac.xapian.org/ticket/364), when the Python is not invoked through the "main interpreter", mod_python is not supported with xapian-haystack.  It may work, with some tweaking, but your mileage will vary.
 - Because Xapian does not support simultaneous WritableDatabase connections, it is *strongly* recommended that users either set `WSGIDaemonProcess processes=1` or override the default SearchIndex class to remove the post-save and post-delete signals that cause an immediate re-index.  A sample index with signals removed can be found here: http://gist.github.com/214254. Instead, manually re-index your site content through a cronjob at pre-determined times.  A sample cronjob can be found here: http://gist.github.com/216247.
 
 Installation
