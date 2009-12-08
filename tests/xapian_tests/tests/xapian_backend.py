@@ -114,13 +114,6 @@ class XapianSearchBackendTestCase(TestCase):
 
         return document_list
     
-    def silly_test(self):
-        
-        self.backend.update(self.index, self.sample_objs)
-        
-        self.assertEqual(len(self.xapian_search('indexed')), 3)
-        self.assertEqual(len(self.xapian_search('Indexed')), 3)
-    
     def test_update(self):
         self.backend.update(self.index, self.sample_objs)
         
