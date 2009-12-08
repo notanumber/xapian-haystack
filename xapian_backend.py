@@ -39,8 +39,8 @@ class InvalidIndexError(HaystackError):
 
 
 class XHValueRangeProcessor(xapian.ValueRangeProcessor):
-    def __init__(self, sb):
-        self.sb = sb
+    def __init__(self, backend):
+        self.backend = backend or SearchBackend()
         xapian.ValueRangeProcessor.__init__(self)
     
     def __call__(self, begin, end):
@@ -55,7 +55,7 @@ class XHValueRangeProcessor(xapian.ValueRangeProcessor):
         colon = begin.find(':')
         field_name = begin[:colon]
         begin = begin[colon + 1:len(begin)]
-        for field_dict in self.sb.schema:
+        for field_dict in self.backend.schema:
             if field_dict['field_name'] == field_name:
                 if not begin:
                     if field_dict['type'] == 'text':
@@ -136,6 +136,20 @@ class SearchBackend(BaseSearchBackend):
             raise IOError("The path to your Xapian index '%s' is not writable for the current user/group." % settings.HAYSTACK_XAPIAN_PATH)
         
         self.language = language
+        self._schema = None
+        self._content_field_name = None
+        
+    @property
+    def schema(self):
+        if not self._schema:
+            self._content_field_name, self._schema = self.build_schema(self.site.all_searchfields())            
+        return self._schema
+
+    @property
+    def content_field_name(self):
+        if not self._content_field_name:
+            self._content_field_name, self._schema = self.build_schema(self.site.all_searchfields())            
+        return self._content_field_name
     
     def update(self, index, iterable):
         """
@@ -727,31 +741,23 @@ class SearchBackend(BaseSearchBackend):
     
     def _database(self, writable=False):
         """
-        Private method that returns a xapian.Database for use and sets up
-        schema and content_field definitions.
-        
+        Private method that returns a xapian.Database for use.
+
         Optional arguments:
             ``writable`` -- Open the database in read/write mode (default=False)
-        
+
         Returns an instance of a xapian.Database or xapian.WritableDatabase
         """
         if writable:
-            self.content_field_name, self.schema = self.build_schema(self.site.all_searchfields())
-            
             database = xapian.WritableDatabase(settings.HAYSTACK_XAPIAN_PATH, xapian.DB_CREATE_OR_OPEN)
-            database.set_metadata('schema', pickle.dumps(self.schema, pickle.HIGHEST_PROTOCOL))
-            database.set_metadata('content', pickle.dumps(self.content_field_name, pickle.HIGHEST_PROTOCOL))
         else:
             try:
                 database = xapian.Database(settings.HAYSTACK_XAPIAN_PATH)
             except xapian.DatabaseOpeningError:
                 raise InvalidIndexError(u'Unable to open index at %s' % settings.HAYSTACK_XAPIAN_PATH)
-            
-            self.schema = pickle.loads(database.get_metadata('schema'))
-            self.content_field_name = pickle.loads(database.get_metadata('content'))
-        
+
         return database
-    
+
     def _value_column(self, field):
         """
         Private method that returns the column value slot in the database
