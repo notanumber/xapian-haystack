@@ -790,8 +790,6 @@ class SearchQuery(BaseSearchQuery):
         self.backend = backend or SearchBackend()
     
     def build_query(self):
-        # DS_TODO: How does stemming work with this new refactor?
-        
         if not self.query_filter:
             query = xapian.Query('')
         else:
