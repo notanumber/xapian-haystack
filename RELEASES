@@ -1,3 +1,18 @@
+xapian-haystack-1.1.1BETA
+=========================
+
+Tagged on December 8, 2009 by David Sauve <dsauve@trapeze.com>
+
+Major Code Changes
+------------------
+* `SearchBackend` now has two additional properties, `schema` and `content_field`, that are cached after the first access.  This fixes an issue where running a `SearchQuery` with value ranges sometimes caused an exception to be raised.
+
+Known Issues
+------------
+* `SearchBackend.search` with `highlight=True` converts terms to lowercase in result content.
+
+* * *
+
 xapian-haystack-1.1.0BETA
 =========================
 
