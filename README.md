@@ -2,8 +2,8 @@ Overview
 --------
 xapian-haystack is a backend for use with the Django Haystack search API and the Xapian search engine.
 
-* More information on Haystack can be found here: http://haystacksearch.org/
-* More information on Xapian can be found here: http://xapian.org
+* More information on Haystack can be found here: <http://haystacksearch.org/>
+* More information on Xapian can be found here: <http://xapian.org>
 
 Requirements
 ------------
@@ -17,7 +17,7 @@ Requirements
 Notes
 -----
 
-- Due to an issue with mod_python possibly causing deadlocks with Xapian (http://trac.xapian.org/ticket/364), when Python is not invoked through the "main interpreter", mod_python is not supported with xapian-haystack.  It may work, with some tweaking, but your mileage will vary.
+- Due to an issue with mod_python possibly causing deadlocks with Xapian (<http://trac.xapian.org/ticket/364>), when Python is not invoked through the "main interpreter", mod_python is not supported with xapian-haystack.  It may work, with some tweaking, but your mileage will vary.
 - Because Xapian does not support simultaneous WritableDatabase connections, it is *strongly* recommended that users take care when using RealTimeSearchIndex to either set `WSGIDaemonProcess processes=1` or use some other way of ensuring that there are not multiple attempts to write to the indexes.  Alternatively, use SearchIndex and a cronjob to reindex content at set time intervals (sample cronjob can be found here: http://gist.github.com/216247) or derive your own SearchIndex to implement some other form of keeping your indexes up to date.
 
 Installation
@@ -67,7 +67,7 @@ Once this is done, the tests can be executed in a similar fashion as the rest of
 Source
 ------
 
-The latest source code can always be found here: http://github.com/notanumber/xapian-haystack/
+The latest source code can always be found here: <http://github.com/notanumber/xapian-haystack/>
 
 Credits
 -------
@@ -82,5 +82,5 @@ xapian-haystack is Copyright © 2009 David Sauve, Trapeze. It is free software, 
 Questions, Comments, Concerns:
 ------------------------------
 
-Feel free to open an issue here: http://github.com/notanumber/xapian-haystack/issues
+Feel free to open an issue here: <http://github.com/notanumber/xapian-haystack/issues>
 Alternatively, ask questions on the django-haystack [mailing list](http://groups.google.com/group/django-haystack/) or [irc channel](irc://irc.freenode.net/haystack).
