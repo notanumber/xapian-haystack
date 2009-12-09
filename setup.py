@@ -8,7 +8,7 @@ setup(
     name='xapian-haystack',
     version='1.1.1beta',
     description="A Xapian backend for Haystack",
-    long_description=read('README'),
+    long_description=read('README.md'),
     classifiers=[
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
