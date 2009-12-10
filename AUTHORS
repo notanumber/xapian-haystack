@@ -1,9 +1,11 @@
 Primary Authors:
+----------------
 
     * David Sauve
 
 
 Thanks to:
+----------
     * Daniel Lindsley for the awesome Haystack API and putting up with all of my questions.
     * Trapeze Media <http://www.trapeze.com/> for providing time and resources to complete this project as well as Q&A.
     * Richard Boulton for answering questions regarding the Xapian python bindings and API.
