@@ -834,8 +834,8 @@ class SearchQuery(BaseSearchQuery):
                 ) for term, value in self.boost.iteritems()
             ]
             query = xapian.Query(
-                xapian.Query.OP_OR, query,
-                xapian.Query(xapian.Query.OP_AND, subqueries)
+                xapian.Query.OP_AND_MAYBE, query,
+                xapian.Query(xapian.Query.OP_OR, subqueries)
             )
         
         return query
