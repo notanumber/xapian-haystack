@@ -1,3 +1,20 @@
+xapian-haystack-1.1.2BETA
+=========================
+
+Tagged on January 15, 2010 by David Sauve <dsauve@trapeze.com>
+
+Minor Code Changes
+------------------
+* Corrected an issue with multiple-term boosts incorrectly weighting terms and returning unexpected results.
+* Added early detection and recovery for DatabaseModifiedError.
+
+Known Issues
+------------
+* `SearchBackend.search` with `highlight=True` converts terms to lowercase in result content.
+* `SearchResults` should obey the type of data chosen in their corresponding field in the `SearchIndex` if present
+
+* * *
+
 xapian-haystack-1.1.1BETA
 =========================
 
