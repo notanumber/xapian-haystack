@@ -103,7 +103,7 @@ class XapianSearchQueryTestCase(TestCase):
     def test_build_query_boost(self):
         self.sq.add_filter(SQ(content='hello'))
         self.sq.add_boost('world', 5)
-        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query((Zhello OR hello OR 5 * world))')
+        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query(((Zhello OR hello) AND_MAYBE 5 * world))')
     
     def test_build_query_in_filter_single_words(self):
         self.sq.add_filter(SQ(content='why'))
