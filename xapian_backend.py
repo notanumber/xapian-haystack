@@ -806,6 +806,18 @@ class SearchQuery(BaseSearchQuery):
         super(SearchQuery, self).__init__(backend=backend)
         self.backend = backend or SearchBackend()
     
+    def run(self, spelling_query=None):
+        try:
+            return super(SearchQuery, self).run(spelling_query=spelling_query)
+        except xapian.DatabaseModifiedError:
+            return super(SearchQuery, self).run(spelling_query=spelling_query)
+
+    def run_mlt(self):
+        try:
+            return super(SearchQuery, self).run_mlt()
+        except xapian.DatabaseModifiedError:
+            return super(SearchQuery, self).run_mlt()
+    
     def build_query(self):
         if not self.query_filter:
             query = xapian.Query('')
