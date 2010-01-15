@@ -17,3 +17,4 @@ Thanks to:
     * Travis Cline for the initial patch to support SQ objects in Haystack.
     * wshallum for a patch that makes date facets compatible with Python 2.4
     * askfor for reporting issues with narrow_queries and float fields.
+    * Brandon Konkle for a patch that corrected the behaviour of weights on multiple term boosts.
