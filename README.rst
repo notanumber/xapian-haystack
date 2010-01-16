@@ -13,7 +13,7 @@ Requirements
 
 - Python 2.4 (May work with 2.3, but untested)
 - Django 1.0.x
-- Django-Haystack 1.0BETA
+- Django-Haystack 1.0
 - Xapian 1.0.13+ (May work with earlier versions, but untested)
 - mod_wsgi 1.3.X
 
