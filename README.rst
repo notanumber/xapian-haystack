@@ -79,7 +79,7 @@ xapian-haystack is maintained by `David Sauve <mailto:dsauve@trapeze.com>`_, and
 License
 -------
 
-xapian-haystack is Copyright © 2009-2010 David Sauve, Trapeze. It is free software, and may be redistributed under the terms specified in the LICENSE file. 
+xapian-haystack is Copyright (c) 2009-2010 David Sauve, Trapeze. It is free software, and may be redistributed under the terms specified in the LICENSE file. 
 
 Questions, Comments, Concerns:
 ------------------------------
