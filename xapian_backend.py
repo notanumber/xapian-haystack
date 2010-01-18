@@ -795,16 +795,17 @@ class SearchQuery(BaseSearchQuery):
     It acts as an intermediary between the ``SearchQuerySet`` and the
     ``SearchBackend`` itself.
     """
-    def __init__(self, backend=None):
+    def __init__(self, backend=None, site=None):
         """
         Create a new instance of the SearchQuery setting the backend as
         specified.  If no backend is set, will use the Xapian `SearchBackend`.
         
         Optional arguments:
             ``backend`` -- The ``SearchBackend`` to use (default = None)
+            ``site`` -- The site to use (default = None)
         """
         super(SearchQuery, self).__init__(backend=backend)
-        self.backend = backend or SearchBackend()
+        self.backend = backend or SearchBackend(site=site)
     
     def run(self, spelling_query=None):
         try:
