@@ -375,7 +375,7 @@ class SearchBackend(BaseSearchBackend):
                     )
                 }
             results.append(
-                SearchResult(app_label, module_name, pk, match.weight, **model_data)
+                SearchResult(app_label, module_name, pk, match.percent, weight=match.weight, **model_data)
             )
         
         if facets:
@@ -471,7 +471,7 @@ class SearchBackend(BaseSearchBackend):
             document = match.get_document()
             app_label, module_name, pk, model_data = pickle.loads(document.get_data())
             results.append(
-                SearchResult(app_label, module_name, pk, match.weight, **model_data)
+                SearchResult(app_label, module_name, pk, match.percent, weight=match.weight, **model_data)
             )
         
         return {
