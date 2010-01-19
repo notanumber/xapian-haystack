@@ -54,6 +54,7 @@ class XapianMockSearchIndex(indexes.SearchIndex):
     slug = indexes.CharField(indexed=False, model_attr='slug')
     popularity = indexes.FloatField(model_attr='popularity')
     sites = indexes.MultiValueField()
+    tags = indexes.MultiValueField()
     
     def prepare_sites(self, obj):
         return ['%d' % (i * obj.id) for i in xrange(1, 4)]
@@ -83,6 +84,10 @@ class XapianSearchBackendTestCase(TestCase):
         self.sample_objs[0].popularity = 834.0
         self.sample_objs[1].popularity = 35.5
         self.sample_objs[2].popularity = 972.0
+        
+        self.sample_objs[0].tags = ['a', 'b', 'c']
+        self.sample_objs[0].tags = ['ab', 'bc', 'cd']
+        self.sample_objs[0].tags = ['an', 'to', 'or']
     
     def tearDown(self):
         if os.path.exists(settings.HAYSTACK_XAPIAN_PATH):
@@ -319,15 +324,16 @@ class XapianSearchBackendTestCase(TestCase):
     def test_build_schema(self):
         (content_field_name, fields) = self.backend.build_schema(self.site.all_searchfields())
         self.assertEqual(content_field_name, 'text')
-        self.assertEqual(len(fields), 7)
+        self.assertEqual(len(fields), 8)
         self.assertEqual(fields, [
             {'column': 0, 'field_name': 'name', 'type': 'text', 'multi_valued': 'false'},
-            {'column': 1, 'field_name': 'text', 'type': 'text', 'multi_valued': 'false'},
-            {'column': 2, 'field_name': 'popularity', 'type': 'float', 'multi_valued': 'false'},
-            {'column': 3, 'field_name': 'sites', 'type': 'text', 'multi_valued': 'true'},
-            {'column': 4, 'field_name': 'value', 'type': 'long', 'multi_valued': 'false'},
-            {'column': 5, 'field_name': 'flag', 'type': 'boolean', 'multi_valued': 'false'},
-            {'column': 6, 'field_name': 'pub_date', 'type': 'date', 'multi_valued': 'false'},
+            {'column': 1, 'type': 'text', 'field_name': 'tags', 'multi_valued': 'true'},
+            {'column': 2, 'field_name': 'text', 'type': 'text', 'multi_valued': 'false'},
+            {'column': 3, 'field_name': 'popularity', 'type': 'float', 'multi_valued': 'false'},
+            {'column': 4, 'field_name': 'sites', 'type': 'text', 'multi_valued': 'true'},
+            {'column': 5, 'field_name': 'value', 'type': 'long', 'multi_valued': 'false'},
+            {'column': 6, 'field_name': 'flag', 'type': 'boolean', 'multi_valued': 'false'},
+            {'column': 7, 'field_name': 'pub_date', 'type': 'date', 'multi_valued': 'false'},
         ])
     
     def test_parse_query(self):
@@ -335,10 +341,10 @@ class XapianSearchBackendTestCase(TestCase):
         self.assertEqual(self.backend.parse_query('indexed').get_description(), 'Xapian::Query((indexed:(pos=1) OR Zindex:(pos=1)))')
         self.assertEqual(self.backend.parse_query('name:david').get_description(), 'Xapian::Query((XNAMEdavid1:(pos=1) OR XNAMEdavid2:(pos=1) OR XNAMEdavid3:(pos=1) OR ZXNAMEdavid:(pos=1)))')
         self.assertEqual(self.backend.parse_query('name:david1..david2').get_description(), 'Xapian::Query(VALUE_RANGE 0 david1 david2)')
-        self.assertEqual(self.backend.parse_query('value:0..10').get_description(), 'Xapian::Query(VALUE_RANGE 4 000000000000 000000000010)')
-        self.assertEqual(self.backend.parse_query('value:..10').get_description(), 'Xapian::Query(VALUE_RANGE 4 -02147483648 000000000010)')
-        self.assertEqual(self.backend.parse_query('value:10..*').get_description(), 'Xapian::Query(VALUE_RANGE 4 000000000010 002147483647)')
-        self.assertEqual(self.backend.parse_query('popularity:25.5..100.0').get_description(), 'Xapian::Query(VALUE_RANGE 2 \xb2` \xba@)')
+        self.assertEqual(self.backend.parse_query('value:0..10').get_description(), 'Xapian::Query(VALUE_RANGE 5 000000000000 000000000010)')
+        self.assertEqual(self.backend.parse_query('value:..10').get_description(), 'Xapian::Query(VALUE_RANGE 5 -02147483648 000000000010)')
+        self.assertEqual(self.backend.parse_query('value:10..*').get_description(), 'Xapian::Query(VALUE_RANGE 5 000000000010 002147483647)')
+        self.assertEqual(self.backend.parse_query('popularity:25.5..100.0').get_description(), 'Xapian::Query(VALUE_RANGE 3 \xb2` \xba@)')
 
 
 class LiveXapianMockSearchIndex(indexes.SearchIndex):
