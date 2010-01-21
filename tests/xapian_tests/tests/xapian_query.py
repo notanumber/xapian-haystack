@@ -51,10 +51,18 @@ class XapianSearchQueryTestCase(TestCase):
         self.sq.add_filter(SQ(content=datetime.date(2009, 5, 8)))
         self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query((Z20090508000000 OR 20090508000000))')
     
+    def test_build_query_date_not(self):
+        self.sq.add_filter(~SQ(content=datetime.date(2009, 5, 8)))
+        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query((<alldocuments> AND_NOT (Z20090508000000 OR 20090508000000)))')
+
     def test_build_query_datetime(self):
         self.sq.add_filter(SQ(content=datetime.datetime(2009, 5, 8, 11, 28)))
         self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query((Z20090508112800 OR 20090508112800))')
     
+    def test_build_query_datetime_not(self):
+        self.sq.add_filter(~SQ(content=datetime.datetime(2009, 5, 8, 11, 28)))
+        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query((<alldocuments> AND_NOT (Z20090508112800 OR 20090508112800)))')
+
     def test_build_query_float(self):
         self.sq.add_filter(SQ(content=25.52))
         self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query((Z25.52 OR 25.52))')
