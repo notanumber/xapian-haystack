@@ -364,7 +364,7 @@ class SearchBackend(BaseSearchBackend):
         if not end_offset:
             end_offset = database.get_doccount()
         
-        matches = enquire.get_mset(start_offset, (end_offset - start_offset))
+        matches = enquire.get_mset(start_offset, end_offset)
         
         for match in matches:
             app_label, module_name, pk, model_data = pickle.loads(match.document.get_data())
