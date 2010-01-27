@@ -362,7 +362,7 @@ class SearchBackend(BaseSearchBackend):
         }
         
         if not end_offset:
-            end_offset = database.get_doccount()
+            end_offset = database.get_doccount() - start_offset
         
         matches = enquire.get_mset(start_offset, end_offset)
         
