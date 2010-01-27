@@ -209,7 +209,8 @@ class SearchBackend(BaseSearchBackend):
                         value = data[field['field_name']]
                         term_generator.index_text(_marshal_term(value))
                         term_generator.index_text(_marshal_term(value), 1, prefix)
-                        document.add_value(field['column'], _marshal_value(value))
+                        if field['multi_valued'] == 'false':
+                            document.add_value(field['column'], _marshal_value(value))
                 
                 document.set_data(pickle.dumps(
                     (obj._meta.app_label, obj._meta.module_name, obj.pk, data),
