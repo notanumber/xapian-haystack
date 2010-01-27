@@ -1,3 +1,23 @@
+xapian-haystack-1.1.3BETA
+=========================
+
+Tagged on January 27, 2010 by David Sauve <dsauve@trapeze.com>
+
+Minor Code Changes
+------------------
+* Corrected an issue where `site` was not being passed into SearchBackend.
+* Corrected an issue with SearchBackend.search that raised an OverFlowError when trying to slice a SearchQueryset.
+
+Known Issues
+------------
+* `SearchBackend.search` with `highlight=True` converts terms to lowercase in result content.
+* `SearchResults` should obey the type of data chosen in their corresponding field in the `SearchIndex` if present
+* `__startswith` filter is highly inefficient, especially with large data-sets.
+* MultiValueFields should not store data in the value column of the index
+* SearchQuery doesn't handle multiple exclude attributes correctly
+
+* * *
+
 xapian-haystack-1.1.2BETA
 =========================
 
