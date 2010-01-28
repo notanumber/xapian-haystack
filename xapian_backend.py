@@ -161,10 +161,11 @@ class SearchBackend(BaseSearchBackend):
             `iterable` -- An iterable of model instances to index
         
         For each object in `iterable`, a document is created containing all
-        of the terms extracted from `index.prepare(obj)` with stemming prefixes,
-        field prefixes, and 'as-is'.
+        of the terms extracted from `index.prepare(obj)` with field prefixes, 
+        and 'as-is' as needed.  Also, if the field type is 'text' it will be 
+        stemmed and stored with the 'Z' prefix as well.
         
-        eg. `content:Testing` ==> `testing, Ztest, ZXCONTENTtest`
+        eg. `content:Testing` ==> `testing, Ztest, ZXCONTENTtest, XCONTENTtest`
         
         Each document also contains an extra term in the format:
         
@@ -207,10 +208,24 @@ class SearchBackend(BaseSearchBackend):
                     if field['field_name'] in data.keys():
                         prefix = DOCUMENT_CUSTOM_TERM_PREFIX + field['field_name'].upper()
                         value = data[field['field_name']]
-                        term_generator.index_text(_marshal_term(value))
-                        term_generator.index_text(_marshal_term(value), 1, prefix)
-                        if field['multi_valued'] == 'false':
-                            document.add_value(field['column'], _marshal_value(value))
+                        if field['type'] == 'text':
+                            if field['multi_valued'] == 'false':
+                                term_generator.index_text(_marshal_term(value))
+                                term_generator.index_text(_marshal_term(value), 1, prefix)
+                                document.add_value(field['column'], _marshal_value(value))
+                            else:
+                                for term in value:
+                                    term_generator.index_text(_marshal_term(term))
+                                    term_generator.index_text(_marshal_term(term), 1, prefix)
+                        else:
+                            if field['multi_valued'] == 'false':
+                                document.add_term(_marshal_term(value))
+                                document.add_term(prefix + _marshal_term(value))
+                                document.add_value(field['column'], _marshal_value(value))
+                            else:
+                                for term in value:
+                                    document.add_term(_marshal_term(term))
+                                    document.add_term(prefix + _marshal_term(term))
                 
                 document.set_data(pickle.dumps(
                     (obj._meta.app_label, obj._meta.module_name, obj.pk, data),
