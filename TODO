@@ -2,7 +2,6 @@ Future
 ======
 
 * Language stemming (needs to be implemented by Haystack first)
-* Refactor SearchBackend and SearchQuery to make use of the Xapian.Query object natively instead of passing query strings between them.
 
 Complete
 ========
@@ -16,3 +15,4 @@ Complete
 * Figure out how to deal with accents? (eg., resume vs résumé).
 * `date_facets` on SearchBackend.search
 * `query_facets` on SearchBackend.search
+* Refactor SearchBackend and SearchQuery to make use of the Xapian.Query object natively instead of passing query strings between them.
