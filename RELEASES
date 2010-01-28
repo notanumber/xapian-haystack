@@ -1,3 +1,22 @@
+xapian-haystack-UNRELEASED
+==========================
+
+Tagged on ??, 2010 by David Sauve <dsauve@trapeze.com>
+
+Minor Code Changes
+------------------
+* Updated SearchBackend.update to be smarter when indexing multi-value fields and stemming. It will now only stem text fields and will properly index each field of a MultiValueField.
+* MultiValueFields will no longer store data in the value column of the index.
+
+Known Issues
+------------
+* `SearchBackend.search` with `highlight=True` converts terms to lowercase in result content.
+* `SearchResults` should obey the type of data chosen in their corresponding field in the `SearchIndex` if present
+* `__startswith` filter is highly inefficient, especially with large data-sets.
+* SearchQuery doesn't handle multiple exclude attributes correctly
+
+* * *
+
 xapian-haystack-1.1.3BETA
 =========================
 
