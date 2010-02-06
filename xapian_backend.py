@@ -272,7 +272,7 @@ class SearchBackend(BaseSearchBackend):
             query = xapian.Query('')
             enquire = xapian.Enquire(database)
             enquire.set_query(query)
-            for match in enquire.get_mset(0, database.get_doccount()):
+            for match in self._get_mset(database, enquire, 0, database.get_doccount()):
                 database.delete_document(match.docid)
         else:
             for model in models:
@@ -280,6 +280,7 @@ class SearchBackend(BaseSearchBackend):
                     DOCUMENT_CT_TERM_PREFIX + '%s.%s' %
                     (model._meta.app_label, model._meta.module_name)
                 )
+    
     @log_query
     def search(self, query, sort_by=None, start_offset=0, end_offset=None,
                fields='', highlight=False, facets=None, date_facets=None,
@@ -380,7 +381,7 @@ class SearchBackend(BaseSearchBackend):
         if not end_offset:
             end_offset = database.get_doccount() - start_offset
         
-        matches = enquire.get_mset(start_offset, end_offset)
+        matches = self._get_mset(database, enquire, start_offset, end_offset)
         
         for match in matches:
             app_label, module_name, pk, model_data = pickle.loads(match.document.get_data())
@@ -452,7 +453,7 @@ class SearchBackend(BaseSearchBackend):
         if not end_offset:
             end_offset = database.get_doccount()
         
-        for match in enquire.get_mset(0, end_offset):
+        for match in self._get_mset(database, enquire, 0, end_offset):
             rset.add_document(match.docid)
         
         query = xapian.Query(xapian.Query.OP_OR,
@@ -481,7 +482,7 @@ class SearchBackend(BaseSearchBackend):
         enquire.set_query(query)
         
         results = []
-        matches = enquire.get_mset(start_offset, end_offset)
+        matches = self._get_mset(database, enquire, start_offset, end_offset)
         
         for match in matches:
             document = match.get_document()
@@ -774,6 +775,25 @@ class SearchBackend(BaseSearchBackend):
 
         return database
 
+    def _get_mset(self, database, enquire, start_offset, end_offset):
+        """
+        A safer version of Xapian.enquire.get_mset
+
+        Simply wraps the Xapian version and catches any `Xapian.DatabaseModifiedError`,
+        attempting a `database.reopen` as needed.
+
+        Required arguments:
+            `database` -- The database to be read
+            `enquire` -- An instance of an Xapian.enquire object
+            `start_offset` -- The start offset to pass to `enquire.get_mset`
+            `end_offset` -- The end offset to pass to `enquire.get_mset`
+        """
+        try:
+            return enquire.get_mset(start_offset, end_offset)
+        except xapian.DatabaseModifiedError:
+            database.reopen()
+            return enquire.get_mset(start_offset, end_offset)
+
     def _value_column(self, field):
         """
         Private method that returns the column value slot in the database
@@ -822,18 +842,6 @@ class SearchQuery(BaseSearchQuery):
         """
         super(SearchQuery, self).__init__(backend=backend)
         self.backend = backend or SearchBackend(site=site)
-    
-    def run(self, spelling_query=None):
-        try:
-            return super(SearchQuery, self).run(spelling_query=spelling_query)
-        except xapian.DatabaseModifiedError:
-            return super(SearchQuery, self).run(spelling_query=spelling_query)
-
-    def run_mlt(self):
-        try:
-            return super(SearchQuery, self).run_mlt()
-        except xapian.DatabaseModifiedError:
-            return super(SearchQuery, self).run_mlt()
     
     def build_query(self):
         if not self.query_filter:
