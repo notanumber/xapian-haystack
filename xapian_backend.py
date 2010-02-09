@@ -527,7 +527,7 @@ class SearchBackend(BaseSearchBackend):
         qp.set_stemmer(xapian.Stem(self.language))
         qp.set_stemming_strategy(xapian.QueryParser.STEM_SOME)
         qp.add_boolean_prefix('django_ct', DOCUMENT_CT_TERM_PREFIX)
-        
+
         for field_dict in self.schema:
             qp.add_prefix(
                 field_dict['field_name'],
@@ -1018,13 +1018,13 @@ class SearchQuery(BaseSearchQuery):
         Returns:
             A xapian.Query
         """
-        sb = SearchBackend()
-        term_list = set()
-        for t in sb._database().allterms():
-            if t.term.startswith(term.rstrip('*')):
-                term_list.add(t.term)
-        
-        return self._filter_in(list(term_list), field, is_not)
+        if is_not:
+            return xapian.Query(
+                xapian.Query.OP_AND_NOT,
+                self._all_query(),
+                self.backend.parse_query('%s:%s' % (field, term)),
+            )
+        return self.backend.parse_query('%s:%s' % (field, term))
     
     def _filter_gt(self, term, field, is_not):
         return self._filter_lte(term, field, is_not=(is_not != True))
