@@ -555,11 +555,11 @@ class SearchBackend(BaseSearchBackend):
         
         for field_name, field_class in fields.items():
             if field_class.document is True:
-                content_field_name = field_name
+                content_field_name = field_class.index_fieldname
             
             if field_class.indexed is True:
                 field_data = {
-                    'field_name': field_name,
+                    'field_name': field_class.index_fieldname,
                     'type': 'text',
                     'multi_valued': 'false',
                     'column': column,
