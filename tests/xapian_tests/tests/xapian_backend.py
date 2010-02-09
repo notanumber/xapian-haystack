@@ -53,6 +53,7 @@ class XapianMockSearchIndex(indexes.SearchIndex):
     flag = indexes.BooleanField(model_attr='flag')
     slug = indexes.CharField(indexed=False, model_attr='slug')
     popularity = indexes.FloatField(model_attr='popularity')
+    month = indexes.CharField(indexed=False)
     
     # Various MultiValueFields
     sites = indexes.MultiValueField()
@@ -81,6 +82,10 @@ class XapianMockSearchIndex(indexes.SearchIndex):
             return ['object two title one', 'object two title two']
         else:
             return ['object three title one', 'object three title two']
+            pub_date = indexes.DateField(model_attr='pub_date')
+
+    def prepare_month(self, obj):
+        return "%02d" % obj.pub_date.month
 
 
 class XapianSearchBackendTestCase(TestCase):
@@ -143,9 +148,9 @@ class XapianSearchBackendTestCase(TestCase):
         
         self.assertEqual(len(self.xapian_search('')), 3)
         self.assertEqual([dict(doc) for doc in self.xapian_search('')], [
-            {'flag': u't', 'name': u'david1', 'tags': u"['a', 'b', 'c']", 'keys': u'[1, 2, 3]', 'text': u'indexed!\n1', 'sites': u"['1', '2', '3']", 'titles': u"['object one title one', 'object one title two']", 'pub_date': u'20090224000000', 'value': u'000000000005', 'id': u'tests.xapianmockmodel.1', 'slug': u'http://example.com/1', 'popularity': '\xca\x84', 'django_id': u'1', 'django_ct': u'tests.xapianmockmodel'},
-            {'flag': u'f', 'name': u'david2', 'tags': u"['ab', 'bc', 'cd']", 'keys': u'[2, 4, 6]', 'text': u'indexed!\n2', 'sites': u"['2', '4', '6']", 'titles': u"['object two title one', 'object two title two']", 'pub_date': u'20090223000000', 'value': u'000000000010', 'id': u'tests.xapianmockmodel.2', 'slug': u'http://example.com/2', 'popularity': '\xb4p', 'django_id': u'2', 'django_ct': u'tests.xapianmockmodel'},
-            {'flag': u't', 'name': u'david3', 'tags': u"['an', 'to', 'or']", 'keys': u'[3, 6, 9]', 'text': u'indexed!\n3', 'sites': u"['3', '6', '9']", 'titles': u"['object three title one', 'object three title two']", 'pub_date': u'20090222000000', 'value': u'000000000015', 'id': u'tests.xapianmockmodel.3', 'slug': u'http://example.com/3', 'popularity': '\xcb\x98', 'django_id': u'3', 'django_ct': u'tests.xapianmockmodel'}
+            {'flag': u't', 'name': u'david1', 'tags': u"['a', 'b', 'c']", 'keys': u'[1, 2, 3]', 'text': u'indexed!\n1', 'sites': u"['1', '2', '3']", 'titles': u"['object one title one', 'object one title two']", 'pub_date': u'20090224000000', 'value': u'000000000005', 'month': u'02', 'id': u'tests.xapianmockmodel.1', 'slug': u'http://example.com/1', 'popularity': '\xca\x84', 'django_id': u'1', 'django_ct': u'tests.xapianmockmodel'},
+            {'flag': u'f', 'name': u'david2', 'tags': u"['ab', 'bc', 'cd']", 'keys': u'[2, 4, 6]', 'text': u'indexed!\n2', 'sites': u"['2', '4', '6']", 'titles': u"['object two title one', 'object two title two']", 'pub_date': u'20090223000000', 'value': u'000000000010', 'month': u'02', 'id': u'tests.xapianmockmodel.2', 'slug': u'http://example.com/2', 'popularity': '\xb4p', 'django_id': u'2', 'django_ct': u'tests.xapianmockmodel'},
+            {'flag': u't', 'name': u'david3', 'tags': u"['an', 'to', 'or']", 'keys': u'[3, 6, 9]', 'text': u'indexed!\n3', 'sites': u"['3', '6', '9']", 'titles': u"['object three title one', 'object three title two']", 'pub_date': u'20090222000000', 'value': u'000000000015', 'month': u'02', 'id': u'tests.xapianmockmodel.3', 'slug': u'http://example.com/3', 'popularity': '\xcb\x98', 'django_id': u'3', 'django_ct': u'tests.xapianmockmodel'}
         ])
     
     def test_duplicate_update(self):
@@ -161,8 +166,8 @@ class XapianSearchBackendTestCase(TestCase):
         self.backend.remove(self.sample_objs[0])
         self.assertEqual(len(self.xapian_search('')), 2)
         self.assertEqual([dict(doc) for doc in self.xapian_search('')], [
-            {'flag': u'f', 'name': u'david2', 'tags': u"['ab', 'bc', 'cd']", 'keys': u'[2, 4, 6]', 'text': u'indexed!\n2', 'sites': u"['2', '4', '6']", 'titles': u"['object two title one', 'object two title two']", 'pub_date': u'20090223000000', 'value': u'000000000010', 'id': u'tests.xapianmockmodel.2', 'slug': u'http://example.com/2', 'popularity': '\xb4p', 'django_id': u'2', 'django_ct': u'tests.xapianmockmodel'},
-            {'flag': u't', 'name': u'david3', 'tags': u"['an', 'to', 'or']", 'keys': u'[3, 6, 9]', 'text': u'indexed!\n3', 'sites': u"['3', '6', '9']", 'titles': u"['object three title one', 'object three title two']", 'pub_date': u'20090222000000', 'value': u'000000000015', 'id': u'tests.xapianmockmodel.3', 'slug': u'http://example.com/3', 'popularity': '\xcb\x98', 'django_id': u'3', 'django_ct': u'tests.xapianmockmodel'}
+            {'flag': u'f', 'name': u'david2', 'tags': u"['ab', 'bc', 'cd']", 'keys': u'[2, 4, 6]', 'text': u'indexed!\n2', 'sites': u"['2', '4', '6']", 'titles': u"['object two title one', 'object two title two']", 'pub_date': u'20090223000000', 'value': u'000000000010', 'month': u'02', 'id': u'tests.xapianmockmodel.2', 'slug': u'http://example.com/2', 'popularity': '\xb4p', 'django_id': u'2', 'django_ct': u'tests.xapianmockmodel'},
+            {'flag': u't', 'name': u'david3', 'tags': u"['an', 'to', 'or']", 'keys': u'[3, 6, 9]', 'text': u'indexed!\n3', 'sites': u"['3', '6', '9']", 'titles': u"['object three title one', 'object three title two']", 'pub_date': u'20090222000000', 'value': u'000000000015', 'month': u'02', 'id': u'tests.xapianmockmodel.3', 'slug': u'http://example.com/3', 'popularity': '\xcb\x98', 'django_id': u'3', 'django_ct': u'tests.xapianmockmodel'}
         ])
     
     def test_clear(self):
@@ -305,6 +310,7 @@ class XapianSearchBackendTestCase(TestCase):
     
     def test_order_by(self):
         self.backend.update(self.index, self.sample_objs)
+        self.assertEqual(len(self.xapian_search('')), 3)
         
         results = self.backend.search(xapian.Query(''), sort_by=['pub_date'])
         self.assertEqual([result.pk for result in results['results']], [3, 2, 1])
@@ -336,6 +342,13 @@ class XapianSearchBackendTestCase(TestCase):
         results = self.backend.search(xapian.Query(''), sort_by=['flag', '-id'])
         self.assertEqual([result.pk for result in results['results']], [2, 3, 1])
     
+    def test_verify_type(self):
+        self.backend.update(self.index, self.sample_objs)
+        self.assertEqual(len(self.xapian_search('')), 3)
+
+        self.assertEqual(self.backend.search(xapian.Query(''))['hits'], 3)
+        self.assertEqual([result.month for result in self.backend.search(xapian.Query(''))['results']], [u'02', u'02', u'02'])
+
     def test__marshal_value(self):
         self.assertEqual(_marshal_value('abc'), u'abc')
         self.assertEqual(_marshal_value(1), '000000000001')
@@ -377,96 +390,96 @@ class XapianSearchBackendTestCase(TestCase):
         self.assertEqual(self.backend.parse_query('popularity:25.5..100.0').get_description(), 'Xapian::Query(VALUE_RANGE 4 \xb2` \xba@)')
 
 
-class LiveXapianMockSearchIndex(indexes.SearchIndex):
-    text = indexes.CharField(document=True, use_template=True)
-    name = indexes.CharField(model_attr='author')
-    pub_date = indexes.DateField(model_attr='pub_date')
-    created = indexes.DateField()
-    title = indexes.CharField()
-
-
-class LiveXapianSearchQueryTestCase(TestCase):
-    """
-    SearchQuery specific tests
-    """
-    fixtures = ['initial_data.json']
-    
-    def setUp(self):
-        super(LiveXapianSearchQueryTestCase, self).setUp()
-        
-        site = SearchSite()
-        backend = SearchBackend(site=site)
-        index = LiveXapianMockSearchIndex(MockModel, backend=backend)
-        site.register(MockModel, LiveXapianMockSearchIndex)
-        backend.update(index, MockModel.objects.all())
-        
-        self.sq = SearchQuery(backend=backend)
-    
-    def test_get_spelling(self):
-        self.sq.add_filter(SQ(content='indxd'))
-        self.assertEqual(self.sq.get_spelling_suggestion(), u'indexed')
-        self.assertEqual(self.sq.get_spelling_suggestion('indxd'), u'indexed')
-    
-    def test_startswith(self):
-        self.sq.add_filter(SQ(name__startswith='da*'))
-        self.assertEqual([result.pk for result in self.sq.get_results()], [1, 2, 3])
-        
-        self.sq = SearchQuery(backend=SearchBackend())
-        self.sq.add_filter(SQ(name__startswith='daniel1'))
-        self.assertEqual([result.pk for result in self.sq.get_results()], [1])
-    
-    def test_build_query_gt(self):
-        self.sq.add_filter(SQ(name__gt='m'))
-        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query((<alldocuments> AND_NOT VALUE_RANGE 3 a m))')
-    
-    def test_build_query_gte(self):
-        self.sq.add_filter(SQ(name__gte='m'))
-        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query(VALUE_RANGE 3 m zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz)')
-    
-    def test_build_query_lt(self):
-        self.sq.add_filter(SQ(name__lt='m'))
-        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query((<alldocuments> AND_NOT VALUE_RANGE 3 m zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz))')
-    
-    def test_build_query_lte(self):
-        self.sq.add_filter(SQ(name__lte='m'))
-        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query(VALUE_RANGE 3 a m)')
-    
-    def test_build_query_multiple_filter_types(self):
-        self.sq.add_filter(SQ(content='why'))
-        self.sq.add_filter(SQ(pub_date__lte=datetime.datetime(2009, 2, 10, 1, 59, 0)))
-        self.sq.add_filter(SQ(name__gt='david'))
-        self.sq.add_filter(SQ(created__lt=datetime.datetime(2009, 2, 12, 12, 13, 0)))
-        self.sq.add_filter(SQ(title__gte='B'))
-        self.sq.add_filter(SQ(id__in=[1, 2, 3]))
-        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query(((Zwhy OR why) AND VALUE_RANGE 2 00010101000000 20090210015900 AND (<alldocuments> AND_NOT VALUE_RANGE 3 a david) AND (<alldocuments> AND_NOT VALUE_RANGE 4 20090212121300 99990101000000) AND VALUE_RANGE 1 b zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz AND (ZXID1 OR XID1 OR ZXID2 OR XID2 OR ZXID3 OR XID3)))')
-    
-    def test_log_query(self):
-        backends.reset_search_queries()
-        self.assertEqual(len(backends.queries), 0)
-        
-        # Stow.
-        old_debug = settings.DEBUG
-        settings.DEBUG = False
-        
-        len(self.sq.get_results())
-        self.assertEqual(len(backends.queries), 0)
-        
-        settings.DEBUG = True
-        # Redefine it to clear out the cached results.
-        self.sq = SearchQuery(backend=SearchBackend())
-        self.sq.add_filter(SQ(name='bar'))
-        len(self.sq.get_results())
-        self.assertEqual(len(backends.queries), 1)
-        self.assertEqual(backends.queries[0]['query_string'].get_description(), u'Xapian::Query((ZXNAMEbar OR XNAMEbar))')
-        
-        # And again, for good measure.
-        self.sq = SearchQuery(backend=SearchBackend())
-        self.sq.add_filter(SQ(name='bar'))
-        self.sq.add_filter(SQ(text='moof'))
-        len(self.sq.get_results())
-        self.assertEqual(len(backends.queries), 2)
-        self.assertEqual(backends.queries[0]['query_string'].get_description(), u'Xapian::Query((ZXNAMEbar OR XNAMEbar))')
-        self.assertEqual(backends.queries[1]['query_string'].get_description(), u'Xapian::Query(((ZXNAMEbar OR XNAMEbar) AND (ZXTEXTmoof OR XTEXTmoof)))')
-        
-        # Restore.
-        settings.DEBUG = old_debug
+# class LiveXapianMockSearchIndex(indexes.SearchIndex):
+#     text = indexes.CharField(document=True, use_template=True)
+#     name = indexes.CharField(model_attr='author')
+#     pub_date = indexes.DateField(model_attr='pub_date')
+#     created = indexes.DateField()
+#     title = indexes.CharField()
+# 
+# 
+# class LiveXapianSearchQueryTestCase(TestCase):
+#     """
+#     SearchQuery specific tests
+#     """
+#     fixtures = ['initial_data.json']
+#     
+#     def setUp(self):
+#         super(LiveXapianSearchQueryTestCase, self).setUp()
+#         
+#         site = SearchSite()
+#         backend = SearchBackend(site=site)
+#         index = LiveXapianMockSearchIndex(MockModel, backend=backend)
+#         site.register(MockModel, LiveXapianMockSearchIndex)
+#         backend.update(index, MockModel.objects.all())
+#         
+#         self.sq = SearchQuery(backend=backend)
+#     
+#     def test_get_spelling(self):
+#         self.sq.add_filter(SQ(content='indxd'))
+#         self.assertEqual(self.sq.get_spelling_suggestion(), u'indexed')
+#         self.assertEqual(self.sq.get_spelling_suggestion('indxd'), u'indexed')
+#     
+#     def test_startswith(self):
+#         self.sq.add_filter(SQ(name__startswith='da*'))
+#         self.assertEqual([result.pk for result in self.sq.get_results()], [1, 2, 3])
+#         
+#         self.sq = SearchQuery(backend=SearchBackend())
+#         self.sq.add_filter(SQ(name__startswith='daniel1'))
+#         self.assertEqual([result.pk for result in self.sq.get_results()], [1])
+#     
+#     def test_build_query_gt(self):
+#         self.sq.add_filter(SQ(name__gt='m'))
+#         self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query((<alldocuments> AND_NOT VALUE_RANGE 3 a m))')
+#     
+#     def test_build_query_gte(self):
+#         self.sq.add_filter(SQ(name__gte='m'))
+#         self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query(VALUE_RANGE 3 m zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz)')
+#     
+#     def test_build_query_lt(self):
+#         self.sq.add_filter(SQ(name__lt='m'))
+#         self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query((<alldocuments> AND_NOT VALUE_RANGE 3 m zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz))')
+#     
+#     def test_build_query_lte(self):
+#         self.sq.add_filter(SQ(name__lte='m'))
+#         self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query(VALUE_RANGE 3 a m)')
+#     
+#     def test_build_query_multiple_filter_types(self):
+#         self.sq.add_filter(SQ(content='why'))
+#         self.sq.add_filter(SQ(pub_date__lte=datetime.datetime(2009, 2, 10, 1, 59, 0)))
+#         self.sq.add_filter(SQ(name__gt='david'))
+#         self.sq.add_filter(SQ(created__lt=datetime.datetime(2009, 2, 12, 12, 13, 0)))
+#         self.sq.add_filter(SQ(title__gte='B'))
+#         self.sq.add_filter(SQ(id__in=[1, 2, 3]))
+#         self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query(((Zwhy OR why) AND VALUE_RANGE 2 00010101000000 20090210015900 AND (<alldocuments> AND_NOT VALUE_RANGE 3 a david) AND (<alldocuments> AND_NOT VALUE_RANGE 4 20090212121300 99990101000000) AND VALUE_RANGE 1 b zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz AND (ZXID1 OR XID1 OR ZXID2 OR XID2 OR ZXID3 OR XID3)))')
+#     
+#     def test_log_query(self):
+#         backends.reset_search_queries()
+#         self.assertEqual(len(backends.queries), 0)
+#         
+#         # Stow.
+#         old_debug = settings.DEBUG
+#         settings.DEBUG = False
+#         
+#         len(self.sq.get_results())
+#         self.assertEqual(len(backends.queries), 0)
+#         
+#         settings.DEBUG = True
+#         # Redefine it to clear out the cached results.
+#         self.sq = SearchQuery(backend=SearchBackend())
+#         self.sq.add_filter(SQ(name='bar'))
+#         len(self.sq.get_results())
+#         self.assertEqual(len(backends.queries), 1)
+#         self.assertEqual(backends.queries[0]['query_string'].get_description(), u'Xapian::Query((ZXNAMEbar OR XNAMEbar))')
+#         
+#         # And again, for good measure.
+#         self.sq = SearchQuery(backend=SearchBackend())
+#         self.sq.add_filter(SQ(name='bar'))
+#         self.sq.add_filter(SQ(text='moof'))
+#         len(self.sq.get_results())
+#         self.assertEqual(len(backends.queries), 2)
+#         self.assertEqual(backends.queries[0]['query_string'].get_description(), u'Xapian::Query((ZXNAMEbar OR XNAMEbar))')
+#         self.assertEqual(backends.queries[1]['query_string'].get_description(), u'Xapian::Query(((ZXNAMEbar OR XNAMEbar) AND (ZXTEXTmoof OR XTEXTmoof)))')
+#         
+#         # Restore.
+#         settings.DEBUG = old_debug
