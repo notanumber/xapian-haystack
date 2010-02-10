@@ -32,6 +32,8 @@ DOCUMENT_ID_TERM_PREFIX = 'Q'
 DOCUMENT_CUSTOM_TERM_PREFIX = 'X'
 DOCUMENT_CT_TERM_PREFIX = DOCUMENT_CUSTOM_TERM_PREFIX + 'CONTENTTYPE'
 
+BACKEND_NAME = 'xapian'
+
 
 class InvalidIndexError(HaystackError):
     """Raised when an index can not be opened."""
