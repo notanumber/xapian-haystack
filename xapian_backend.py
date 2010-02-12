@@ -1099,7 +1099,7 @@ class SearchQuery(BaseSearchQuery):
         else:
             return xapian.Query(
                 xapian.Query.OP_OR,
-                xapian.Query('Z%s' % term),
+                xapian.Query('Z%s' % stem(term)),
                 xapian.Query(term)
             )
     

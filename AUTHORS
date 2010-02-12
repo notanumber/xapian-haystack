@@ -18,3 +18,4 @@ Thanks to:
     * wshallum for a patch that makes date facets compatible with Python 2.4
     * askfor for reporting issues with narrow_queries and float fields.
     * Brandon Konkle for a patch that corrected the behaviour of weights on multiple term boosts.
+    * Adam Endicott for the initial patch that corrected an oversight with stemming not always being done during a search.
