@@ -7,12 +7,14 @@ Minor Code Changes
 ------------------
 * Updated SearchBackend.update to be smarter when indexing multi-value fields and stemming. It will now only stem text fields and will properly index each field of a MultiValueField.
 * MultiValueFields will no longer store data in the value column of the index.
+* Fixed another occurrence of DatabaseModifiedError
+* Faceted fields will now be automatically duplicated internally.  This corresponds to Haystack, SHA c8f8d, http://github.com/toastdriven/django-haystack/commit/c8f8dcc2d79a9dcb67deefdc031629655b874820
+* `__startswith` filter has been improved to work more effeciently.
+* `SearchResults` obey the type of data chosen in their corresponding field in the `SearchIndex` if present.
 
 Known Issues
 ------------
 * `SearchBackend.search` with `highlight=True` converts terms to lowercase in result content.
-* `SearchResults` should obey the type of data chosen in their corresponding field in the `SearchIndex` if present
-* `__startswith` filter is highly inefficient, especially with large data-sets.
 * SearchQuery doesn't handle multiple exclude attributes correctly
 
 * * *

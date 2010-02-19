@@ -20,7 +20,7 @@ from haystack.backends import BaseSearchBackend, BaseSearchQuery, SearchNode, lo
 from haystack.exceptions import HaystackError, MissingDependency
 from haystack.fields import DateField, DateTimeField, IntegerField, FloatField, BooleanField, MultiValueField
 from haystack.models import SearchResult
-from haystack.utils import get_identifier
+from haystack.utils import get_identifier, get_facet_field_name
 
 try:
     import xapian
@@ -274,7 +274,7 @@ class SearchBackend(BaseSearchBackend):
             query = xapian.Query('')
             enquire = xapian.Enquire(database)
             enquire.set_query(query)
-            for match in self._get_mset(database, enquire, 0, database.get_doccount()):
+            for match in self._get_enquire_mset(database, enquire, 0, database.get_doccount()):
                 database.delete_document(match.docid)
         else:
             for model in models:
@@ -383,10 +383,10 @@ class SearchBackend(BaseSearchBackend):
         if not end_offset:
             end_offset = database.get_doccount() - start_offset
         
-        matches = self._get_mset(database, enquire, start_offset, end_offset)
+        matches = self._get_enquire_mset(database, enquire, start_offset, end_offset)
         
         for match in matches:
-            app_label, module_name, pk, model_data = pickle.loads(match.document.get_data())
+            app_label, module_name, pk, model_data = pickle.loads(self._get_document_data(database, match.document))
             if highlight:
                 model_data['highlighted'] = {
                     self.content_field_name: self._do_highlight(
@@ -455,7 +455,7 @@ class SearchBackend(BaseSearchBackend):
         if not end_offset:
             end_offset = database.get_doccount()
         
-        for match in self._get_mset(database, enquire, 0, end_offset):
+        for match in self._get_enquire_mset(database, enquire, 0, end_offset):
             rset.add_document(match.docid)
         
         query = xapian.Query(xapian.Query.OP_OR,
@@ -484,11 +484,10 @@ class SearchBackend(BaseSearchBackend):
         enquire.set_query(query)
         
         results = []
-        matches = self._get_mset(database, enquire, start_offset, end_offset)
+        matches = self._get_enquire_mset(database, enquire, start_offset, end_offset)
         
         for match in matches:
-            document = match.get_document()
-            app_label, module_name, pk, model_data = pickle.loads(document.get_data())
+            app_label, module_name, pk, model_data = pickle.loads(self._get_document_data(database, match.document))
             results.append(
                 SearchResult(app_label, module_name, pk, match.percent, weight=match.weight, **model_data)
             )
@@ -580,6 +579,15 @@ class SearchBackend(BaseSearchBackend):
                 
                 schema_fields.append(field_data)
                 column += 1
+
+                if field_class.faceted is True:
+                    # Duplicate the field.
+                    faceted_field = field_data.copy()
+                    faceted_field['field_name'] = get_facet_field_name(faceted_field['field_name'])
+                    faceted_field['column'] = column
+
+                    schema_fields.append(faceted_field)
+                    column += 1
         
         return (content_field_name, schema_fields)
     
@@ -777,7 +785,7 @@ class SearchBackend(BaseSearchBackend):
 
         return database
 
-    def _get_mset(self, database, enquire, start_offset, end_offset):
+    def _get_enquire_mset(self, database, enquire, start_offset, end_offset):
         """
         A safer version of Xapian.enquire.get_mset
 
@@ -795,6 +803,23 @@ class SearchBackend(BaseSearchBackend):
         except xapian.DatabaseModifiedError:
             database.reopen()
             return enquire.get_mset(start_offset, end_offset)
+
+    def _get_document_data(self, database, document):
+        """
+        A safer version of Xapian.document.get_data
+
+        Simply wraps the Xapian version and catches any `Xapian.DatabaseModifiedError`,
+        attempting a `database.reopen` as needed.
+
+        Required arguments:
+            `database` -- The database to be read
+            `document` -- An instance of an Xapian.document object
+        """
+        try:
+            return document.get_data()
+        except xapian.DatabaseModifiedError:
+            database.reopen()
+            return document.get_data()
 
     def _value_column(self, field):
         """
