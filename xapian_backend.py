@@ -163,7 +163,7 @@ class SearchBackend(BaseSearchBackend):
             `iterable` -- An iterable of model instances to index
         
         For each object in `iterable`, a document is created containing all
-        of the terms extracted from `index.prepare(obj)` with field prefixes, 
+        of the terms extracted from `index.full_prepare(obj)` with field prefixes, 
         and 'as-is' as needed.  Also, if the field type is 'text' it will be 
         stemmed and stored with the 'Z' prefix as well.
         
@@ -204,7 +204,7 @@ class SearchBackend(BaseSearchBackend):
                 term_generator.set_document(document)
                 
                 document_id = DOCUMENT_ID_TERM_PREFIX + get_identifier(obj)
-                data = index.prepare(obj)
+                data = index.full_prepare(obj)
                 
                 for field in self.schema:
                     if field['field_name'] in data.keys():
