@@ -1,4 +1,4 @@
-# Copyright (C) 2009 David Sauve, Trapeze.  All rights reserved.
+# Copyright (C) 2009-2010 David Sauve, Trapeze.  All rights reserved.
 
 import datetime
 import os
@@ -151,3 +151,7 @@ class XapianSearchQueryTestCase(TestCase):
         
         self.sq.add_model(AnotherMockModel)
         self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query(((Zhello OR hello) AND (0 * XCONTENTTYPEcore.anothermockmodel OR 0 * XCONTENTTYPEcore.mockmodel)))')
+
+    def test_build_query_with_punctuation(self):
+        self.sq.add_filter(SQ(content='http://www.example.com'))
+        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query((Zhttp://www.example.com OR http://www.example.com))')

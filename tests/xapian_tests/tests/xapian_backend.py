@@ -1,4 +1,4 @@
-# Copyright (C) 2009 David Sauve, Trapeze.  All rights reserved.
+# Copyright (C) 2009-2010 David Sauve, Trapeze.  All rights reserved.
 # Based on original code by Daniel Lindsley as part of the Haystack test suite.
 
 import cPickle as pickle
@@ -34,6 +34,7 @@ class XapianMockModel(models.Model):
     flag = models.BooleanField(default=True)
     slug = models.SlugField()
     popularity = models.FloatField(default=0.0)
+    url = models.URLField()
     
     def __unicode__(self):
         return self.author
@@ -54,6 +55,7 @@ class XapianMockSearchIndex(indexes.SearchIndex):
     slug = indexes.CharField(indexed=False, model_attr='slug')
     popularity = indexes.FloatField(model_attr='popularity')
     month = indexes.CharField(indexed=False)
+    url = indexes.CharField(model_attr='url')
     
     # Various MultiValueFields
     sites = indexes.MultiValueField()
@@ -106,7 +108,8 @@ class XapianSearchBackendTestCase(TestCase):
             mock.pub_date = datetime.date(2009, 2, 25) - datetime.timedelta(days=i)
             mock.value = i * 5
             mock.flag = bool(i % 2)
-            mock.slug = 'http://example.com/%d' % i
+            mock.slug = 'http://example.com/%d/' % i
+            mock.url = 'http://example.com/%d/' % i
             self.sample_objs.append(mock)
         
         self.sample_objs[0].popularity = 834.0
@@ -148,9 +151,9 @@ class XapianSearchBackendTestCase(TestCase):
         
         self.assertEqual(len(self.xapian_search('')), 3)
         self.assertEqual([dict(doc) for doc in self.xapian_search('')], [
-            {'flag': u't', 'name': u'david1', 'name_exact': u'david1', 'tags': u"['a', 'b', 'c']", 'keys': u'[1, 2, 3]', 'text': u'indexed!\n1', 'sites': u"['1', '2', '3']", 'titles': u"['object one title one', 'object one title two']", 'pub_date': u'20090224000000', 'value': u'000000000005', 'month': u'02', 'id': u'tests.xapianmockmodel.1', 'slug': u'http://example.com/1', 'popularity': '\xca\x84', 'django_id': u'1', 'django_ct': u'tests.xapianmockmodel'},
-            {'flag': u'f', 'name': u'david2', 'name_exact': u'david2', 'tags': u"['ab', 'bc', 'cd']", 'keys': u'[2, 4, 6]', 'text': u'indexed!\n2', 'sites': u"['2', '4', '6']", 'titles': u"['object two title one', 'object two title two']", 'pub_date': u'20090223000000', 'value': u'000000000010', 'month': u'02', 'id': u'tests.xapianmockmodel.2', 'slug': u'http://example.com/2', 'popularity': '\xb4p', 'django_id': u'2', 'django_ct': u'tests.xapianmockmodel'},
-            {'flag': u't', 'name': u'david3', 'name_exact': u'david3', 'tags': u"['an', 'to', 'or']", 'keys': u'[3, 6, 9]', 'text': u'indexed!\n3', 'sites': u"['3', '6', '9']", 'titles': u"['object three title one', 'object three title two']", 'pub_date': u'20090222000000', 'value': u'000000000015', 'month': u'02', 'id': u'tests.xapianmockmodel.3', 'slug': u'http://example.com/3', 'popularity': '\xcb\x98', 'django_id': u'3', 'django_ct': u'tests.xapianmockmodel'}
+            {'flag': u't', 'name': u'david1', 'name_exact': u'david1', 'tags': u"['a', 'b', 'c']", 'keys': u'[1, 2, 3]', 'text': u'indexed!\n1', 'sites': u"['1', '2', '3']", 'titles': u"['object one title one', 'object one title two']", 'pub_date': u'20090224000000', 'value': u'000000000005', 'month': u'02', 'id': u'tests.xapianmockmodel.1', 'slug': u'http://example.com/1/', 'url': u'http://example.com/1/', 'popularity': '\xca\x84', 'django_id': u'1', 'django_ct': u'tests.xapianmockmodel'},
+            {'flag': u'f', 'name': u'david2', 'name_exact': u'david2', 'tags': u"['ab', 'bc', 'cd']", 'keys': u'[2, 4, 6]', 'text': u'indexed!\n2', 'sites': u"['2', '4', '6']", 'titles': u"['object two title one', 'object two title two']", 'pub_date': u'20090223000000', 'value': u'000000000010', 'month': u'02', 'id': u'tests.xapianmockmodel.2', 'slug': u'http://example.com/2/', 'url': u'http://example.com/2/', 'popularity': '\xb4p', 'django_id': u'2', 'django_ct': u'tests.xapianmockmodel'},
+            {'flag': u't', 'name': u'david3', 'name_exact': u'david3', 'tags': u"['an', 'to', 'or']", 'keys': u'[3, 6, 9]', 'text': u'indexed!\n3', 'sites': u"['3', '6', '9']", 'titles': u"['object three title one', 'object three title two']", 'pub_date': u'20090222000000', 'value': u'000000000015', 'month': u'02', 'id': u'tests.xapianmockmodel.3', 'slug': u'http://example.com/3/', 'url': u'http://example.com/3/', 'popularity': '\xcb\x98', 'django_id': u'3', 'django_ct': u'tests.xapianmockmodel'}
         ])
     
     def test_duplicate_update(self):
@@ -166,8 +169,8 @@ class XapianSearchBackendTestCase(TestCase):
         self.backend.remove(self.sample_objs[0])
         self.assertEqual(len(self.xapian_search('')), 2)
         self.assertEqual([dict(doc) for doc in self.xapian_search('')], [
-            {'flag': u'f', 'name': u'david2', 'name_exact': u'david2', 'tags': u"['ab', 'bc', 'cd']", 'keys': u'[2, 4, 6]', 'text': u'indexed!\n2', 'sites': u"['2', '4', '6']", 'titles': u"['object two title one', 'object two title two']", 'pub_date': u'20090223000000', 'value': u'000000000010', 'month': u'02', 'id': u'tests.xapianmockmodel.2', 'slug': u'http://example.com/2', 'popularity': '\xb4p', 'django_id': u'2', 'django_ct': u'tests.xapianmockmodel'},
-            {'flag': u't', 'name': u'david3', 'name_exact': u'david3', 'tags': u"['an', 'to', 'or']", 'keys': u'[3, 6, 9]', 'text': u'indexed!\n3', 'sites': u"['3', '6', '9']", 'titles': u"['object three title one', 'object three title two']", 'pub_date': u'20090222000000', 'value': u'000000000015', 'month': u'02', 'id': u'tests.xapianmockmodel.3', 'slug': u'http://example.com/3', 'popularity': '\xcb\x98', 'django_id': u'3', 'django_ct': u'tests.xapianmockmodel'}
+            {'flag': u'f', 'name': u'david2', 'name_exact': u'david2', 'tags': u"['ab', 'bc', 'cd']", 'keys': u'[2, 4, 6]', 'text': u'indexed!\n2', 'sites': u"['2', '4', '6']", 'titles': u"['object two title one', 'object two title two']", 'pub_date': u'20090223000000', 'value': u'000000000010', 'month': u'02', 'id': u'tests.xapianmockmodel.2', 'slug': u'http://example.com/2/', 'url': u'http://example.com/2/', 'popularity': '\xb4p', 'django_id': u'2', 'django_ct': u'tests.xapianmockmodel'},
+            {'flag': u't', 'name': u'david3', 'name_exact': u'david3', 'tags': u"['an', 'to', 'or']", 'keys': u'[3, 6, 9]', 'text': u'indexed!\n3', 'sites': u"['3', '6', '9']", 'titles': u"['object three title one', 'object three title two']", 'pub_date': u'20090222000000', 'value': u'000000000015', 'month': u'02', 'id': u'tests.xapianmockmodel.3', 'slug': u'http://example.com/3/', 'url': u'http://example.com/3/', 'popularity': '\xcb\x98', 'django_id': u'3', 'django_ct': u'tests.xapianmockmodel'}
         ])
     
     def test_clear(self):
@@ -201,6 +204,13 @@ class XapianSearchBackendTestCase(TestCase):
         self.assertEqual([result.pk for result in self.backend.search(xapian.Query(''))['results']], [1, 2, 3])
         self.assertEqual(self.backend.search(xapian.Query('indexed'))['hits'], 3)
         self.assertEqual([result.pk for result in self.backend.search(xapian.Query(''))['results']], [1, 2, 3])
+
+    def test_search_field_with_punctuation(self):
+        self.backend.update(self.index, self.sample_objs)
+        self.assertEqual(len(self.xapian_search('')), 3)
+
+        # self.assertEqual(self.backend.search(xapian.Query('http://example.com/'))['hits'], 3)
+        self.assertEqual([result.pk for result in self.backend.search(xapian.Query('http://example.com/1/'))['results']], [1])
 
     def test_search_by_mvf(self):
         self.backend.update(self.index, self.sample_objs)
@@ -365,24 +375,25 @@ class XapianSearchBackendTestCase(TestCase):
     def test_build_schema(self):
         (content_field_name, fields) = self.backend.build_schema(self.site.all_searchfields())
         self.assertEqual(content_field_name, 'text')
-        self.assertEqual(len(fields), 11)
+        self.assertEqual(len(fields), 12)
         self.assertEqual(fields, [
             {'column': 0, 'type': 'text', 'field_name': 'name', 'multi_valued': 'false'},
-            {'column': 1, 'type': 'text', 'field_name': 'name_exact', 'multi_valued': 'false'},
+            {'column': 1, 'field_name': 'name_exact', 'type': 'text', 'multi_valued': 'false'},
             {'column': 2, 'type': 'text', 'field_name': 'tags', 'multi_valued': 'true'},
-            {'column': 3, 'type': 'text', 'field_name': 'keys', 'multi_valued': 'true'},
+            {'column': 3, 'type': 'text', 'field_name': 'url', 'multi_valued': 'false'},
             {'column': 4, 'type': 'text', 'field_name': 'text', 'multi_valued': 'false'},
             {'column': 5, 'type': 'float', 'field_name': 'popularity', 'multi_valued': 'false'},
             {'column': 6, 'type': 'text', 'field_name': 'sites', 'multi_valued': 'true'},
             {'column': 7, 'type': 'long', 'field_name': 'value', 'multi_valued': 'false'},
-            {'column': 8, 'type': 'boolean', 'field_name': 'flag', 'multi_valued': 'false'},
-            {'column': 9, 'type': 'text', 'field_name': 'titles', 'multi_valued': 'true'},
-            {'column': 10, 'type': 'date', 'field_name': 'pub_date', 'multi_valued': 'false'}
+            {'column': 8, 'type': 'text', 'field_name': 'keys', 'multi_valued': 'true'},
+            {'column': 9, 'type': 'boolean', 'field_name': 'flag', 'multi_valued': 'false'},
+            {'column': 10, 'type': 'text', 'field_name': 'titles', 'multi_valued': 'true'},
+            {'column': 11, 'type': 'date', 'field_name': 'pub_date', 'multi_valued': 'false'}
         ])
     
     def test_parse_query(self):
         self.backend.update(self.index, self.sample_objs)
-        self.assertEqual(self.backend.parse_query('indexed').get_description(), 'Xapian::Query((indexed:(pos=1) OR Zindex:(pos=1)))')
+        self.assertEqual(self.backend.parse_query('indexed').get_description(), 'Xapian::Query((indexed:(pos=1) OR indexed!\n1:(pos=1) OR indexed!\n2:(pos=1) OR indexed!\n3:(pos=1) OR Zindex:(pos=1)))')
         self.assertEqual(self.backend.parse_query('name:david').get_description(), 'Xapian::Query((XNAMEdavid1:(pos=1) OR XNAMEdavid2:(pos=1) OR XNAMEdavid3:(pos=1) OR ZXNAMEdavid:(pos=1)))')
         self.assertEqual(self.backend.parse_query('name:da*').get_description(), 'Xapian::Query((XNAMEdavid1:(pos=1) OR XNAMEdavid2:(pos=1) OR XNAMEdavid3:(pos=1)))')
         self.assertEqual(self.backend.parse_query('name:david1..david2').get_description(), 'Xapian::Query(VALUE_RANGE 0 david1 david2)')

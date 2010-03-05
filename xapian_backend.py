@@ -1,7 +1,7 @@
-# Copyright (C) 2009 David Sauve, Trapeze
+# Copyright (C) 2009-2010 David Sauve, Trapeze.  All rights reserved.
 
 __author__ = 'David Sauve'
-__version__ = (1, 1, 3, 'beta')
+__version__ = (1, 1, 4, 'alpha')
 
 import time
 import datetime
@@ -9,6 +9,7 @@ import cPickle as pickle
 import os
 import re
 import shutil
+import string
 import sys
 import warnings
 
@@ -212,22 +213,32 @@ class SearchBackend(BaseSearchBackend):
                         value = data[field['field_name']]
                         if field['type'] == 'text':
                             if field['multi_valued'] == 'false':
-                                term_generator.index_text(_marshal_term(value))
-                                term_generator.index_text(_marshal_term(value), 1, prefix)
+                                term = _marshal_term(value)
+                                term_generator.index_text(term)
+                                term_generator.index_text(term, 1, prefix)
+                                if not string.whitespace in term:
+                                    document.add_term(term)
+                                    document.add_term(prefix + term)
                                 document.add_value(field['column'], _marshal_value(value))
                             else:
                                 for term in value:
-                                    term_generator.index_text(_marshal_term(term))
-                                    term_generator.index_text(_marshal_term(term), 1, prefix)
+                                    term = _marshal_term(term)
+                                    term_generator.index_text(term)
+                                    term_generator.index_text(term, 1, prefix)
+                                    if not string.whitespace in term:
+                                        document.add_term(term)
+                                        document.add_term(prefix + term)
                         else:
                             if field['multi_valued'] == 'false':
-                                document.add_term(_marshal_term(value))
-                                document.add_term(prefix + _marshal_term(value))
+                                term = _marshal_term(value)
+                                document.add_term(term)
+                                document.add_term(prefix + term)
                                 document.add_value(field['column'], _marshal_value(value))
                             else:
                                 for term in value:
-                                    document.add_term(_marshal_term(term))
-                                    document.add_term(prefix + _marshal_term(term))
+                                    term = _marshal_term(term)
+                                    document.add_term(term)
+                                    document.add_term(prefix + term)
                 
                 document.set_data(pickle.dumps(
                     (obj._meta.app_label, obj._meta.module_name, obj.pk, data),
