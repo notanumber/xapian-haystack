@@ -214,31 +214,35 @@ class SearchBackend(BaseSearchBackend):
                         if field['type'] == 'text':
                             if field['multi_valued'] == 'false':
                                 term = _marshal_term(value)
-                                term_generator.index_text(term)
-                                term_generator.index_text(term, 1, prefix)
-                                if not string.whitespace in term:
-                                    document.add_term(term)
-                                    document.add_term(prefix + term)
-                                document.add_value(field['column'], _marshal_value(value))
-                            else:
-                                for term in value:
-                                    term = _marshal_term(term)
+                                if term:
                                     term_generator.index_text(term)
                                     term_generator.index_text(term, 1, prefix)
                                     if not string.whitespace in term:
                                         document.add_term(term)
                                         document.add_term(prefix + term)
-                        else:
-                            if field['multi_valued'] == 'false':
-                                term = _marshal_term(value)
-                                document.add_term(term)
-                                document.add_term(prefix + term)
-                                document.add_value(field['column'], _marshal_value(value))
+                                    document.add_value(field['column'], _marshal_value(value))
                             else:
                                 for term in value:
                                     term = _marshal_term(term)
+                                    if term:
+                                        term_generator.index_text(term)
+                                        term_generator.index_text(term, 1, prefix)
+                                        if not string.whitespace in term:
+                                            document.add_term(term)
+                                            document.add_term(prefix + term)
+                        else:
+                            if field['multi_valued'] == 'false':
+                                term = _marshal_term(value)
+                                if term:
                                     document.add_term(term)
                                     document.add_term(prefix + term)
+                                    document.add_value(field['column'], _marshal_value(value))
+                            else:
+                                for term in value:
+                                    term = _marshal_term(term)
+                                    if term:
+                                        document.add_term(term)
+                                        document.add_term(prefix + term)
                 
                 document.set_data(pickle.dumps(
                     (obj._meta.app_label, obj._meta.module_name, obj.pk, data),
