@@ -9,7 +9,6 @@ import cPickle as pickle
 import os
 import re
 import shutil
-import string
 import sys
 import warnings
 
@@ -214,33 +213,31 @@ class SearchBackend(BaseSearchBackend):
                         if field['type'] == 'text':
                             if field['multi_valued'] == 'false':
                                 term = _marshal_term(value)
-                                if term:
-                                    term_generator.index_text(term)
-                                    term_generator.index_text(term, 1, prefix)
-                                    if not string.whitespace in term:
-                                        document.add_term(term)
-                                        document.add_term(prefix + term)
-                                    document.add_value(field['column'], _marshal_value(value))
+                                term_generator.index_text(term)
+                                term_generator.index_text(term, 1, prefix)
+                                if len(term.split()) == 1:
+                                    document.add_term(term)
+                                    document.add_term(prefix + term)
+                                document.add_value(field['column'], _marshal_value(value))
                             else:
                                 for term in value:
                                     term = _marshal_term(term)
-                                    if term:
-                                        term_generator.index_text(term)
-                                        term_generator.index_text(term, 1, prefix)
-                                        if not string.whitespace in term:
-                                            document.add_term(term)
-                                            document.add_term(prefix + term)
+                                    term_generator.index_text(term)
+                                    term_generator.index_text(term, 1, prefix)
+                                    if len(term.split()) == 1:
+                                        document.add_term(term)
+                                        document.add_term(prefix + term)
                         else:
                             if field['multi_valued'] == 'false':
                                 term = _marshal_term(value)
-                                if term:
+                                if len(term.split()) == 1:
                                     document.add_term(term)
                                     document.add_term(prefix + term)
                                     document.add_value(field['column'], _marshal_value(value))
                             else:
                                 for term in value:
                                     term = _marshal_term(term)
-                                    if term:
+                                    if len(term.split()) == 1:
                                         document.add_term(term)
                                         document.add_term(prefix + term)
                 
