@@ -47,6 +47,7 @@ Testing
 The easiest way to test xapian-haystack is to symlink or copy the ``xapian_haystack/tests`` folder into the haystack/tests folder so that your source tree resembles this layout::
 
     django-haystack
+        |
         +---haystack
         |       |
         |       +---backends
@@ -57,9 +58,16 @@ The easiest way to test xapian-haystack is to symlink or copy the ``xapian_hayst
         +---tests
                 |
                 +---core
-                +---solr_tests
-                +---whoosh_tests
+                |    |
+                |    +---[...]
+                |
+                +---[...]
+                |
                 +---xapian_tests
+                |       |
+                |       +---[...]
+                |
+                +---xapian_settings.py
 
 Once this is done, the tests can be executed in a similar fashion as the rest of the Haystack test-suite::
 
