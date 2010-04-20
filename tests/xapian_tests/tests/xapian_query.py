@@ -128,6 +128,10 @@ class XapianSearchQueryTestCase(TestCase):
         self.sq.add_filter(SQ(title__in=["A Famous Paper", "An Infamous Article"]))
         self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query(((Zwhi OR why) AND ((XTITLEa PHRASE 3 XTITLEfamous PHRASE 3 XTITLEpaper) OR (XTITLEan PHRASE 3 XTITLEinfamous PHRASE 3 XTITLEarticle))))')
     
+    def test_build_query_in_filter_multiple_words_with_punctuation(self):
+        self.sq.add_filter(SQ(title__in=["A Famous Paper", "An Infamous Article", "My Store Inc."]))
+        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query(((XTITLEa PHRASE 3 XTITLEfamous PHRASE 3 XTITLEpaper) OR (XTITLEan PHRASE 3 XTITLEinfamous PHRASE 3 XTITLEarticle) OR (XTITLEmy PHRASE 3 XTITLEstore PHRASE 3 XTITLEinc.)))')
+
     def test_build_query_not_in_filter_multiple_words(self):
         self.sq.add_filter(SQ(content='why'))
         self.sq.add_filter(~SQ(title__in=["A Famous Paper", "An Infamous Article"]))
