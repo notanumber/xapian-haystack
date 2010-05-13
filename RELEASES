@@ -3,18 +3,16 @@ xapian-haystack-UNRELEASED
 
 Tagged on ??, 2010 by David Sauve <dsauve@trapeze.com>
 
-Major Code Changes
-------------------
+Code Changes
+------------
 * Updated SearchBackend.update to be smarter when indexing multi-value fields and stemming. It will now only stem text fields and will properly index each field of a MultiValueField.
 * MultiValueFields will no longer store data in the value column of the index.
 * Faceted fields will now be automatically duplicated internally.  This corresponds to Haystack, SHA c8f8d, http://github.com/toastdriven/django-haystack/commit/c8f8dcc2d79a9dcb67deefdc031629655b874820
 * `__startswith` filter has been improved to work more effeciently.
 * `SearchResults` obey the type of data chosen in their corresponding field in the `SearchIndex` if present.
 * Changed `SearchBackend.update` method to index terms with punctuation as well as using the Xapian.TermGenerator.
-
-Minor Code Changes
-------------------
 * Fixed another occurrence of DatabaseModifiedError
+* Updated for compatibility with Xapian 1.2 by removing deprecated method calls and slightly refactoring the way queries are constructed.
 
 Known Issues
 ------------
