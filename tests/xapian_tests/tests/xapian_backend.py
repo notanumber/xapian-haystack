@@ -141,8 +141,7 @@ class XapianSearchBackendTestCase(TestCase):
         document_list = []
         
         for match in matches:
-            document = match.get_document()
-            app_label, module_name, pk, model_data = pickle.loads(document.get_data())
+            app_label, module_name, pk, model_data = pickle.loads(match.document.get_data())
             for key, value in model_data.iteritems():
                 model_data[key] = _marshal_value(value)
             model_data['id'] = u'%s.%s.%d' % (app_label, module_name, pk)
@@ -398,14 +397,20 @@ class XapianSearchBackendTestCase(TestCase):
     
     def test_parse_query(self):
         self.backend.update(self.index, self.sample_objs)
-        self.assertEqual(self.backend.parse_query('indexed').get_description(), 'Xapian::Query((indexed:(pos=1) OR Zindex:(pos=1)))')
-        self.assertEqual(self.backend.parse_query('name:david').get_description(), 'Xapian::Query((XNAMEdavid1:(pos=1) OR XNAMEdavid2:(pos=1) OR XNAMEdavid3:(pos=1) OR ZXNAMEdavid:(pos=1)))')
-        self.assertEqual(self.backend.parse_query('name:da*').get_description(), 'Xapian::Query((XNAMEdavid1:(pos=1) OR XNAMEdavid2:(pos=1) OR XNAMEdavid3:(pos=1)))')
-        self.assertEqual(self.backend.parse_query('name:david1..david2').get_description(), 'Xapian::Query(VALUE_RANGE 0 david1 david2)')
-        self.assertEqual(self.backend.parse_query('value:0..10').get_description(), 'Xapian::Query(VALUE_RANGE 7 000000000000 000000000010)')
-        self.assertEqual(self.backend.parse_query('value:..10').get_description(), 'Xapian::Query(VALUE_RANGE 7 -02147483648 000000000010)')
-        self.assertEqual(self.backend.parse_query('value:10..*').get_description(), 'Xapian::Query(VALUE_RANGE 7 000000000010 002147483647)')
-        self.assertEqual(self.backend.parse_query('popularity:25.5..100.0').get_description(), 'Xapian::Query(VALUE_RANGE 5 \xb2` \xba@)')
+        self.assertEqual(str(self.backend.parse_query('indexed')), 'Xapian::Query((indexed:(pos=1) OR Zindex:(pos=1)))')
+
+        if xapian.minor_version() >= 2:
+            self.assertEqual(str(self.backend.parse_query('name:david')), 'Xapian::Query(((XNAMEdavid1:(pos=1) SYNONYM XNAMEdavid2:(pos=1) SYNONYM XNAMEdavid3:(pos=1)) OR ZXNAMEdavid:(pos=1)))')
+            self.assertEqual(str(self.backend.parse_query('name:da*')), 'Xapian::Query((XNAMEdavid1:(pos=1) SYNONYM XNAMEdavid2:(pos=1) SYNONYM XNAMEdavid3:(pos=1)))')
+        else:
+            self.assertEqual(str(self.backend.parse_query('name:david')), 'Xapian::Query((XNAMEdavid1:(pos=1) OR XNAMEdavid2:(pos=1) OR XNAMEdavid3:(pos=1) OR ZXNAMEdavid:(pos=1)))')
+            self.assertEqual(str(self.backend.parse_query('name:da*')), 'Xapian::Query((XNAMEdavid1:(pos=1) OR XNAMEdavid2:(pos=1) OR XNAMEdavid3:(pos=1)))')
+
+        self.assertEqual(str(self.backend.parse_query('name:david1..david2')), 'Xapian::Query(VALUE_RANGE 0 david1 david2)')
+        self.assertEqual(str(self.backend.parse_query('value:0..10')), 'Xapian::Query(VALUE_RANGE 7 000000000000 000000000010)')
+        self.assertEqual(str(self.backend.parse_query('value:..10')), 'Xapian::Query(VALUE_RANGE 7 -02147483648 000000000010)')
+        self.assertEqual(str(self.backend.parse_query('value:10..*')), 'Xapian::Query(VALUE_RANGE 7 000000000010 002147483647)')
+        self.assertEqual(str(self.backend.parse_query('popularity:25.5..100.0')), 'Xapian::Query(VALUE_RANGE 5 \xb2` \xba@)')
 
 
 class LiveXapianMockSearchIndex(indexes.SearchIndex):
@@ -448,19 +453,19 @@ class LiveXapianSearchQueryTestCase(TestCase):
     
     def test_build_query_gt(self):
         self.sq.add_filter(SQ(name__gt='m'))
-        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query((<alldocuments> AND_NOT VALUE_RANGE 3 a m))')
+        self.assertEqual(str(self.sq.build_query()), u'Xapian::Query((<alldocuments> AND_NOT VALUE_RANGE 3 a m))')
     
     def test_build_query_gte(self):
         self.sq.add_filter(SQ(name__gte='m'))
-        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query(VALUE_RANGE 3 m zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz)')
+        self.assertEqual(str(self.sq.build_query()), u'Xapian::Query(VALUE_RANGE 3 m zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz)')
     
     def test_build_query_lt(self):
         self.sq.add_filter(SQ(name__lt='m'))
-        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query((<alldocuments> AND_NOT VALUE_RANGE 3 m zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz))')
+        self.assertEqual(str(self.sq.build_query()), u'Xapian::Query((<alldocuments> AND_NOT VALUE_RANGE 3 m zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz))')
     
     def test_build_query_lte(self):
         self.sq.add_filter(SQ(name__lte='m'))
-        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query(VALUE_RANGE 3 a m)')
+        self.assertEqual(str(self.sq.build_query()), u'Xapian::Query(VALUE_RANGE 3 a m)')
     
     def test_build_query_multiple_filter_types(self):
         self.sq.add_filter(SQ(content='why'))
@@ -469,7 +474,7 @@ class LiveXapianSearchQueryTestCase(TestCase):
         self.sq.add_filter(SQ(created__lt=datetime.datetime(2009, 2, 12, 12, 13, 0)))
         self.sq.add_filter(SQ(title__gte='B'))
         self.sq.add_filter(SQ(id__in=[1, 2, 3]))
-        self.assertEqual(self.sq.build_query().get_description(), u'Xapian::Query(((Zwhi OR why) AND VALUE_RANGE 2 00010101000000 20090210015900 AND (<alldocuments> AND_NOT VALUE_RANGE 3 a david) AND (<alldocuments> AND_NOT VALUE_RANGE 4 20090212121300 99990101000000) AND VALUE_RANGE 1 b zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz AND (ZXID1 OR XID1 OR ZXID2 OR XID2 OR ZXID3 OR XID3)))')
+        self.assertEqual(str(self.sq.build_query()), u'Xapian::Query(((Zwhi OR why) AND VALUE_RANGE 2 00010101000000 20090210015900 AND (<alldocuments> AND_NOT VALUE_RANGE 3 a david) AND (<alldocuments> AND_NOT VALUE_RANGE 4 20090212121300 99990101000000) AND VALUE_RANGE 1 b zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz AND (ZXID1 OR XID1 OR ZXID2 OR XID2 OR ZXID3 OR XID3)))')
     
     def test_log_query(self):
         backends.reset_search_queries()
@@ -488,7 +493,7 @@ class LiveXapianSearchQueryTestCase(TestCase):
         self.sq.add_filter(SQ(name='bar'))
         len(self.sq.get_results())
         self.assertEqual(len(backends.queries), 1)
-        self.assertEqual(backends.queries[0]['query_string'].get_description(), u'Xapian::Query((ZXNAMEbar OR XNAMEbar))')
+        self.assertEqual(str(backends.queries[0]['query_string']), u'Xapian::Query((ZXNAMEbar OR XNAMEbar))')
         
         # And again, for good measure.
         self.sq = SearchQuery(backend=SearchBackend())
@@ -496,8 +501,8 @@ class LiveXapianSearchQueryTestCase(TestCase):
         self.sq.add_filter(SQ(text='moof'))
         len(self.sq.get_results())
         self.assertEqual(len(backends.queries), 2)
-        self.assertEqual(backends.queries[0]['query_string'].get_description(), u'Xapian::Query((ZXNAMEbar OR XNAMEbar))')
-        self.assertEqual(backends.queries[1]['query_string'].get_description(), u'Xapian::Query(((ZXNAMEbar OR XNAMEbar) AND (ZXTEXTmoof OR XTEXTmoof)))')
+        self.assertEqual(str(backends.queries[0]['query_string']), u'Xapian::Query((ZXNAMEbar OR XNAMEbar))')
+        self.assertEqual(str(backends.queries[1]['query_string']), u'Xapian::Query(((ZXNAMEbar OR XNAMEbar) AND (ZXTEXTmoof OR XTEXTmoof)))')
         
         # Restore.
         settings.DEBUG = old_debug

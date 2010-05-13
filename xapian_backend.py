@@ -922,12 +922,7 @@ class SearchQuery(BaseSearchQuery):
         for child in search_node.children:
             if isinstance(child, SearchNode):
                 query_list.append(
-                    xapian.Query(
-                        xapian.Query.OP_AND,
-                        self._query_from_search_node(
-                            child, child.negated
-                        )
-                    )
+                    self._query_from_search_node(child, child.negated)
                 )
             else:
                 expression, term = child
@@ -1029,15 +1024,11 @@ class SearchQuery(BaseSearchQuery):
         for term in term_list:
             if ' ' in term:
                 query_list.append(
-                    xapian.Query(
-                        xapian.Query.OP_OR, self._phrase_query(term.split(), field)
-                    )
+                    self._phrase_query(term.split(), field)
                 )
             else:
                 query_list.append(
-                    xapian.Query(
-                        xapian.Query.OP_OR, self._term_query(term, field)
-                    )
+                    self._term_query(term, field)
                 )
         if is_not:
             return xapian.Query(xapian.Query.OP_AND_NOT, self._all_query(), xapian.Query(xapian.Query.OP_OR, query_list))
