@@ -470,7 +470,7 @@ class SearchBackend(BaseSearchBackend):
         for match in self._get_enquire_mset(database, enquire, 0, end_offset):
             rset.add_document(match.docid)
         
-        query = xapian.Query(xapian.Query.OP_OR,
+        query = xapian.Query(xapian.Query.OP_ELITE_SET,
             [expand.term for expand in enquire.get_eset(match.document.termlist_count(), rset, XHExpandDecider())]
         )
         query = xapian.Query(
