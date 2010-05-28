@@ -469,9 +469,11 @@ class SearchBackend(BaseSearchBackend):
         
         for match in self._get_enquire_mset(database, enquire, 0, end_offset):
             rset.add_document(match.docid)
-        
-        query = xapian.Query(xapian.Query.OP_ELITE_SET,
-            [expand.term for expand in enquire.get_eset(match.document.termlist_count(), rset, XHExpandDecider())]
+                
+        query = xapian.Query(
+            xapian.Query.OP_ELITE_SET,
+            [expand.term for expand in enquire.get_eset(match.document.termlist_count(), rset, XHExpandDecider())],
+            match.document.termlist_count()
         )
         query = xapian.Query(
             xapian.Query.OP_AND_NOT, [query, DOCUMENT_ID_TERM_PREFIX + get_identifier(model_instance)]
@@ -503,7 +505,7 @@ class SearchBackend(BaseSearchBackend):
             results.append(
                 SearchResult(app_label, module_name, pk, match.percent, weight=match.weight, **model_data)
             )
-        
+
         return {
             'results': results,
             'hits': matches.get_matches_estimated(),
