@@ -205,41 +205,45 @@ class SearchBackend(BaseSearchBackend):
                 
                 document_id = DOCUMENT_ID_TERM_PREFIX + get_identifier(obj)
                 data = index.full_prepare(obj)
-                
+                weights = index.get_field_weights()
                 for field in self.schema:
                     if field['field_name'] in data.keys():
                         prefix = DOCUMENT_CUSTOM_TERM_PREFIX + field['field_name'].upper()
                         value = data[field['field_name']]
+                        try:
+                            weight = int(weights[field['field_name']])
+                        except KeyError:
+                            weight = 1
                         if field['type'] == 'text':
                             if field['multi_valued'] == 'false':
                                 term = _marshal_term(value)
-                                term_generator.index_text(term)
-                                term_generator.index_text(term, 1, prefix)
+                                term_generator.index_text(term, weight)
+                                term_generator.index_text(term, weight, prefix)
                                 if len(term.split()) == 1:
-                                    document.add_term(term)
-                                    document.add_term(prefix + term)
+                                    document.add_term(term, weight)
+                                    document.add_term(prefix + term, weight)
                                 document.add_value(field['column'], _marshal_value(value))
                             else:
                                 for term in value:
                                     term = _marshal_term(term)
-                                    term_generator.index_text(term)
-                                    term_generator.index_text(term, 1, prefix)
+                                    term_generator.index_text(term, weight)
+                                    term_generator.index_text(term, weight, prefix)
                                     if len(term.split()) == 1:
-                                        document.add_term(term)
-                                        document.add_term(prefix + term)
+                                        document.add_term(term, weight)
+                                        document.add_term(prefix + term, weight)
                         else:
                             if field['multi_valued'] == 'false':
                                 term = _marshal_term(value)
                                 if len(term.split()) == 1:
-                                    document.add_term(term)
-                                    document.add_term(prefix + term)
+                                    document.add_term(term, weight)
+                                    document.add_term(prefix + term, weight)
                                     document.add_value(field['column'], _marshal_value(value))
                             else:
                                 for term in value:
                                     term = _marshal_term(term)
                                     if len(term.split()) == 1:
-                                        document.add_term(term)
-                                        document.add_term(prefix + term)
+                                        document.add_term(term, weight)
+                                        document.add_term(prefix + term, weight)
                 
                 document.set_data(pickle.dumps(
                     (obj._meta.app_label, obj._meta.module_name, obj.pk, data),
