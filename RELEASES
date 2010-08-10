@@ -13,6 +13,7 @@ Code Changes
 * Changed `SearchBackend.update` method to index terms with punctuation as well as using the Xapian.TermGenerator.
 * Fixed another occurrence of DatabaseModifiedError
 * Updated for compatibility with Xapian 1.2 by removing deprecated method calls and slightly refactoring the way queries are constructed.
+* SearchQuery._term_query will now properly build a query for field `id` and `django_ct` fields.
 
 Known Issues
 ------------

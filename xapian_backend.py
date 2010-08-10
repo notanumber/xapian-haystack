@@ -1114,24 +1114,27 @@ class SearchQuery(BaseSearchQuery):
             A xapian.Query
         """
         stem = xapian.Stem(self.backend.language)
-        if field:
-            return xapian.Query(
-                xapian.Query.OP_OR, 
-                xapian.Query('Z%s%s%s' % (
-                        DOCUMENT_CUSTOM_TERM_PREFIX, field.upper(), stem(term)
-                    )
-                ),
-                xapian.Query('%s%s%s' % (
-                        DOCUMENT_CUSTOM_TERM_PREFIX, field.upper(), term
-                    )
-                )
+        
+        if field == 'id':
+            return xapian.Query('%s%s' % (DOCUMENT_ID_TERM_PREFIX, term))
+        elif field == 'django_ct':
+            return xapian.Query('%s%s' % (DOCUMENT_CT_TERM_PREFIX, term))
+        elif field:
+            stemmed = 'Z%s%s%s' % (
+                DOCUMENT_CUSTOM_TERM_PREFIX, field.upper(), stem(term)
+            )
+            unstemmed = '%s%s%s' % (
+                DOCUMENT_CUSTOM_TERM_PREFIX, field.upper(), term
             )
         else:
-            return xapian.Query(
-                xapian.Query.OP_OR,
-                xapian.Query('Z%s' % stem(term)),
-                xapian.Query(term)
-            )
+            stemmed = 'Z%s' % stem(term)
+            unstemmed = term
+            
+        return xapian.Query(
+            xapian.Query.OP_OR,
+            xapian.Query(stemmed),
+            xapian.Query(unstemmed)
+        )
     
     def _phrase_query(self, term_list, field=None):
         """
