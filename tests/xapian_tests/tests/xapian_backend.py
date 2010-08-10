@@ -408,8 +408,8 @@ class XapianSearchBackendTestCase(TestCase):
 
         self.assertEqual(str(self.backend.parse_query('name:david1..david2')), 'Xapian::Query(VALUE_RANGE 0 david1 david2)')
         self.assertEqual(str(self.backend.parse_query('value:0..10')), 'Xapian::Query(VALUE_RANGE 7 000000000000 000000000010)')
-        self.assertEqual(str(self.backend.parse_query('value:..10')), 'Xapian::Query(VALUE_RANGE 7 -02147483648 000000000010)')
-        self.assertEqual(str(self.backend.parse_query('value:10..*')), 'Xapian::Query(VALUE_RANGE 7 000000000010 002147483647)')
+        self.assertEqual(str(self.backend.parse_query('value:..10')), 'Xapian::Query(VALUE_RANGE 7 -9223372036854775808 000000000010)')
+        self.assertEqual(str(self.backend.parse_query('value:10..*')), 'Xapian::Query(VALUE_RANGE 7 000000000010 9223372036854775807)')
         self.assertEqual(str(self.backend.parse_query('popularity:25.5..100.0')), 'Xapian::Query(VALUE_RANGE 5 \xb2` \xba@)')
 
 
@@ -474,7 +474,7 @@ class LiveXapianSearchQueryTestCase(TestCase):
         self.sq.add_filter(SQ(created__lt=datetime.datetime(2009, 2, 12, 12, 13, 0)))
         self.sq.add_filter(SQ(title__gte='B'))
         self.sq.add_filter(SQ(id__in=[1, 2, 3]))
-        self.assertEqual(str(self.sq.build_query()), u'Xapian::Query(((Zwhi OR why) AND VALUE_RANGE 2 00010101000000 20090210015900 AND (<alldocuments> AND_NOT VALUE_RANGE 3 a david) AND (<alldocuments> AND_NOT VALUE_RANGE 4 20090212121300 99990101000000) AND VALUE_RANGE 1 b zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz AND (ZXID1 OR XID1 OR ZXID2 OR XID2 OR ZXID3 OR XID3)))')
+        self.assertEqual(str(self.sq.build_query()), u'Xapian::Query(((Zwhi OR why) AND VALUE_RANGE 2 00010101000000 20090210015900 AND (<alldocuments> AND_NOT VALUE_RANGE 3 a david) AND (<alldocuments> AND_NOT VALUE_RANGE 4 20090212121300 99990101000000) AND VALUE_RANGE 1 b zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz AND (Q1 OR Q2 OR Q3)))')
     
     def test_log_query(self):
         backends.reset_search_queries()
