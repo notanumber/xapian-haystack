@@ -5,7 +5,7 @@ Overview
 --------
 xapian-haystack is a backend for use with the Django Haystack search API and the Xapian search engine.
 
-* More information on Haystack can be found here: `haystackserach.org <http://haystacksearch.org/>`_.
+* More information on Haystack can be found here: `haystacksearch.org <http://haystacksearch.org/>`_.
 * More information on Xapian can be found here: `xapian.org <http://xapian.org>`_.
 
 Requirements
