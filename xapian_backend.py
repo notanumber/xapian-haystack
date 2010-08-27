@@ -1,7 +1,7 @@
 # Copyright (C) 2009-2010 David Sauve, Trapeze.  All rights reserved.
 
 __author__ = 'David Sauve'
-__version__ = (1, 1, 4, 'alpha')
+__version__ = (1, 0, 2, 'beta')
 
 import time
 import datetime
@@ -204,7 +204,7 @@ class SearchBackend(BaseSearchBackend):
                 term_generator.set_document(document)
                 
                 document_id = DOCUMENT_ID_TERM_PREFIX + get_identifier(obj)
-                data = index.full_prepare(obj)
+                data = index.prepare(obj)
                 
                 for field in self.schema:
                     if field['field_name'] in data.keys():
@@ -570,11 +570,11 @@ class SearchBackend(BaseSearchBackend):
         
         for field_name, field_class in fields.items():
             if field_class.document is True:
-                content_field_name = field_class.index_fieldname
+                content_field_name = field_name
             
             if field_class.indexed is True:
                 field_data = {
-                    'field_name': field_class.index_fieldname,
+                    'field_name': field_name,
                     'type': 'text',
                     'multi_valued': 'false',
                     'column': column,
@@ -593,15 +593,6 @@ class SearchBackend(BaseSearchBackend):
                 
                 schema_fields.append(field_data)
                 column += 1
-
-                if field_class.faceted is True:
-                    # Duplicate the field.
-                    faceted_field = field_data.copy()
-                    faceted_field['field_name'] = get_facet_field_name(faceted_field['field_name'])
-                    faceted_field['column'] = column
-
-                    schema_fields.append(faceted_field)
-                    column += 1
         
         return (content_field_name, schema_fields)
     

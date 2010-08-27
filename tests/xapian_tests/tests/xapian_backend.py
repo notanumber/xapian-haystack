@@ -48,7 +48,7 @@ class XapianMockSearchIndex(indexes.SearchIndex):
         document=True, use_template=True,
         template_name='search/indexes/core/mockmodel_text.txt'
     )
-    name = indexes.CharField(model_attr='author', faceted=True)
+    name = indexes.CharField(model_attr='author')
     pub_date = indexes.DateField(model_attr='pub_date')
     value = indexes.IntegerField(model_attr='value')
     flag = indexes.BooleanField(model_attr='flag')
@@ -154,9 +154,9 @@ class XapianSearchBackendTestCase(TestCase):
         
         self.assertEqual(len(self.xapian_search('')), 3)
         self.assertEqual([dict(doc) for doc in self.xapian_search('')], [
-            {'flag': u't', 'name': u'david1', 'name_exact': u'david1', 'tags': u"['a', 'b', 'c']", 'keys': u'[1, 2, 3]', 'text': u'indexed!\n1', 'sites': u"['1', '2', '3']", 'titles': u"['object one title one', 'object one title two']", 'pub_date': u'20090224000000', 'value': u'000000000005', 'month': u'02', 'id': u'tests.xapianmockmodel.1', 'slug': u'http://example.com/1/', 'url': u'http://example.com/1/', 'popularity': '\xca\x84', 'django_id': u'1', 'django_ct': u'tests.xapianmockmodel', 'empty': u''},
-            {'flag': u'f', 'name': u'david2', 'name_exact': u'david2', 'tags': u"['ab', 'bc', 'cd']", 'keys': u'[2, 4, 6]', 'text': u'indexed!\n2', 'sites': u"['2', '4', '6']", 'titles': u"['object two title one', 'object two title two']", 'pub_date': u'20090223000000', 'value': u'000000000010', 'month': u'02', 'id': u'tests.xapianmockmodel.2', 'slug': u'http://example.com/2/', 'url': u'http://example.com/2/', 'popularity': '\xb4p', 'django_id': u'2', 'django_ct': u'tests.xapianmockmodel', 'empty': u''},
-            {'flag': u't', 'name': u'david3', 'name_exact': u'david3', 'tags': u"['an', 'to', 'or']", 'keys': u'[3, 6, 9]', 'text': u'indexed!\n3', 'sites': u"['3', '6', '9']", 'titles': u"['object three title one', 'object three title two']", 'pub_date': u'20090222000000', 'value': u'000000000015', 'month': u'02', 'id': u'tests.xapianmockmodel.3', 'slug': u'http://example.com/3/', 'url': u'http://example.com/3/', 'popularity': '\xcb\x98', 'django_id': u'3', 'django_ct': u'tests.xapianmockmodel', 'empty': u''}
+            {'flag': u't', 'name': u'david1', 'tags': u"['a', 'b', 'c']", 'keys': u'[1, 2, 3]', 'text': u'indexed!\n1', 'sites': u"['1', '2', '3']", 'titles': u"['object one title one', 'object one title two']", 'pub_date': u'20090224000000', 'value': u'000000000005', 'month': u'02', 'id': u'tests.xapianmockmodel.1', 'slug': u'http://example.com/1/', 'url': u'http://example.com/1/', 'popularity': '\xca\x84', 'django_id': u'1', 'django_ct': u'tests.xapianmockmodel', 'empty': u''},
+            {'flag': u'f', 'name': u'david2', 'tags': u"['ab', 'bc', 'cd']", 'keys': u'[2, 4, 6]', 'text': u'indexed!\n2', 'sites': u"['2', '4', '6']", 'titles': u"['object two title one', 'object two title two']", 'pub_date': u'20090223000000', 'value': u'000000000010', 'month': u'02', 'id': u'tests.xapianmockmodel.2', 'slug': u'http://example.com/2/', 'url': u'http://example.com/2/', 'popularity': '\xb4p', 'django_id': u'2', 'django_ct': u'tests.xapianmockmodel', 'empty': u''},
+            {'flag': u't', 'name': u'david3', 'tags': u"['an', 'to', 'or']", 'keys': u'[3, 6, 9]', 'text': u'indexed!\n3', 'sites': u"['3', '6', '9']", 'titles': u"['object three title one', 'object three title two']", 'pub_date': u'20090222000000', 'value': u'000000000015', 'month': u'02', 'id': u'tests.xapianmockmodel.3', 'slug': u'http://example.com/3/', 'url': u'http://example.com/3/', 'popularity': '\xcb\x98', 'django_id': u'3', 'django_ct': u'tests.xapianmockmodel', 'empty': u''}
         ])
     
     def test_duplicate_update(self):
@@ -172,8 +172,8 @@ class XapianSearchBackendTestCase(TestCase):
         self.backend.remove(self.sample_objs[0])
         self.assertEqual(len(self.xapian_search('')), 2)
         self.assertEqual([dict(doc) for doc in self.xapian_search('')], [
-            {'flag': u'f', 'name': u'david2', 'name_exact': u'david2', 'tags': u"['ab', 'bc', 'cd']", 'keys': u'[2, 4, 6]', 'text': u'indexed!\n2', 'sites': u"['2', '4', '6']", 'titles': u"['object two title one', 'object two title two']", 'pub_date': u'20090223000000', 'value': u'000000000010', 'month': u'02', 'id': u'tests.xapianmockmodel.2', 'slug': u'http://example.com/2/', 'url': u'http://example.com/2/', 'popularity': '\xb4p', 'django_id': u'2', 'django_ct': u'tests.xapianmockmodel', 'empty': u''},
-            {'flag': u't', 'name': u'david3', 'name_exact': u'david3', 'tags': u"['an', 'to', 'or']", 'keys': u'[3, 6, 9]', 'text': u'indexed!\n3', 'sites': u"['3', '6', '9']", 'titles': u"['object three title one', 'object three title two']", 'pub_date': u'20090222000000', 'value': u'000000000015', 'month': u'02', 'id': u'tests.xapianmockmodel.3', 'slug': u'http://example.com/3/', 'url': u'http://example.com/3/', 'popularity': '\xcb\x98', 'django_id': u'3', 'django_ct': u'tests.xapianmockmodel', 'empty': u''}
+            {'flag': u'f', 'name': u'david2', 'tags': u"['ab', 'bc', 'cd']", 'keys': u'[2, 4, 6]', 'text': u'indexed!\n2', 'sites': u"['2', '4', '6']", 'titles': u"['object two title one', 'object two title two']", 'pub_date': u'20090223000000', 'value': u'000000000010', 'month': u'02', 'id': u'tests.xapianmockmodel.2', 'slug': u'http://example.com/2/', 'url': u'http://example.com/2/', 'popularity': '\xb4p', 'django_id': u'2', 'django_ct': u'tests.xapianmockmodel', 'empty': u''},
+            {'flag': u't', 'name': u'david3', 'tags': u"['an', 'to', 'or']", 'keys': u'[3, 6, 9]', 'text': u'indexed!\n3', 'sites': u"['3', '6', '9']", 'titles': u"['object three title one', 'object three title two']", 'pub_date': u'20090222000000', 'value': u'000000000015', 'month': u'02', 'id': u'tests.xapianmockmodel.3', 'slug': u'http://example.com/3/', 'url': u'http://example.com/3/', 'popularity': '\xcb\x98', 'django_id': u'3', 'django_ct': u'tests.xapianmockmodel', 'empty': u''}
         ])
     
     def test_clear(self):
@@ -378,21 +378,20 @@ class XapianSearchBackendTestCase(TestCase):
     def test_build_schema(self):
         (content_field_name, fields) = self.backend.build_schema(self.site.all_searchfields())
         self.assertEqual(content_field_name, 'text')
-        self.assertEqual(len(fields), 13)
+        self.assertEqual(len(fields), 12)
         self.assertEqual(fields, [
             {'column': 0, 'type': 'text', 'field_name': 'name', 'multi_valued': 'false'},
-            {'column': 1, 'field_name': 'name_exact', 'type': 'text', 'multi_valued': 'false'},
-            {'column': 2, 'type': 'text', 'field_name': 'tags', 'multi_valued': 'true'},
-            {'column': 3, 'type': 'text', 'field_name': 'keys', 'multi_valued': 'true'},
-            {'column': 4, 'type': 'text', 'field_name': 'text', 'multi_valued': 'false'},
-            {'column': 5, 'type': 'float', 'field_name': 'popularity', 'multi_valued': 'false'},
-            {'column': 6, 'type': 'text', 'field_name': 'sites', 'multi_valued': 'true'},
-            {'column': 7, 'type': 'long', 'field_name': 'value', 'multi_valued': 'false'},
-            {'column': 8, 'type': 'text', 'field_name': 'url', 'multi_valued': 'false'},
-            {'column': 9, 'type': 'boolean', 'field_name': 'flag', 'multi_valued': 'false'},
-            {'column': 10, 'type': 'text', 'field_name': 'titles', 'multi_valued': 'true'},
-            {'column': 11, 'type': 'date', 'field_name': 'pub_date', 'multi_valued': 'false'},
-            {'column': 12, 'type': 'text', 'field_name': 'empty', 'multi_valued': 'false'},
+            {'column': 1, 'type': 'text', 'field_name': 'tags', 'multi_valued': 'true'},
+            {'column': 2, 'type': 'text', 'field_name': 'keys', 'multi_valued': 'true'},
+            {'column': 3, 'type': 'text', 'field_name': 'text', 'multi_valued': 'false'},
+            {'column': 4, 'type': 'float', 'field_name': 'popularity', 'multi_valued': 'false'},
+            {'column': 5, 'type': 'text', 'field_name': 'sites', 'multi_valued': 'true'},
+            {'column': 6, 'type': 'long', 'field_name': 'value', 'multi_valued': 'false'},
+            {'column': 7, 'type': 'text', 'field_name': 'url', 'multi_valued': 'false'},
+            {'column': 8, 'type': 'boolean', 'field_name': 'flag', 'multi_valued': 'false'},
+            {'column': 9, 'type': 'text', 'field_name': 'titles', 'multi_valued': 'true'},
+            {'column': 10, 'type': 'date', 'field_name': 'pub_date', 'multi_valued': 'false'},
+            {'column': 11, 'type': 'text', 'field_name': 'empty', 'multi_valued': 'false'},
         ])
     
     def test_parse_query(self):
@@ -407,10 +406,10 @@ class XapianSearchBackendTestCase(TestCase):
             self.assertEqual(str(self.backend.parse_query('name:da*')), 'Xapian::Query((XNAMEdavid1:(pos=1) OR XNAMEdavid2:(pos=1) OR XNAMEdavid3:(pos=1)))')
 
         self.assertEqual(str(self.backend.parse_query('name:david1..david2')), 'Xapian::Query(VALUE_RANGE 0 david1 david2)')
-        self.assertEqual(str(self.backend.parse_query('value:0..10')), 'Xapian::Query(VALUE_RANGE 7 000000000000 000000000010)')
-        self.assertEqual(str(self.backend.parse_query('value:..10')), 'Xapian::Query(VALUE_RANGE 7 -9223372036854775808 000000000010)')
-        self.assertEqual(str(self.backend.parse_query('value:10..*')), 'Xapian::Query(VALUE_RANGE 7 000000000010 9223372036854775807)')
-        self.assertEqual(str(self.backend.parse_query('popularity:25.5..100.0')), 'Xapian::Query(VALUE_RANGE 5 \xb2` \xba@)')
+        self.assertEqual(str(self.backend.parse_query('value:0..10')), 'Xapian::Query(VALUE_RANGE 6 000000000000 000000000010)')
+        self.assertEqual(str(self.backend.parse_query('value:..10')), 'Xapian::Query(VALUE_RANGE 6 -9223372036854775808 000000000010)')
+        self.assertEqual(str(self.backend.parse_query('value:10..*')), 'Xapian::Query(VALUE_RANGE 6 000000000010 9223372036854775807)')
+        self.assertEqual(str(self.backend.parse_query('popularity:25.5..100.0')), 'Xapian::Query(VALUE_RANGE 4 \xb2` \xba@)')
 
 
 class LiveXapianMockSearchIndex(indexes.SearchIndex):
