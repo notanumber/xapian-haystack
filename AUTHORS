@@ -12,6 +12,7 @@ Thanks to:
     * The Xapian team for creating and releasing under the GPL, such a great search engine.
     * Supreet Sethi for suggestions regarding morphologic date comparisons and for fixing NOT query expressions.
     * Joshua Jonah for changes to highlighting logic to avoid reserved words.
+    * J00bar for a fix with `get_identifier` and fixing query_filter reference in SearchQuery.
     * Jannis Leidel for setting up the code base for pip, easy_install and PyPI.
     * Erik Aigner for the initial patch to get_identifier changes.
     * Travis Cline for the initial patch to support SQ objects in Haystack.
