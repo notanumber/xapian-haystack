@@ -503,7 +503,7 @@ class SearchBackend(BaseSearchBackend):
         for match in matches:
             app_label, module_name, pk, model_data = pickle.loads(self._get_document_data(database, match.document))
             results.append(
-                SearchResult(app_label, module_name, pk, match.percent, weight=match.weight, **model_data)
+                SearchResult(app_label, module_name, pk, match.percent, **model_data)
             )
 
         return {
