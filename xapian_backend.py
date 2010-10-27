@@ -531,8 +531,7 @@ class SearchBackend(BaseSearchBackend):
         elif query_string == '':
             return xapian.Query()   # Match nothing
         
-        flags = xapian.QueryParser.FLAG_PARTIAL \
-              | xapian.QueryParser.FLAG_PHRASE \
+        flags = xapian.QueryParser.FLAG_PHRASE \
               | xapian.QueryParser.FLAG_BOOLEAN \
               | xapian.QueryParser.FLAG_LOVEHATE \
               | xapian.QueryParser.FLAG_WILDCARD \
