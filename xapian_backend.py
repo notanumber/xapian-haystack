@@ -20,7 +20,7 @@ from haystack.backends import BaseSearchBackend, BaseSearchQuery, SearchNode, lo
 from haystack.exceptions import HaystackError, MissingDependency
 from haystack.fields import DateField, DateTimeField, IntegerField, FloatField, BooleanField, MultiValueField
 from haystack.models import SearchResult
-from haystack.utils import get_identifier, get_facet_field_name
+from haystack.utils import get_identifier
 
 try:
     import xapian
@@ -594,15 +594,6 @@ class SearchBackend(BaseSearchBackend):
                 schema_fields.append(field_data)
                 column += 1
 
-                if field_class.faceted is True:
-                    # Duplicate the field.
-                    faceted_field = field_data.copy()
-                    faceted_field['field_name'] = get_facet_field_name(faceted_field['field_name'])
-                    faceted_field['column'] = column
-
-                    schema_fields.append(faceted_field)
-                    column += 1
-        
         return (content_field_name, schema_fields)
     
     def _do_highlight(self, content, query, tag='em'):

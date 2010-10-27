@@ -5,6 +5,7 @@ import cPickle as pickle
 import datetime
 import os
 import shutil
+import sys
 import xapian
 
 from django.conf import settings
@@ -381,18 +382,18 @@ class XapianSearchBackendTestCase(TestCase):
         self.assertEqual(len(fields), 13)
         self.assertEqual(fields, [
             {'column': 0, 'type': 'text', 'field_name': 'name', 'multi_valued': 'false'},
-            {'column': 1, 'field_name': 'name_exact', 'type': 'text', 'multi_valued': 'false'},
-            {'column': 2, 'type': 'text', 'field_name': 'tags', 'multi_valued': 'true'},
-            {'column': 3, 'type': 'text', 'field_name': 'keys', 'multi_valued': 'true'},
-            {'column': 4, 'type': 'text', 'field_name': 'text', 'multi_valued': 'false'},
-            {'column': 5, 'type': 'float', 'field_name': 'popularity', 'multi_valued': 'false'},
-            {'column': 6, 'type': 'text', 'field_name': 'sites', 'multi_valued': 'true'},
-            {'column': 7, 'type': 'long', 'field_name': 'value', 'multi_valued': 'false'},
-            {'column': 8, 'type': 'text', 'field_name': 'url', 'multi_valued': 'false'},
-            {'column': 9, 'type': 'boolean', 'field_name': 'flag', 'multi_valued': 'false'},
-            {'column': 10, 'type': 'text', 'field_name': 'titles', 'multi_valued': 'true'},
+            {'column': 1, 'type': 'text', 'field_name': 'tags', 'multi_valued': 'true'},
+            {'column': 2, 'type': 'text', 'field_name': 'keys', 'multi_valued': 'true'},
+            {'column': 3, 'type': 'text', 'field_name': 'text', 'multi_valued': 'false'},
+            {'column': 4, 'type': 'float', 'field_name': 'popularity', 'multi_valued': 'false'},
+            {'column': 5, 'type': 'text', 'field_name': 'sites', 'multi_valued': 'true'},
+            {'column': 6, 'type': 'long', 'field_name': 'value', 'multi_valued': 'false'},
+            {'column': 7, 'type': 'text', 'field_name': 'url', 'multi_valued': 'false'},
+            {'column': 8, 'type': 'boolean', 'field_name': 'flag', 'multi_valued': 'false'},
+            {'column': 9, 'type': 'text', 'field_name': 'titles', 'multi_valued': 'true'},
+            {'column': 10, 'type': 'text', 'field_name': 'name_exact', 'multi_valued': 'false'},
             {'column': 11, 'type': 'date', 'field_name': 'pub_date', 'multi_valued': 'false'},
-            {'column': 12, 'type': 'text', 'field_name': 'empty', 'multi_valued': 'false'},
+            {'column': 12, 'type': 'text', 'field_name': 'empty', 'multi_valued': 'false'}
         ])
     
     def test_parse_query(self):
@@ -407,10 +408,10 @@ class XapianSearchBackendTestCase(TestCase):
             self.assertEqual(str(self.backend.parse_query('name:da*')), 'Xapian::Query((XNAMEdavid1:(pos=1) OR XNAMEdavid2:(pos=1) OR XNAMEdavid3:(pos=1)))')
 
         self.assertEqual(str(self.backend.parse_query('name:david1..david2')), 'Xapian::Query(VALUE_RANGE 0 david1 david2)')
-        self.assertEqual(str(self.backend.parse_query('value:0..10')), 'Xapian::Query(VALUE_RANGE 7 000000000000 000000000010)')
-        self.assertEqual(str(self.backend.parse_query('value:..10')), 'Xapian::Query(VALUE_RANGE 7 -9223372036854775808 000000000010)')
-        self.assertEqual(str(self.backend.parse_query('value:10..*')), 'Xapian::Query(VALUE_RANGE 7 000000000010 9223372036854775807)')
-        self.assertEqual(str(self.backend.parse_query('popularity:25.5..100.0')), 'Xapian::Query(VALUE_RANGE 5 \xb2` \xba@)')
+        self.assertEqual(str(self.backend.parse_query('value:0..10')), 'Xapian::Query(VALUE_RANGE 6 000000000000 000000000010)')
+        self.assertEqual(str(self.backend.parse_query('value:..10')), 'Xapian::Query(VALUE_RANGE 6 %012d 000000000010)' % (-sys.maxint - 1))
+        self.assertEqual(str(self.backend.parse_query('value:10..*')), 'Xapian::Query(VALUE_RANGE 6 000000000010 %012d)' % sys.maxint)
+        self.assertEqual(str(self.backend.parse_query('popularity:25.5..100.0')), 'Xapian::Query(VALUE_RANGE 4 \xb2` \xba@)')
 
 
 class LiveXapianMockSearchIndex(indexes.SearchIndex):
