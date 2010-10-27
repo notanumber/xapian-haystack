@@ -283,18 +283,24 @@ class SearchBackend(BaseSearchBackend):
         """
         database = self._database(writable=True)
         if not models:
-            query = xapian.Query('')
-            enquire = xapian.Enquire(database)
-            enquire.set_query(query)
-            for match in self._get_enquire_mset(database, enquire, 0, database.get_doccount()):
-                database.delete_document(match.docid)
+            # Because there does not appear to be a "clear all" method,
+            # it's much quicker to remove the contents of the `HAYSTACK_XAPIAN_PATH`
+            # folder than it is to remove each document one at a time.
+            if os.path.exists(settings.HAYSTACK_XAPIAN_PATH):
+                shutil.rmtree(settings.HAYSTACK_XAPIAN_PATH)
         else:
             for model in models:
                 database.delete_document(
                     DOCUMENT_CT_TERM_PREFIX + '%s.%s' %
                     (model._meta.app_label, model._meta.module_name)
                 )
-    
+
+    def document_count(self):
+        try:
+            return self._database().get_doccount()
+        except InvalidIndexError:
+            return 0
+
     @log_query
     def search(self, query, sort_by=None, start_offset=0, end_offset=None,
                fields='', highlight=False, facets=None, date_facets=None,
