@@ -585,15 +585,16 @@ class SearchBackend(BaseSearchBackend):
                     'column': column,
                 }
                 
-                if isinstance(field_class, (DateField, DateTimeField)):
+                if field_class.field_type in ['date', 'datetime']:
                     field_data['type'] = 'date'
-                elif isinstance(field_class, IntegerField):
+                elif field_class.field_type == 'integer':
                     field_data['type'] = 'long'
-                elif isinstance(field_class, FloatField):
+                elif field_class.field_type == 'float':
                     field_data['type'] = 'float'
-                elif isinstance(field_class, BooleanField):
+                elif field_class.field_type == 'boolean':
                     field_data['type'] = 'boolean'
-                elif isinstance(field_class, MultiValueField):
+                
+                if field_class.is_multivalued:
                     field_data['multi_valued'] = 'true'
                 
                 schema_fields.append(field_data)
