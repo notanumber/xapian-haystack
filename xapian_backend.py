@@ -843,7 +843,7 @@ class SearchBackend(BaseSearchBackend):
         """
         return self._get_enquire_mset(
             database, enquire, 0, database.get_doccount()
-        ).get_matches_estimated()
+        ).size()
 
     def _value_column(self, field):
         """
