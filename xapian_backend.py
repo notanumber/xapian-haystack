@@ -424,7 +424,7 @@ class SearchBackend(BaseSearchBackend):
         
         return {
             'results': results,
-            'hits': matches.get_matches_estimated(),
+            'hits': self._get_hit_count(database, enquire),
             'facets': facets_dict,
             'spelling_suggestion': spelling_suggestion,
         }
@@ -514,7 +514,7 @@ class SearchBackend(BaseSearchBackend):
 
         return {
             'results': results,
-            'hits': matches.get_matches_estimated(),
+            'hits': self._get_hit_count(database, enquire),
             'facets': {
                 'fields': {},
                 'dates': {},
@@ -831,6 +831,19 @@ class SearchBackend(BaseSearchBackend):
         except xapian.DatabaseModifiedError:
             database.reopen()
             return document.get_data()
+
+    def _get_hit_count(self, database, enquire):
+        """
+        Given a database and enquire instance, returns the estimated number
+        of matches.
+        
+        Required arguments:
+            `database` -- The database to be queried
+            `enquire` -- The enquire instance
+        """
+        return self._get_enquire_mset(
+            database, enquire, 0, database.get_doccount()
+        ).get_matches_estimated()
 
     def _value_column(self, field):
         """
