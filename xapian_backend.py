@@ -1064,9 +1064,9 @@ class SearchQuery(BaseSearchQuery):
             return xapian.Query(
                 xapian.Query.OP_AND_NOT,
                 self._all_query(),
-                self.backend.parse_query('%s:%s' % (field, term)),
+                self.backend.parse_query('%s:%s*' % (field, term)),
             )
-        return self.backend.parse_query('%s:%s' % (field, term))
+        return self.backend.parse_query('%s:%s*' % (field, term))
     
     def _filter_gt(self, term, field, is_not):
         return self._filter_lte(term, field, is_not=(is_not != True))

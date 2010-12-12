@@ -414,13 +414,9 @@ class LiveXapianSearchQueryTestCase(TestCase):
         self.assertEqual(self.sq.get_spelling_suggestion(), u'indexed')
         self.assertEqual(self.sq.get_spelling_suggestion('indxd'), u'indexed')
     
-    def test_startswith_wildcard(self):
-        self.sq.add_filter(SQ(name__startswith='da*'))
+    def test_startswith(self):
+        self.sq.add_filter(SQ(name__startswith='da'))
         self.assertEqual([result.pk for result in self.sq.get_results()], [1, 2, 3])
-        
-    def test_startswith_fullword(self):
-        self.sq.add_filter(SQ(name__startswith='daniel1'))
-        self.assertEqual([result.pk for result in self.sq.get_results()], [1])
     
     def test_build_query_gt(self):
         self.sq.add_filter(SQ(name__gt='m'))
