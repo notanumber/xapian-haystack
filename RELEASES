@@ -1,3 +1,21 @@
+xapian-haystack-1.1.5BETA
+=========================
+
+Tagged on December 20, 2010 by David Sauve <dsauve@trapeze.com>
+
+Code Changes
+------------
+* Merged `field_weights` branch to add support for field weights for Haystack 1.1
+
+Known Issues
+------------
+* `SearchBackend.search` with `highlight=True` converts terms to lowercase in result content.
+* __in filter combined with punctuation drops valid results
+* Spelling suggestions not programatically useful
+* `more_like_this` slow on large database
+
+* * *
+
 xapian-haystack-1.1.4BETA
 =========================
 
