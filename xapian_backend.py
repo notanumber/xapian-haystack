@@ -259,6 +259,9 @@ class SearchBackend(BaseSearchBackend):
         except UnicodeDecodeError:
             sys.stderr.write('Chunk failed.\n')
             pass
+        
+        finally:
+            database = None
     
     def remove(self, obj):
         """
