@@ -22,3 +22,4 @@ Thanks to:
     * Adam Endicott for the initial patch that corrected an oversight with stemming not always being done during a search.
     * Sym Roe for a patch that improved performance in "more-like-this" and suggestion the removal of FLAG_PARTIAL.
     * liranz for pointing out a potential conflict with arguments pass into `SearchResult`
+    * Jacob Kaplan-Moss for pointing out that write permission shouldn't be required for searching.
