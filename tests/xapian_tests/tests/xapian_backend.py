@@ -379,12 +379,11 @@ class XapianSearchBackendTestCase(TestCase):
     def test_parse_query(self):
         self.backend.update(self.index, self.sample_objs)
         self.assertEqual(str(self.backend.parse_query('indexed')), 'Xapian::Query(Zindex:(pos=1))')
+        self.assertEqual(str(self.backend.parse_query('name:david')), 'Xapian::Query(ZXNAMEdavid:(pos=1))')
 
         if xapian.minor_version() >= 2:
-            self.assertEqual(str(self.backend.parse_query('name:david')), 'Xapian::Query(((XNAMEdavid1:(pos=1) SYNONYM XNAMEdavid2:(pos=1) SYNONYM XNAMEdavid3:(pos=1)) OR ZXNAMEdavid:(pos=1)))')
             self.assertEqual(str(self.backend.parse_query('name:da*')), 'Xapian::Query((XNAMEdavid1:(pos=1) SYNONYM XNAMEdavid2:(pos=1) SYNONYM XNAMEdavid3:(pos=1)))')
         else:
-            self.assertEqual(str(self.backend.parse_query('name:david')), 'Xapian::Query(ZXNAMEdavid:(pos=1))')
             self.assertEqual(str(self.backend.parse_query('name:da*')), 'Xapian::Query((XNAMEdavid1:(pos=1) OR XNAMEdavid2:(pos=1) OR XNAMEdavid3:(pos=1)))')
 
         self.assertEqual(str(self.backend.parse_query('name:david1..david2')), 'Xapian::Query(VALUE_RANGE 0 david1 david2)')
