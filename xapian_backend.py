@@ -1,7 +1,7 @@
 # Copyright (C) 2009-2011 David Sauve, Trapeze.  All rights reserved.
 
 __author__ = 'David Sauve'
-__version__ = (1, 1, 5, 'beta')
+__version__ = (1, 2, 0, 'beta')
 
 import time
 import datetime
@@ -597,6 +597,10 @@ class SearchBackend(BaseSearchBackend):
                     field_data['type'] = 'float'
                 elif field_class.field_type == 'boolean':
                     field_data['type'] = 'boolean'
+                elif field_class.field_type == 'ngram':
+                    field_data['type'] = 'ngram'
+                elif field_class.field_type == 'edge_ngram':
+                    field_data['type'] = 'edge_ngram'
                 
                 if field_class.is_multivalued:
                     field_data['multi_valued'] = 'true'
