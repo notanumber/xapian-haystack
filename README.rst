@@ -42,6 +42,11 @@ Installation
 #. Add ``HAYSTACK_XAPIAN_PATH`` to ``settings.py``
 #. Set ``HAYSTACK_SEARCH_ENGINE`` to ``xapian``
 
+Configuration
+-------------
+
+As well as the flags described `here <http://docs.haystacksearch.org/dev/settings.html>`_, the xapian backend includes and additional `HAYSTACK_XAPIAN_FLAGS` variable to further configure how indexes are stored and manipulated.  By default, this value is set to `FLAG_PHRASE | FLAG_BOOLEAN | FLAG_LOVEHATE | FLAG_WILDCARD | FLAG_PURE_NOT`.  See the `Xapian documentation <http://xapian.org/docs/apidoc/html/classXapian_1_1QueryParser.html>`_ for further explanation of the available Xapian.QueryParser flags.
+
 Testing
 -------
 
