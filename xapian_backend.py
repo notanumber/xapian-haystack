@@ -34,6 +34,14 @@ DOCUMENT_CT_TERM_PREFIX = DOCUMENT_CUSTOM_TERM_PREFIX + 'CONTENTTYPE'
 
 BACKEND_NAME = 'xapian'
 
+DEFAULT_XAPIAN_FLAGS = (
+    xapian.QueryParser.FLAG_PHRASE | 
+    xapian.QueryParser.FLAG_BOOLEAN |
+    xapian.QueryParser.FLAG_LOVEHATE |
+    xapian.QueryParser.FLAG_WILDCARD |
+    xapian.QueryParser.FLAG_PURE_NOT
+)
+
 
 class InvalidIndexError(HaystackError):
     """Raised when an index can not be opened."""
@@ -541,11 +549,7 @@ class SearchBackend(BaseSearchBackend):
         elif query_string == '':
             return xapian.Query()   # Match nothing
         
-        flags = xapian.QueryParser.FLAG_PHRASE \
-              | xapian.QueryParser.FLAG_BOOLEAN \
-              | xapian.QueryParser.FLAG_LOVEHATE \
-              | xapian.QueryParser.FLAG_WILDCARD \
-              | xapian.QueryParser.FLAG_PURE_NOT
+        flags = getattr(settings, 'HAYSTACK_XAPIAN_FLAGS', DEFAULT_XAPIAN_FLAGS)
         qp = xapian.QueryParser()
         qp.set_database(self._database())
         qp.set_stemmer(xapian.Stem(self.language))
