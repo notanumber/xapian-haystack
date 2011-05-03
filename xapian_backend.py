@@ -954,6 +954,10 @@ class SearchQuery(BaseSearchQuery):
                 expression, term = child
                 field, filter_type = search_node.split_expression(expression)
                 
+                # Handle when we've got a ``ValuesListQuerySet``...
+                if hasattr(term, 'values_list'):
+                    term = list(term)
+                
                 if isinstance(term, (list, tuple)):
                     term = [_marshal_term(t) for t in term]
                 else:
