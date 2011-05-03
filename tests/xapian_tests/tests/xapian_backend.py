@@ -310,6 +310,36 @@ class XapianSearchBackendTestCase(TestCase):
         # Ensure that swapping the ``result_class`` works.
         self.assertTrue(isinstance(self.backend.more_like_this(self.sample_objs[0], result_class=MockSearchResult)['results'][0], MockSearchResult))
     
+    def test_use_correct_site(self):
+        test_site = SearchSite()
+        test_site.register(XapianMockModel, XapianMockSearchIndex)
+        self.backend.update(self.index, self.sample_objs)
+        
+        # Make sure that ``_process_results`` uses the right ``site``.
+        self.assertEqual(self.backend.search(xapian.Query('indexed'))['hits'], 3)
+        self.assertEqual([result.pk for result in self.backend.search(xapian.Query('indexed'))['results']], [1, 2, 3])
+        
+        self.site.unregister(XapianMockModel)
+        self.assertEqual(len(self.site.get_indexed_models()), 0)
+        self.backend.site = test_site
+        self.assertTrue(len(self.backend.site.get_indexed_models()) > 0)
+        
+        # Should still be there, despite the main ``site`` not having that model
+        # registered any longer.
+        self.assertEqual(self.backend.search(xapian.Query('indexed'))['hits'], 3)
+        self.assertEqual([result.pk for result in self.backend.search(xapian.Query('indexed'))['results']], [1, 2, 3])
+        
+        # Unregister it on the backend & make sure it takes effect.
+        self.backend.site.unregister(XapianMockModel)
+        self.assertEqual(len(self.backend.site.get_indexed_models()), 0)
+        self.assertEqual(self.backend.search(xapian.Query('indexed'))['hits'], 0)
+        
+        # Nuke it & fallback on the main ``site``.
+        self.backend.site = haystack.site
+        self.assertEqual(self.backend.search(xapian.Query('indexed'))['hits'], 0)
+        self.site.register(XapianMockModel, XapianMockSearchIndex)
+        self.assertEqual(self.backend.search(xapian.Query('indexed'))['hits'], 3)
+    
     def test_order_by(self):
         self.backend.update(self.index, self.sample_objs)
         self.assertEqual(self.backend.document_count(), 3)

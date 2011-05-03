@@ -354,6 +354,11 @@ class SearchBackend(BaseSearchBackend):
         and any suggestions for spell correction will be returned as well as
         the results.
         """
+        if not self.site:
+            from haystack import site
+        else:
+            site = self.site
+        
         if xapian.Query.empty(query):
             return {
                 'results': [],
@@ -476,6 +481,11 @@ class SearchBackend(BaseSearchBackend):
         
         Finally, processes the resulting matches and returns.
         """
+        if not self.site:
+            from haystack import site
+        else:
+            site = self.site
+        
         database = self._database()
         
         if result_class is None:
@@ -527,7 +537,7 @@ class SearchBackend(BaseSearchBackend):
         for match in matches:
             app_label, module_name, pk, model_data = pickle.loads(self._get_document_data(database, match.document))
             results.append(
-                result_class(app_label, module_name, pk, match.percent, **model_data)
+                result_class(app_label, module_name, pk, match.percent, searchsite=site, **model_data)
             )
 
         return {
