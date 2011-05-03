@@ -427,7 +427,7 @@ class SearchBackend(BaseSearchBackend):
                     )
                 }
             results.append(
-                result_class(app_label, module_name, pk, match.percent, **model_data)
+                result_class(app_label, module_name, pk, match.percent, searchsite=site, **model_data)
             )
         
         if facets:
