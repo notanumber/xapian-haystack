@@ -317,7 +317,7 @@ class SearchBackend(BaseSearchBackend):
     def search(self, query, sort_by=None, start_offset=0, end_offset=None,
                fields='', highlight=False, facets=None, date_facets=None,
                query_facets=None, narrow_queries=None, spelling_query=None,
-               limit_to_registered_models=True, **kwargs):
+               limit_to_registered_models=True, result_class=None, **kwargs):
         """
         Executes the Xapian::query as defined in `query`.
         
@@ -361,6 +361,9 @@ class SearchBackend(BaseSearchBackend):
             }
         
         database = self._database()
+        
+        if result_class is None:
+            result_class = SearchResult
         
         if getattr(settings, 'HAYSTACK_INCLUDE_SPELLING', False) is True:
             spelling_suggestion = self._do_spelling_suggestion(database, query, spelling_query)
@@ -424,7 +427,7 @@ class SearchBackend(BaseSearchBackend):
                     )
                 }
             results.append(
-                SearchResult(app_label, module_name, pk, match.percent, **model_data)
+                result_class(app_label, module_name, pk, match.percent, **model_data)
             )
         
         if facets:
@@ -443,7 +446,7 @@ class SearchBackend(BaseSearchBackend):
     
     def more_like_this(self, model_instance, additional_query=None,
                        start_offset=0, end_offset=None,
-                       limit_to_registered_models=True, **kwargs):
+                       limit_to_registered_models=True, result_class=None, **kwargs):
         """
         Given a model instance, returns a result set of similar documents.
         
@@ -474,6 +477,9 @@ class SearchBackend(BaseSearchBackend):
         Finally, processes the resulting matches and returns.
         """
         database = self._database()
+        
+        if result_class is None:
+            result_class = SearchResult
         
         query = xapian.Query(DOCUMENT_ID_TERM_PREFIX + get_identifier(model_instance))
         
@@ -521,7 +527,7 @@ class SearchBackend(BaseSearchBackend):
         for match in matches:
             app_label, module_name, pk, model_data = pickle.loads(self._get_document_data(database, match.document))
             results.append(
-                SearchResult(app_label, module_name, pk, match.percent, **model_data)
+                result_class(app_label, module_name, pk, match.percent, **model_data)
             )
 
         return {
