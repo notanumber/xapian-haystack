@@ -159,3 +159,8 @@ class XapianSearchQueryTestCase(TestCase):
     def test_build_query_with_punctuation(self):
         self.sq.add_filter(SQ(content='http://www.example.com'))
         self.assertEqual(str(self.sq.build_query()), u'Xapian::Query((Zhttp://www.example.com OR http://www.example.com))')
+    
+    def test_in_filter_values_list(self):
+        self.sq.add_filter(SQ(content='why'))
+        self.sq.add_filter(SQ(title__in=MockModel.objects.values_list('id', flat=True)))
+        self.assertEqual(str(self.sq.build_query()), u'Xapian::Query(((Zwhi OR why) AND (ZXTITLE1 OR XTITLE1 OR ZXTITLE2 OR XTITLE2 OR ZXTITLE3 OR XTITLE3)))')

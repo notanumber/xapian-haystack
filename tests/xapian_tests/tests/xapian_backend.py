@@ -15,10 +15,12 @@ from django.test import TestCase
 from haystack import indexes, sites, backends
 from haystack.backends.xapian_backend import SearchBackend, SearchQuery, _marshal_value
 from haystack.exceptions import HaystackError
+from haystack.models import SearchResult
 from haystack.query import SearchQuerySet, SQ
 from haystack.sites import SearchSite
 
 from core.models import MockTag, MockModel, AnotherMockModel, AFourthMockModel
+from core.tests.mocks import MockSearchResult
 
 
 class XapianMockModel(models.Model):
@@ -188,6 +190,9 @@ class XapianSearchBackendTestCase(TestCase):
         self.assertEqual([result.pk for result in self.backend.search(xapian.Query(''))['results']], [1, 2, 3])
         self.assertEqual(self.backend.search(xapian.Query('indexed'))['hits'], 3)
         self.assertEqual([result.pk for result in self.backend.search(xapian.Query(''))['results']], [1, 2, 3])
+        
+        # Ensure that swapping the ``result_class`` works.
+        self.assertTrue(isinstance(self.backend.search(xapian.Query('indexed'), result_class=MockSearchResult)['results'][0], MockSearchResult))
 
     def test_search_field_with_punctuation(self):
         self.backend.update(self.index, self.sample_objs)
@@ -301,6 +306,39 @@ class XapianSearchBackendTestCase(TestCase):
         results = self.backend.more_like_this(self.sample_objs[0], limit_to_registered_models=True)
         self.assertEqual(results['hits'], 2)
         self.assertEqual([result.pk for result in results['results']], [3, 2])
+        
+        # Ensure that swapping the ``result_class`` works.
+        self.assertTrue(isinstance(self.backend.more_like_this(self.sample_objs[0], result_class=MockSearchResult)['results'][0], MockSearchResult))
+    
+    def test_use_correct_site(self):
+        test_site = SearchSite()
+        test_site.register(XapianMockModel, XapianMockSearchIndex)
+        self.backend.update(self.index, self.sample_objs)
+        
+        # Make sure that ``_process_results`` uses the right ``site``.
+        self.assertEqual(self.backend.search(xapian.Query('indexed'))['hits'], 3)
+        self.assertEqual([result.pk for result in self.backend.search(xapian.Query('indexed'))['results']], [1, 2, 3])
+        
+        self.site.unregister(XapianMockModel)
+        self.assertEqual(len(self.site.get_indexed_models()), 0)
+        self.backend.site = test_site
+        self.assertTrue(len(self.backend.site.get_indexed_models()) > 0)
+        
+        # Should still be there, despite the main ``site`` not having that model
+        # registered any longer.
+        self.assertEqual(self.backend.search(xapian.Query('indexed'))['hits'], 3)
+        self.assertEqual([result.pk for result in self.backend.search(xapian.Query('indexed'))['results']], [1, 2, 3])
+        
+        # Unregister it on the backend & make sure it takes effect.
+        self.backend.site.unregister(XapianMockModel)
+        self.assertEqual(len(self.backend.site.get_indexed_models()), 0)
+        self.assertEqual(self.backend.search(xapian.Query('indexed'))['hits'], 0)
+        
+        # Nuke it & fallback on the main ``site``.
+        self.backend.site = haystack.site
+        self.assertEqual(self.backend.search(xapian.Query('indexed'))['hits'], 0)
+        self.site.register(XapianMockModel, XapianMockSearchIndex)
+        self.assertEqual(self.backend.search(xapian.Query('indexed'))['hits'], 3)
     
     def test_order_by(self):
         self.backend.update(self.index, self.sample_objs)
@@ -482,6 +520,38 @@ class LiveXapianSearchQueryTestCase(TestCase):
         
         # Restore.
         settings.DEBUG = old_debug
+
+
+class LiveXapianSearchQuerySetTestCase(TestCase):
+    """
+    SearchQuerySet specific tests
+    """
+    fixtures = ['initial_data.json']
+    
+    def setUp(self):
+        super(LiveXapianSearchQuerySetTestCase, self).setUp()
+        
+        site = SearchSite()
+        backend = SearchBackend(site=site)
+        index = LiveXapianMockSearchIndex(MockModel, backend=backend)
+        site.register(MockModel, LiveXapianMockSearchIndex)
+        backend.update(index, MockModel.objects.all())
+        
+        self.sq = SearchQuery(backend=backend)
+        self.sqs = SearchQuerySet(query=self.sq)
+    
+    def test_result_class(self):
+        # Assert that we're defaulting to ``SearchResult``.
+        sqs = self.sqs.all()
+        self.assertTrue(isinstance(sqs[0], SearchResult))
+        
+        # Custom class.
+        sqs = self.sqs.result_class(MockSearchResult).all()
+        self.assertTrue(isinstance(sqs[0], MockSearchResult))
+        
+        # Reset to default.
+        sqs = self.sqs.result_class(None).all()
+        self.assertTrue(isinstance(sqs[0], SearchResult))
 
 
 class XapianBoostBackendTestCase(TestCase):
