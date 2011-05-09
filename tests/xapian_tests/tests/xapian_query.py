@@ -7,7 +7,7 @@ import shutil
 from django.conf import settings
 from django.test import TestCase
 
-from haystack.backends.xapian_backend import SearchBackend, SearchQuery
+from haystack import connections
 from haystack.query import SQ
 
 from core.models import MockModel, AnotherMockModel
@@ -16,11 +16,11 @@ from core.models import MockModel, AnotherMockModel
 class XapianSearchQueryTestCase(TestCase):
     def setUp(self):
         super(XapianSearchQueryTestCase, self).setUp()
-        self.sq = SearchQuery(backend=SearchBackend())
+        self.sq = connections['default'].get_query()
     
     def tearDown(self):
-        if os.path.exists(settings.HAYSTACK_XAPIAN_PATH):
-            shutil.rmtree(settings.HAYSTACK_XAPIAN_PATH)
+        if os.path.exists(settings.HAYSTACK_CONNECTIONS['default']['PATH']):
+            shutil.rmtree(settings.HAYSTACK_CONNECTIONS['default']['PATH'])
         
         super(XapianSearchQueryTestCase, self).tearDown()
     
