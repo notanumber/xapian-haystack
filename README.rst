@@ -44,7 +44,11 @@ Installation
 Configuration
 -------------
 
-As well as the flags described `here <http://docs.haystacksearch.org/dev/settings.html>`_, the xapian backend includes and additional `HAYSTACK_XAPIAN_FLAGS` variable to further configure how indexes are stored and manipulated.  By default, this value is set to `FLAG_PHRASE | FLAG_BOOLEAN | FLAG_LOVEHATE | FLAG_WILDCARD | FLAG_PURE_NOT`.  See the `Xapian documentation <http://xapian.org/docs/apidoc/html/classXapian_1_1QueryParser.html>`_ for further explanation of the available Xapian.QueryParser flags.
+As well as the flags described `here <http://docs.haystacksearch.org/dev/settings.html>`_, the xapian backend includes two additional variables:
+
+    - `HAYSTACK_XAPIAN_FLAGS` -- used to further configure how indexes are stored and manipulated.  By default, this value is set to `FLAG_PHRASE | FLAG_BOOLEAN | FLAG_LOVEHATE | FLAG_WILDCARD | FLAG_PURE_NOT`.  See the `Xapian::QueryParser::feature_flag in the Xapian documentation <http://xapian.org/docs/apidoc/html/classXapian_1_1QueryParser.html>`_ for further explanation of the available Xapian.QueryParser flags.
+
+    - `HAYSTACK_XAPIAN_WEIGHTING_SCHEME` -- used to override the default weighting scheme used during search.  `HAYSTACK_XAPIAN_WEIGHTING_SCHEME` is assumed to be a tuple that corepsonds to the arguments to a BM25Weight constructor.  See `Xapian::BM25Weight::BM25Weight in the Xapian documentation <http://xapian.org/docs/apidoc/html/classXapian_1_1BM25Weight.html>`_ for further information.
 
 Testing
 -------
