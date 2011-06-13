@@ -396,6 +396,8 @@ class SearchBackend(BaseSearchBackend):
                 )
         
         enquire = xapian.Enquire(database)
+        if hasattr(settings, 'HAYSTACK_XAPIAN_WEIGHTING_SCHEME'):
+            enquire.set_weighting_scheme(xapian.BM25Weight(*settings.HAYSTACK_XAPIAN_WEIGHTING_SCHEME))
         enquire.set_query(query)
         
         if sort_by:

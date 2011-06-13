@@ -23,3 +23,4 @@ Thanks to:
     * Sym Roe for a patch that improved performance in "more-like-this" and suggestion the removal of FLAG_PARTIAL.
     * liranz for pointing out a potential conflict with arguments pass into `SearchResult`
     * Jacob Kaplan-Moss for pointing out that write permission shouldn't be required for searching.
+    * glassresistor for assistance troubleshooting an issue with boosting a phrase query & a patch to make weighting schemes overridable.
