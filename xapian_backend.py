@@ -1013,10 +1013,12 @@ class SearchQuery(BaseSearchQuery):
         if ' ' in term:
             if is_not:
                 return xapian.Query(
-                    xapian.Query.OP_AND_NOT, self._all_query(), self._phrase_query(term.split())
+                    xapian.Query.OP_AND_NOT, self._all_query(), self._phrase_query(
+                        term.split(), self.backend.content_field_name
+                    )
                 )
             else:
-                return self._phrase_query(term.split())
+                return self._phrase_query(term.split(), self.backend.content_field_name)
         else:
             if is_not:
                 return xapian.Query(xapian.Query.OP_AND_NOT, self._all_query(), self._term_query(term))
