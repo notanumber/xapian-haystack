@@ -236,6 +236,19 @@ class SearchBackend(BaseSearchBackend):
                                     if len(term.split()) == 1:
                                         document.add_term(term, weight)
                                         document.add_term(prefix + term, weight)
+                        elif field['type'] == 'ngram':
+                            pass
+                        elif field['type'] == 'edge_ngram':
+                            NGRAM_LENGTH = 4
+                            value_length = len(value)
+                            for start in xrange(0, value_length - NGRAM_LENGTH + 1):
+                                for size in xrange(NGRAM_LENGTH, NGRAM_LENGTH + 1):
+                                    end = start + size
+                                    if end > value_length:
+                                        continue
+                                    term = _marshal_term(value[start:end])
+                                    document.add_term(term, weight)
+                                    document.add_term(prefix + term, weight)
                         else:
                             if field['multi_valued'] == 'false':
                                 term = _marshal_term(value)
