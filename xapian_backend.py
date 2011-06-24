@@ -1,7 +1,7 @@
 # Copyright (C) 2009-2011 David Sauve, Trapeze.  All rights reserved.
 
 __author__ = 'David Sauve'
-__version__ = (1, 1, 5, 'beta')
+__version__ = (1, 2, 0, 'beta')
 
 import time
 import datetime
@@ -236,6 +236,19 @@ class SearchBackend(BaseSearchBackend):
                                     if len(term.split()) == 1:
                                         document.add_term(term, weight)
                                         document.add_term(prefix + term, weight)
+                        elif field['type'] == 'ngram':
+                            pass
+                        elif field['type'] == 'edge_ngram':
+                            NGRAM_LENGTH = 4
+                            value_length = len(value)
+                            for start in xrange(0, value_length - NGRAM_LENGTH + 1):
+                                for size in xrange(NGRAM_LENGTH, NGRAM_LENGTH + 1):
+                                    end = start + size
+                                    if end > value_length:
+                                        continue
+                                    term = _marshal_term(value[start:end])
+                                    document.add_term(term, weight)
+                                    document.add_term(prefix + term, weight)
                         else:
                             if field['multi_valued'] == 'false':
                                 term = _marshal_term(value)
@@ -619,6 +632,10 @@ class SearchBackend(BaseSearchBackend):
                     field_data['type'] = 'float'
                 elif field_class.field_type == 'boolean':
                     field_data['type'] = 'boolean'
+                elif field_class.field_type == 'ngram':
+                    field_data['type'] = 'ngram'
+                elif field_class.field_type == 'edge_ngram':
+                    field_data['type'] = 'edge_ngram'
                 
                 if field_class.is_multivalued:
                     field_data['multi_valued'] = 'true'

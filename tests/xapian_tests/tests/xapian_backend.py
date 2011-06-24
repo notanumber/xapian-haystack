@@ -109,6 +109,14 @@ class XapianBoostMockSearchIndex(indexes.SearchIndex):
     pub_date = indexes.DateField(model_attr='pub_date')
 
 
+class XapianAutocompleteMockModelSearchIndex(indexes.SearchIndex):
+    text = indexes.CharField(model_attr='foo', document=True)
+    name = indexes.CharField(model_attr='author')
+    pub_date = indexes.DateField(model_attr='pub_date')
+    text_auto = indexes.EdgeNgramField(model_attr='foo')
+    name_auto = indexes.EdgeNgramField(model_attr='author')
+
+
 class XapianSearchBackendTestCase(TestCase):
     def setUp(self):
         super(XapianSearchBackendTestCase, self).setUp()
@@ -466,6 +474,12 @@ class LiveXapianSearchQueryTestCase(TestCase):
         
         self.sq = SearchQuery(backend=backend)
     
+    def tearDown(self):
+        if os.path.exists(settings.HAYSTACK_XAPIAN_PATH):
+            shutil.rmtree(settings.HAYSTACK_XAPIAN_PATH)
+        
+        super(LiveXapianSearchQueryTestCase, self).tearDown()
+
     def test_get_spelling(self):
         self.sq.add_filter(SQ(content='indxd'))
         self.assertEqual(self.sq.get_spelling_suggestion(), u'indexed')
@@ -550,6 +564,12 @@ class LiveXapianSearchQuerySetTestCase(TestCase):
         self.sq = SearchQuery(backend=backend)
         self.sqs = SearchQuerySet(query=self.sq)
     
+    def tearDown(self):
+        if os.path.exists(settings.HAYSTACK_XAPIAN_PATH):
+            shutil.rmtree(settings.HAYSTACK_XAPIAN_PATH)
+        
+        super(LiveXapianSearchQuerySetTestCase, self).tearDown()
+
     def test_result_class(self):
         # Assert that we're defaulting to ``SearchResult``.
         sqs = self.sqs.all()
@@ -612,3 +632,37 @@ class XapianBoostBackendTestCase(TestCase):
             'core.afourthmockmodel.2',
             'core.afourthmockmodel.4'
         ])
+
+
+class LiveXapianAutocompleteTestCase(TestCase):
+    fixtures = ['bulk_data.json']
+    
+    def setUp(self):
+        super(LiveXapianAutocompleteTestCase, self).setUp()
+        
+        site = SearchSite()
+        backend = SearchBackend(site=site)
+        index = XapianAutocompleteMockModelSearchIndex(MockModel, backend=backend)
+        site.register(MockModel, XapianAutocompleteMockModelSearchIndex)
+        backend.update(index, MockModel.objects.all())
+        
+        self.sq = SearchQuery(backend=backend)
+        self.sqs = SearchQuerySet(query=self.sq)
+    
+    def tearDown(self):
+        if os.path.exists(settings.HAYSTACK_XAPIAN_PATH):
+            shutil.rmtree(settings.HAYSTACK_XAPIAN_PATH)
+        
+        super(LiveXapianAutocompleteTestCase, self).tearDown()
+
+    def test_autocomplete(self):
+        autocomplete = self.sqs.autocomplete(text_auto='mod')
+        self.assertEqual(autocomplete.count(), 5)
+        self.assertEqual([result.pk for result in autocomplete], [u'1', u'12', u'7', u'6', u'14'])
+        self.assertTrue('mod' in autocomplete[0].text.lower())
+        self.assertTrue('mod' in autocomplete[1].text.lower())
+        self.assertTrue('mod' in autocomplete[2].text.lower())
+        self.assertTrue('mod' in autocomplete[3].text.lower())
+        self.assertTrue('mod' in autocomplete[4].text.lower())
+        self.assertEqual(len([result.pk for result in autocomplete]), 5)
+
