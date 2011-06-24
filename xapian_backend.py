@@ -239,16 +239,23 @@ class SearchBackend(BaseSearchBackend):
                         elif field['type'] == 'ngram':
                             pass
                         elif field['type'] == 'edge_ngram':
-                            NGRAM_LENGTH = 4
-                            value_length = len(value)
-                            for start in xrange(0, value_length - NGRAM_LENGTH + 1):
-                                for size in xrange(NGRAM_LENGTH, NGRAM_LENGTH + 1):
-                                    end = start + size
-                                    if end > value_length:
-                                        continue
-                                    term = _marshal_term(value[start:end])
-                                    document.add_term(term, weight)
-                                    document.add_term(prefix + term, weight)
+                            # using defaults from whoosh backend. seems like
+                            # this should go on the Haystack SearchField
+                            NGRAM_MIN_LENGTH = 2
+                            NGRAM_MAX_LENGTH = 15
+                            # this is an edge ngram, so split on whitespace first
+                            values = value.split()
+                            for value in values:
+                                value_length = len(value)
+                                for NGRAM_LENGTH in xrange(NGRAM_MIN_LENGTH, NGRAM_MAX_LENGTH + 1):
+                                    for start in xrange(0, value_length - NGRAM_LENGTH + 1):
+                                        for size in xrange(NGRAM_LENGTH, NGRAM_LENGTH + 1):
+                                            end = start + size
+                                            if end > value_length:
+                                                continue
+                                            term = _marshal_term(value[start:end])
+                                            document.add_term(term, weight)
+                                            document.add_term(prefix + term, weight)
                         else:
                             if field['multi_valued'] == 'false':
                                 term = _marshal_term(value)
@@ -1030,10 +1037,12 @@ class SearchQuery(BaseSearchQuery):
         if ' ' in term:
             if is_not:
                 return xapian.Query(
-                    xapian.Query.OP_AND_NOT, self._all_query(), self._phrase_query(term.split())
+                    xapian.Query.OP_AND_NOT, self._all_query(), self._phrase_query(
+                        term.split(), self.backend.content_field_name
+                    )
                 )
             else:
-                return self._phrase_query(term.split())
+                return self._phrase_query(term.split(), self.backend.content_field_name)
         else:
             if is_not:
                 return xapian.Query(xapian.Query.OP_AND_NOT, self._all_query(), self._term_query(term))

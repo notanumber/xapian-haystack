@@ -31,6 +31,7 @@ class XapianMockModel(models.Model):
     author = models.CharField(max_length=255)
     foo = models.CharField(max_length=255, blank=True)
     pub_date = models.DateTimeField(default=datetime.datetime.now)
+    exp_date = models.DateTimeField(default=datetime.datetime.now)
     tag = models.ForeignKey(MockTag)
     
     value = models.IntegerField(default=0)
@@ -53,6 +54,7 @@ class XapianMockSearchIndex(indexes.SearchIndex):
     )
     name = indexes.CharField(model_attr='author', faceted=True)
     pub_date = indexes.DateField(model_attr='pub_date')
+    exp_date = indexes.DateField(model_attr='exp_date')
     value = indexes.IntegerField(model_attr='value')
     flag = indexes.BooleanField(model_attr='flag')
     slug = indexes.CharField(indexed=False, model_attr='slug')
@@ -131,6 +133,7 @@ class XapianSearchBackendTestCase(TestCase):
             mock.id = i
             mock.author = 'david%s' % i
             mock.pub_date = datetime.date(2009, 2, 25) - datetime.timedelta(days=i)
+            mock.exp_date = datetime.date(2009, 2, 23) + datetime.timedelta(days=i)
             mock.value = i * 5
             mock.flag = bool(i % 2)
             mock.slug = 'http://example.com/%d/' % i
@@ -358,6 +361,12 @@ class XapianSearchBackendTestCase(TestCase):
         results = self.backend.search(xapian.Query(''), sort_by=['-pub_date'])
         self.assertEqual([result.pk for result in results['results']], [1, 2, 3])
         
+        results = self.backend.search(xapian.Query(''), sort_by=['exp_date'])
+        self.assertEqual([result.pk for result in results['results']], [1, 2, 3])
+        
+        results = self.backend.search(xapian.Query(''), sort_by=['-exp_date'])
+        self.assertEqual([result.pk for result in results['results']], [3, 2, 1])
+        
         results = self.backend.search(xapian.Query(''), sort_by=['id'])
         self.assertEqual([result.pk for result in results['results']], [1, 2, 3])
         
@@ -405,7 +414,7 @@ class XapianSearchBackendTestCase(TestCase):
     def test_build_schema(self):
         (content_field_name, fields) = self.backend.build_schema(self.site.all_searchfields())
         self.assertEqual(content_field_name, 'text')
-        self.assertEqual(len(fields), 13)
+        self.assertEqual(len(fields), 14)
         self.assertEqual(fields, [
             {'column': 0, 'type': 'text', 'field_name': 'name', 'multi_valued': 'false'},
             {'column': 1, 'type': 'text', 'field_name': 'tags', 'multi_valued': 'true'},
@@ -417,9 +426,10 @@ class XapianSearchBackendTestCase(TestCase):
             {'column': 7, 'type': 'text', 'field_name': 'url', 'multi_valued': 'false'},
             {'column': 8, 'type': 'boolean', 'field_name': 'flag', 'multi_valued': 'false'},
             {'column': 9, 'type': 'text', 'field_name': 'titles', 'multi_valued': 'true'},
-            {'column': 10, 'type': 'text', 'field_name': 'name_exact', 'multi_valued': 'false'},
-            {'column': 11, 'type': 'date', 'field_name': 'pub_date', 'multi_valued': 'false'},
-            {'column': 12, 'type': 'text', 'field_name': 'empty', 'multi_valued': 'false'}
+            {'column': 10, 'type': 'date', 'field_name': 'exp_date', 'multi_valued': 'false'},
+            {'column': 11, 'type': 'text', 'field_name': 'name_exact', 'multi_valued': 'false'},
+            {'column': 12, 'type': 'date', 'field_name': 'pub_date', 'multi_valued': 'false'},
+            {'column': 13, 'type': 'text', 'field_name': 'empty', 'multi_valued': 'false'}
         ])
     
     def test_parse_query(self):
