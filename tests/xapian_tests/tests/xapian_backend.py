@@ -12,12 +12,13 @@ from django.conf import settings
 from django.db import models
 from django.test import TestCase
 
-from haystack import indexes, sites, backends
-from haystack.backends.xapian_backend import SearchBackend, SearchQuery, _marshal_value
+from haystack import connections, reset_search_queries
+from haystack import indexes
+from haystack.backends.xapian_backend import _marshal_value
 from haystack.exceptions import HaystackError
 from haystack.models import SearchResult
 from haystack.query import SearchQuerySet, SQ
-from haystack.sites import SearchSite
+from haystack.utils.loading import UnifiedIndex
 
 from core.models import MockTag, MockModel, AnotherMockModel, AFourthMockModel
 from core.tests.mocks import MockSearchResult
@@ -69,6 +70,9 @@ class XapianMockSearchIndex(indexes.SearchIndex):
     keys = indexes.MultiValueField()
     titles = indexes.MultiValueField()
     
+    def get_model(self):
+        return XapianMockModel
+    
     def prepare_sites(self, obj):
         return ['%d' % (i * obj.id) for i in xrange(1, 4)]
 
@@ -107,16 +111,21 @@ class XapianBoostMockSearchIndex(indexes.SearchIndex):
     author = indexes.CharField(model_attr='author', weight=2.0)
     editor = indexes.CharField(model_attr='editor')
     pub_date = indexes.DateField(model_attr='pub_date')
+    
+    def get_model(self):
+        return AFourthMockModel
 
 
 class XapianSearchBackendTestCase(TestCase):
     def setUp(self):
         super(XapianSearchBackendTestCase, self).setUp()
         
-        self.site = SearchSite()
-        self.backend = SearchBackend(site=self.site)
-        self.index = XapianMockSearchIndex(XapianMockModel, backend=self.backend)
-        self.site.register(XapianMockModel, XapianMockSearchIndex)
+        self.old_ui = connections['default'].get_unified_index()
+        self.ui = UnifiedIndex()
+        self.index = XapianMockSearchIndex()
+        self.ui.build(indexes=[self.index])
+        self.backend = connections['default'].get_backend()
+        connections['default']._index = self.ui
         
         self.sample_objs = []
         
@@ -137,9 +146,10 @@ class XapianSearchBackendTestCase(TestCase):
         self.sample_objs[2].popularity = 972.0
     
     def tearDown(self):
-        if os.path.exists(settings.HAYSTACK_XAPIAN_PATH):
-            shutil.rmtree(settings.HAYSTACK_XAPIAN_PATH)
+        if os.path.exists(settings.HAYSTACK_CONNECTIONS['default']['PATH']):
+            shutil.rmtree(settings.HAYSTACK_CONNECTIONS['default']['PATH'])
         
+        connections['default']._index = self.old_ui
         super(XapianSearchBackendTestCase, self).tearDown()
     
     def test_update(self):
@@ -313,36 +323,6 @@ class XapianSearchBackendTestCase(TestCase):
         # Ensure that swapping the ``result_class`` works.
         self.assertTrue(isinstance(self.backend.more_like_this(self.sample_objs[0], result_class=MockSearchResult)['results'][0], MockSearchResult))
     
-    def test_use_correct_site(self):
-        test_site = SearchSite()
-        test_site.register(XapianMockModel, XapianMockSearchIndex)
-        self.backend.update(self.index, self.sample_objs)
-        
-        # Make sure that ``_process_results`` uses the right ``site``.
-        self.assertEqual(self.backend.search(xapian.Query('indexed'))['hits'], 3)
-        self.assertEqual([result.pk for result in self.backend.search(xapian.Query('indexed'))['results']], [1, 2, 3])
-        
-        self.site.unregister(XapianMockModel)
-        self.assertEqual(len(self.site.get_indexed_models()), 0)
-        self.backend.site = test_site
-        self.assertTrue(len(self.backend.site.get_indexed_models()) > 0)
-        
-        # Should still be there, despite the main ``site`` not having that model
-        # registered any longer.
-        self.assertEqual(self.backend.search(xapian.Query('indexed'))['hits'], 3)
-        self.assertEqual([result.pk for result in self.backend.search(xapian.Query('indexed'))['results']], [1, 2, 3])
-        
-        # Unregister it on the backend & make sure it takes effect.
-        self.backend.site.unregister(XapianMockModel)
-        self.assertEqual(len(self.backend.site.get_indexed_models()), 0)
-        self.assertEqual(self.backend.search(xapian.Query('indexed'))['hits'], 0)
-        
-        # Nuke it & fallback on the main ``site``.
-        self.backend.site = haystack.site
-        self.assertEqual(self.backend.search(xapian.Query('indexed'))['hits'], 0)
-        self.site.register(XapianMockModel, XapianMockSearchIndex)
-        self.assertEqual(self.backend.search(xapian.Query('indexed'))['hits'], 3)
-    
     def test_order_by(self):
         self.backend.update(self.index, self.sample_objs)
         self.assertEqual(self.backend.document_count(), 3)
@@ -404,7 +384,7 @@ class XapianSearchBackendTestCase(TestCase):
         self.assertEqual(_marshal_value(datetime.datetime(2009, 5, 18, 1, 16, 30, 250)), u'20090518011630000250')
     
     def test_build_schema(self):
-        (content_field_name, fields) = self.backend.build_schema(self.site.all_searchfields())
+        (content_field_name, fields) = self.backend.build_schema(connections['default'].get_unified_index().all_searchfields())
         self.assertEqual(content_field_name, 'text')
         self.assertEqual(len(fields), 14)
         self.assertEqual(fields, [
@@ -447,6 +427,9 @@ class LiveXapianMockSearchIndex(indexes.SearchIndex):
     pub_date = indexes.DateField(model_attr='pub_date')
     created = indexes.DateField()
     title = indexes.CharField()
+    
+    def get_model(self):
+        return MockModel
 
 
 class LiveXapianSearchQueryTestCase(TestCase):
@@ -458,13 +441,19 @@ class LiveXapianSearchQueryTestCase(TestCase):
     def setUp(self):
         super(LiveXapianSearchQueryTestCase, self).setUp()
         
-        site = SearchSite()
-        backend = SearchBackend(site=site)
-        index = LiveXapianMockSearchIndex(MockModel, backend=backend)
-        site.register(MockModel, LiveXapianMockSearchIndex)
+        self.old_ui = connections['default'].get_unified_index()
+        ui = UnifiedIndex()
+        index = LiveXapianMockSearchIndex()
+        ui.build(indexes=[index])
+        backend = connections['default'].get_backend()
+        connections['default']._index = ui
         backend.update(index, MockModel.objects.all())
         
-        self.sq = SearchQuery(backend=backend)
+        self.sq = connections['default'].get_query()
+    
+    def tearDown(self):
+        connections['default']._index = self.old_ui
+        super(LiveXapianSearchQueryTestCase, self).tearDown()
     
     def test_get_spelling(self):
         self.sq.add_filter(SQ(content='indxd'))
@@ -501,32 +490,32 @@ class LiveXapianSearchQueryTestCase(TestCase):
         self.assertEqual(str(self.sq.build_query()), u'Xapian::Query(((Zwhi OR why) AND VALUE_RANGE 2 00010101000000 20090210015900 AND (<alldocuments> AND_NOT VALUE_RANGE 3 a david) AND (<alldocuments> AND_NOT VALUE_RANGE 4 20090212121300 99990101000000) AND VALUE_RANGE 1 b zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz AND (Q1 OR Q2 OR Q3)))')
     
     def test_log_query(self):
-        backends.reset_search_queries()
-        self.assertEqual(len(backends.queries), 0)
+        reset_search_queries()
+        self.assertEqual(len(connections['default'].queries), 0)
         
         # Stow.
         old_debug = settings.DEBUG
         settings.DEBUG = False
         
         len(self.sq.get_results())
-        self.assertEqual(len(backends.queries), 0)
+        self.assertEqual(len(connections['default'].queries), 0)
         
         settings.DEBUG = True
         # Redefine it to clear out the cached results.
-        self.sq = SearchQuery(backend=SearchBackend())
+        self.sq = connections['default'].get_query()
         self.sq.add_filter(SQ(name='bar'))
         len(self.sq.get_results())
-        self.assertEqual(len(backends.queries), 1)
-        self.assertEqual(str(backends.queries[0]['query_string']), u'Xapian::Query((ZXNAMEbar OR XNAMEbar))')
+        self.assertEqual(len(connections['default'].queries), 1)
+        self.assertEqual(str(connections['default'].queries[0]['query_string']), u'Xapian::Query((ZXNAMEbar OR XNAMEbar))')
         
         # And again, for good measure.
-        self.sq = SearchQuery(backend=SearchBackend())
+        self.sq = connections['default'].get_query()
         self.sq.add_filter(SQ(name='bar'))
         self.sq.add_filter(SQ(text='moof'))
         len(self.sq.get_results())
-        self.assertEqual(len(backends.queries), 2)
-        self.assertEqual(str(backends.queries[0]['query_string']), u'Xapian::Query((ZXNAMEbar OR XNAMEbar))')
-        self.assertEqual(str(backends.queries[1]['query_string']), u'Xapian::Query(((ZXNAMEbar OR XNAMEbar) AND (ZXTEXTmoof OR XTEXTmoof)))')
+        self.assertEqual(len(connections['default'].queries), 2)
+        self.assertEqual(str(connections['default'].queries[0]['query_string']), u'Xapian::Query((ZXNAMEbar OR XNAMEbar))')
+        self.assertEqual(str(connections['default'].queries[1]['query_string']), u'Xapian::Query(((ZXNAMEbar OR XNAMEbar) AND (ZXTEXTmoof OR XTEXTmoof)))')
         
         # Restore.
         settings.DEBUG = old_debug
@@ -541,14 +530,20 @@ class LiveXapianSearchQuerySetTestCase(TestCase):
     def setUp(self):
         super(LiveXapianSearchQuerySetTestCase, self).setUp()
         
-        site = SearchSite()
-        backend = SearchBackend(site=site)
-        index = LiveXapianMockSearchIndex(MockModel, backend=backend)
-        site.register(MockModel, LiveXapianMockSearchIndex)
-        backend.update(index, MockModel.objects.all())
+        self.old_ui = connections['default'].get_unified_index()
+        self.ui = UnifiedIndex()
+        self.index = LiveXapianMockSearchIndex()
+        self.ui.build(indexes=[self.index])
+        self.backend = connections['default'].get_backend()
+        connections['default']._index = self.ui
+        self.backend.update(self.index, MockModel.objects.all())
         
-        self.sq = SearchQuery(backend=backend)
-        self.sqs = SearchQuerySet(query=self.sq)
+        self.sq = connections['default'].get_query()
+        self.sqs = SearchQuerySet()
+    
+    def tearDown(self):
+        connections['default']._index = self.old_ui
+        super(LiveXapianSearchQuerySetTestCase, self).tearDown()
     
     def test_result_class(self):
         # Assert that we're defaulting to ``SearchResult``.
@@ -567,16 +562,14 @@ class LiveXapianSearchQuerySetTestCase(TestCase):
 class XapianBoostBackendTestCase(TestCase):
     def setUp(self):
         super(XapianBoostBackendTestCase, self).setUp()
-
-        self.site = SearchSite()
-        self.sb = SearchBackend(site=self.site)
-        self.smmi = XapianBoostMockSearchIndex(AFourthMockModel, backend=self.sb)
-        self.site.register(AFourthMockModel, XapianBoostMockSearchIndex)
-
+        
         # Stow.
-        import haystack
-        self.old_site = haystack.site
-        haystack.site = self.site
+        self.old_ui = connections['default'].get_unified_index()
+        self.ui = UnifiedIndex()
+        self.index = XapianBoostMockSearchIndex()
+        self.ui.build(indexes=[self.index])
+        self.sb = connections['default'].get_backend()
+        connections['default']._index = self.ui
 
         self.sample_objs = []
 
@@ -593,12 +586,11 @@ class XapianBoostBackendTestCase(TestCase):
             self.sample_objs.append(mock)
 
     def tearDown(self):
-        import haystack
-        haystack.site = self.old_site
+        connections['default']._index = self.old_ui
         super(XapianBoostBackendTestCase, self).tearDown()
 
     def test_boost(self):
-        self.sb.update(self.smmi, self.sample_objs)
+        self.sb.update(self.index, self.sample_objs)
         
         sqs = SearchQuerySet()
         

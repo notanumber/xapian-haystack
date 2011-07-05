@@ -7,6 +7,10 @@ INSTALLED_APPS += [
     'xapian_tests',
 ]
 
-HAYSTACK_SEARCH_ENGINE = 'xapian'
-HAYSTACK_XAPIAN_PATH = os.path.join('tmp', 'test_xapian_query')
-HAYSTACK_INCLUDE_SPELLING = True
+HAYSTACK_CONNECTIONS = {
+    'default': {
+        'ENGINE': 'haystack.backends.xapian_backend.XapianEngine',
+        'PATH': os.path.join('tmp', 'test_xapian_query'),
+        'INCLUDE_SPELLING': True,
+    }
+}

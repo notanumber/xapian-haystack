@@ -1,7 +1,7 @@
 # Copyright (C) 2009-2011 David Sauve, Trapeze.  All rights reserved.
 
 __author__ = 'David Sauve'
-__version__ = (1, 1, 5, 'beta')
+__version__ = (2, 0, 0, 'beta')
 
 import time
 import datetime
@@ -12,11 +12,11 @@ import shutil
 import sys
 import warnings
 
-from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
-from django.utils.encoding import smart_unicode, force_unicode
+from django.utils.encoding import force_unicode
 
-from haystack.backends import BaseSearchBackend, BaseSearchQuery, SearchNode, log_query
+from haystack import connections
+from haystack.backends import BaseEngine, BaseSearchBackend, BaseSearchQuery, SearchNode, log_query
 from haystack.exceptions import HaystackError, MissingDependency, MoreLikeThisError
 from haystack.fields import DateField, DateTimeField, IntegerField, FloatField, BooleanField, MultiValueField
 from haystack.models import SearchResult
@@ -31,8 +31,6 @@ except ImportError:
 DOCUMENT_ID_TERM_PREFIX = 'Q'
 DOCUMENT_CUSTOM_TERM_PREFIX = 'X'
 DOCUMENT_CT_TERM_PREFIX = DOCUMENT_CUSTOM_TERM_PREFIX + 'CONTENTTYPE'
-
-BACKEND_NAME = 'xapian'
 
 DEFAULT_XAPIAN_FLAGS = (
     xapian.QueryParser.FLAG_PHRASE | 
@@ -50,7 +48,8 @@ class InvalidIndexError(HaystackError):
 
 class XHValueRangeProcessor(xapian.ValueRangeProcessor):
     def __init__(self, backend):
-        self.backend = backend or SearchBackend()
+        # FIXME: This needs to get smarter about pulling the right backend.
+        self.backend = backend or XapianSearchBackend()
         xapian.ValueRangeProcessor.__init__(self)
     
     def __call__(self, begin, end):
@@ -107,7 +106,7 @@ class XHExpandDecider(xapian.ExpandDecider):
         return True
 
 
-class SearchBackend(BaseSearchBackend):
+class XapianSearchBackend(BaseSearchBackend):
     """
     `SearchBackend` defines the Xapian search backend for use with the Haystack
     API for Django search.
@@ -120,28 +119,33 @@ class SearchBackend(BaseSearchBackend):
     `WSGIApplicationGroup to %{GLOBAL}` when using mod_wsgi, or
     `PythonInterpreter main_interpreter` when using mod_python.
     
-    In order to use this backend, `HAYSTACK_XAPIAN_PATH` must be set in
-    your settings.  This should point to a location where you would your
+    In order to use this backend, `PATH` must be included in the
+    `connection_options`.  This should point to a location where you would your
     indexes to reside.
     """
-    def __init__(self, site=None, language='english'):
+    def __init__(self, connection_alias, language='english', **connection_options):
         """
         Instantiates an instance of `SearchBackend`.
         
         Optional arguments:
-            `site` -- The site to associate the backend with (default = None)
-            `stemming_language` -- The stemming language (default = 'english')
+            `connection_alias` -- The name of the connection
+            `language` -- The stemming language (default = 'english')
+            `**connection_options` -- The various options needed to setup
+              the backend.
         
-        Also sets the stemming language to be used to `stemming_language`.
+        Also sets the stemming language to be used to `language`.
         """
-        super(SearchBackend, self).__init__(site)
+        super(XapianSearchBackend, self).__init__(connection_alias, **connection_options)
         
-        if not hasattr(settings, 'HAYSTACK_XAPIAN_PATH'):
-            raise ImproperlyConfigured('You must specify a HAYSTACK_XAPIAN_PATH in your settings.')
+        if not 'PATH' in connection_options:
+            raise ImproperlyConfigured("You must specify a 'PATH' in your settings for connection '%s'." % connection_alias)
         
-        if not os.path.exists(settings.HAYSTACK_XAPIAN_PATH):
-            os.makedirs(settings.HAYSTACK_XAPIAN_PATH)
+        self.path = connection_options.get('PATH')
         
+        if not os.path.exists(self.path):
+            os.makedirs(self.path)
+        
+        self.flags = connection_options.get('FLAGS', DEFAULT_XAPIAN_FLAGS)
         self.language = language
         self._schema = None
         self._content_field_name = None
@@ -149,13 +153,13 @@ class SearchBackend(BaseSearchBackend):
     @property
     def schema(self):
         if not self._schema:
-            self._content_field_name, self._schema = self.build_schema(self.site.all_searchfields())            
+            self._content_field_name, self._schema = self.build_schema(connections[self.connection_alias].get_unified_index().all_searchfields())            
         return self._schema
 
     @property
     def content_field_name(self):
         if not self._content_field_name:
-            self._content_field_name, self._schema = self.build_schema(self.site.all_searchfields())            
+            self._content_field_name, self._schema = self.build_schema(connections[self.connection_alias].get_unified_index().all_searchfields())            
         return self._content_field_name
     
     def update(self, index, iterable):
@@ -204,7 +208,7 @@ class SearchBackend(BaseSearchBackend):
                 term_generator = xapian.TermGenerator()
                 term_generator.set_database(database)
                 term_generator.set_stemmer(xapian.Stem(self.language))
-                if getattr(settings, 'HAYSTACK_INCLUDE_SPELLING', False) is True:
+                if self.include_spelling is True:
                     term_generator.set_flags(xapian.TermGenerator.FLAG_SPELLING)
                 term_generator.set_document(document)
                 
@@ -296,10 +300,10 @@ class SearchBackend(BaseSearchBackend):
         database = self._database(writable=True)
         if not models:
             # Because there does not appear to be a "clear all" method,
-            # it's much quicker to remove the contents of the `HAYSTACK_XAPIAN_PATH`
+            # it's much quicker to remove the contents of the `self.path`
             # folder than it is to remove each document one at a time.
-            if os.path.exists(settings.HAYSTACK_XAPIAN_PATH):
-                shutil.rmtree(settings.HAYSTACK_XAPIAN_PATH)
+            if os.path.exists(self.path):
+                shutil.rmtree(self.path)
         else:
             for model in models:
                 database.delete_document(
@@ -349,16 +353,11 @@ class SearchBackend(BaseSearchBackend):
         
         If `query` is None, returns no results.
         
-        If `HAYSTACK_INCLUDE_SPELLING` was enabled in `settings.py`, the
+        If `INCLUDE_SPELLING` was enabled in the connection options, the
         extra flag `FLAG_SPELLING_CORRECTION` will be passed to the query parser
         and any suggestions for spell correction will be returned as well as
         the results.
         """
-        if not self.site:
-            from haystack import site
-        else:
-            site = self.site
-        
         if xapian.Query.empty(query):
             return {
                 'results': [],
@@ -370,7 +369,7 @@ class SearchBackend(BaseSearchBackend):
         if result_class is None:
             result_class = SearchResult
         
-        if getattr(settings, 'HAYSTACK_INCLUDE_SPELLING', False) is True:
+        if self.include_spelling is True:
             spelling_suggestion = self._do_spelling_suggestion(database, query, spelling_query)
         else:
             spelling_suggestion = ''
@@ -383,7 +382,7 @@ class SearchBackend(BaseSearchBackend):
             )
         
         if limit_to_registered_models:
-            registered_models = self.build_registered_models_list()
+            registered_models = self.build_models_list()
             
             if len(registered_models) > 0:
                 query = xapian.Query(
@@ -434,7 +433,7 @@ class SearchBackend(BaseSearchBackend):
                     )
                 }
             results.append(
-                result_class(app_label, module_name, pk, match.percent, searchsite=site, **model_data)
+                result_class(app_label, module_name, pk, match.percent, **model_data)
             )
         
         if facets:
@@ -483,11 +482,6 @@ class SearchBackend(BaseSearchBackend):
         
         Finally, processes the resulting matches and returns.
         """
-        if not self.site:
-            from haystack import site
-        else:
-            site = self.site
-        
         database = self._database()
         
         if result_class is None:
@@ -515,7 +509,7 @@ class SearchBackend(BaseSearchBackend):
             xapian.Query.OP_AND_NOT, [query, DOCUMENT_ID_TERM_PREFIX + get_identifier(model_instance)]
         )
         if limit_to_registered_models:
-            registered_models = self.build_registered_models_list()
+            registered_models = self.build_models_list()
             
             if len(registered_models) > 0:
                 query = xapian.Query(
@@ -539,7 +533,7 @@ class SearchBackend(BaseSearchBackend):
         for match in matches:
             app_label, module_name, pk, model_data = pickle.loads(self._get_document_data(database, match.document))
             results.append(
-                result_class(app_label, module_name, pk, match.percent, searchsite=site, **model_data)
+                result_class(app_label, module_name, pk, match.percent, **model_data)
             )
 
         return {
@@ -567,7 +561,6 @@ class SearchBackend(BaseSearchBackend):
         elif query_string == '':
             return xapian.Query()   # Match nothing
         
-        flags = getattr(settings, 'HAYSTACK_XAPIAN_FLAGS', DEFAULT_XAPIAN_FLAGS)
         qp = xapian.QueryParser()
         qp.set_database(self._database())
         qp.set_stemmer(xapian.Stem(self.language))
@@ -583,7 +576,7 @@ class SearchBackend(BaseSearchBackend):
         vrp = XHValueRangeProcessor(self)
         qp.add_valuerangeprocessor(vrp)
         
-        return qp.parse_query(query_string, flags)
+        return qp.parse_query(query_string, self.flags)
     
     def build_schema(self, fields):
         """
@@ -813,12 +806,12 @@ class SearchBackend(BaseSearchBackend):
         Returns an instance of a xapian.Database or xapian.WritableDatabase
         """
         if writable:
-            database = xapian.WritableDatabase(settings.HAYSTACK_XAPIAN_PATH, xapian.DB_CREATE_OR_OPEN)
+            database = xapian.WritableDatabase(self.path, xapian.DB_CREATE_OR_OPEN)
         else:
             try:
-                database = xapian.Database(settings.HAYSTACK_XAPIAN_PATH)
+                database = xapian.Database(self.path)
             except xapian.DatabaseOpeningError:
-                raise InvalidIndexError(u'Unable to open index at %s' % settings.HAYSTACK_XAPIAN_PATH)
+                raise InvalidIndexError(u'Unable to open index at %s' % self.path)
 
         return database
 
@@ -902,24 +895,12 @@ class SearchBackend(BaseSearchBackend):
         return False
 
 
-class SearchQuery(BaseSearchQuery):
+class XapianSearchQuery(BaseSearchQuery):
     """
     This class is the Xapian specific version of the SearchQuery class.
     It acts as an intermediary between the ``SearchQuerySet`` and the
     ``SearchBackend`` itself.
     """
-    def __init__(self, backend=None, site=None):
-        """
-        Create a new instance of the SearchQuery setting the backend as
-        specified.  If no backend is set, will use the Xapian `SearchBackend`.
-        
-        Optional arguments:
-            ``backend`` -- The ``SearchBackend`` to use (default = None)
-            ``site`` -- The site to use (default = None)
-        """
-        super(SearchQuery, self).__init__(backend=backend)
-        self.backend = backend or SearchBackend(site=site)
-    
     def build_query(self):
         if not self.query_filter:
             query = xapian.Query('')
@@ -1309,3 +1290,8 @@ def run_mlt(self):
     results = self.backend.more_like_this(self._mlt_instance, additional_query_string, **kwargs)
     self._results = results.get('results', [])
     self._hit_count = results.get('hits', 0)
+
+
+class XapianEngine(BaseEngine):
+    backend = XapianSearchBackend
+    query = XapianSearchQuery
