@@ -1,4 +1,6 @@
-# Copyright (C) 2009-2011 David Sauve, Trapeze.  All rights reserved.
+# Copyright (C) 2009, 2010, 2011 David Sauve
+# Copyright (C) 2009, 2010 Trapeze
+
 # Based on original code by Daniel Lindsley as part of the Haystack test suite.
 
 import cPickle as pickle

@@ -91,12 +91,12 @@ The latest source code can always be found here: `github.com/notanumber/xapian-h
 Credits
 -------
 
-xapian-haystack is maintained by `David Sauve <mailto:dsauve@gmail.com>`_, and was originally funded by `Trapeze <http://www.trapeze.com>`_.
+xapian-haystack is maintained by `David Sauve <mailto:david.sauve@bag-of-holding.com>`_, and was originally funded by `Trapeze <http://www.trapeze.com>`_.
 
 License
 -------
 
-xapian-haystack is Copyright (c) 2009-2011 David Sauve, Trapeze. It is free software, and may be redistributed under the terms specified in the LICENSE file. 
+xapian-haystack is Copyright (c) 2009, 2010, 2011 David Sauve, 2009, 2010 Trapeze. It is free software, and may be redistributed under the terms specified in the LICENSE file. 
 
 Questions, Comments, Concerns:
 ------------------------------

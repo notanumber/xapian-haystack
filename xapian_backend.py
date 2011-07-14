@@ -1,4 +1,5 @@
-# Copyright (C) 2009-2011 David Sauve, Trapeze.  All rights reserved.
+# Copyright (C) 2009, 2010, 2011 David Sauve
+# Copyright (C) 2009, 2010 Trapeze
 
 __author__ = 'David Sauve'
 __version__ = (2, 0, 0, 'beta')
