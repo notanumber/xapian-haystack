@@ -33,6 +33,8 @@ DOCUMENT_ID_TERM_PREFIX = 'Q'
 DOCUMENT_CUSTOM_TERM_PREFIX = 'X'
 DOCUMENT_CT_TERM_PREFIX = DOCUMENT_CUSTOM_TERM_PREFIX + 'CONTENTTYPE'
 
+MEMORY_DB_NAME = ':memory:'
+
 BACKEND_NAME = 'xapian'
 
 DEFAULT_XAPIAN_FLAGS = (
@@ -125,6 +127,9 @@ class SearchBackend(BaseSearchBackend):
     your settings.  This should point to a location where you would your
     indexes to reside.
     """
+
+    inmemory_db = None
+
     def __init__(self, site=None, language='english'):
         """
         Instantiates an instance of `SearchBackend`.
@@ -139,8 +144,9 @@ class SearchBackend(BaseSearchBackend):
         
         if not hasattr(settings, 'HAYSTACK_XAPIAN_PATH'):
             raise ImproperlyConfigured('You must specify a HAYSTACK_XAPIAN_PATH in your settings.')
-        
-        if not os.path.exists(settings.HAYSTACK_XAPIAN_PATH):
+
+        if settings.HAYSTACK_XAPIAN_PATH != MEMORY_DB_NAME and \
+           not os.path.exists(settings.HAYSTACK_XAPIAN_PATH):
             os.makedirs(settings.HAYSTACK_XAPIAN_PATH)
         
         self.language = language
@@ -813,6 +819,10 @@ class SearchBackend(BaseSearchBackend):
 
         Returns an instance of a xapian.Database or xapian.WritableDatabase
         """
+        if settings.HAYSTACK_XAPIAN_PATH == MEMORY_DB_NAME:
+            if not SearchBackend.inmemory_db:
+                SearchBackend.inmemory_db = xapian.inmemory_open()
+            return SearchBackend.inmemory_db
         if writable:
             database = xapian.WritableDatabase(settings.HAYSTACK_XAPIAN_PATH, xapian.DB_CREATE_OR_OPEN)
         else:
