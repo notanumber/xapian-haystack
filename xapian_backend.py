@@ -205,72 +205,73 @@ class SearchBackend(BaseSearchBackend):
         """
         database = self._database(writable=True)
         try:
-            for obj in iterable:
-                document = xapian.Document()
-                
-                term_generator = xapian.TermGenerator()
-                term_generator.set_database(database)
-                term_generator.set_stemmer(xapian.Stem(self.language))
-                if getattr(settings, 'HAYSTACK_INCLUDE_SPELLING', False) is True:
-                    term_generator.set_flags(xapian.TermGenerator.FLAG_SPELLING)
-                term_generator.set_document(document)
-                
-                document_id = DOCUMENT_ID_TERM_PREFIX + get_identifier(obj)
-                data = index.full_prepare(obj)
-                weights = index.get_field_weights()
-                for field in self.schema:
-                    if field['field_name'] in data.keys():
-                        prefix = DOCUMENT_CUSTOM_TERM_PREFIX + field['field_name'].upper()
-                        value = data[field['field_name']]
-                        try:
-                            weight = int(weights[field['field_name']])
-                        except KeyError:
-                            weight = 1
-                        if field['type'] == 'text':
-                            if field['multi_valued'] == 'false':
-                                term = _marshal_term(value)
-                                term_generator.index_text(term, weight)
-                                term_generator.index_text(term, weight, prefix)
-                                if len(term.split()) == 1:
-                                    document.add_term(term, weight)
-                                    document.add_term(prefix + term, weight)
-                                document.add_value(field['column'], _marshal_value(value))
-                            else:
-                                for term in value:
-                                    term = _marshal_term(term)
+            try:
+                for obj in iterable:
+                    document = xapian.Document()
+                    
+                    term_generator = xapian.TermGenerator()
+                    term_generator.set_database(database)
+                    term_generator.set_stemmer(xapian.Stem(self.language))
+                    if getattr(settings, 'HAYSTACK_INCLUDE_SPELLING', False) is True:
+                        term_generator.set_flags(xapian.TermGenerator.FLAG_SPELLING)
+                    term_generator.set_document(document)
+                    
+                    document_id = DOCUMENT_ID_TERM_PREFIX + get_identifier(obj)
+                    data = index.full_prepare(obj)
+                    weights = index.get_field_weights()
+                    for field in self.schema:
+                        if field['field_name'] in data.keys():
+                            prefix = DOCUMENT_CUSTOM_TERM_PREFIX + field['field_name'].upper()
+                            value = data[field['field_name']]
+                            try:
+                                weight = int(weights[field['field_name']])
+                            except KeyError:
+                                weight = 1
+                            if field['type'] == 'text':
+                                if field['multi_valued'] == 'false':
+                                    term = _marshal_term(value)
                                     term_generator.index_text(term, weight)
                                     term_generator.index_text(term, weight, prefix)
                                     if len(term.split()) == 1:
                                         document.add_term(term, weight)
                                         document.add_term(prefix + term, weight)
-                        else:
-                            if field['multi_valued'] == 'false':
-                                term = _marshal_term(value)
-                                if len(term.split()) == 1:
-                                    document.add_term(term, weight)
-                                    document.add_term(prefix + term, weight)
                                     document.add_value(field['column'], _marshal_value(value))
+                                else:
+                                    for term in value:
+                                        term = _marshal_term(term)
+                                        term_generator.index_text(term, weight)
+                                        term_generator.index_text(term, weight, prefix)
+                                        if len(term.split()) == 1:
+                                            document.add_term(term, weight)
+                                            document.add_term(prefix + term, weight)
                             else:
-                                for term in value:
-                                    term = _marshal_term(term)
+                                if field['multi_valued'] == 'false':
+                                    term = _marshal_term(value)
                                     if len(term.split()) == 1:
                                         document.add_term(term, weight)
                                         document.add_term(prefix + term, weight)
-                
-                document.set_data(pickle.dumps(
-                    (obj._meta.app_label, obj._meta.module_name, obj.pk, data),
-                    pickle.HIGHEST_PROTOCOL
-                ))
-                document.add_term(document_id)
-                document.add_term(
-                    DOCUMENT_CT_TERM_PREFIX + u'%s.%s' %
-                    (obj._meta.app_label, obj._meta.module_name)
-                )
-                database.replace_document(document_id, document)
-        
-        except UnicodeDecodeError:
-            sys.stderr.write('Chunk failed.\n')
-            pass
+                                        document.add_value(field['column'], _marshal_value(value))
+                                else:
+                                    for term in value:
+                                        term = _marshal_term(term)
+                                        if len(term.split()) == 1:
+                                            document.add_term(term, weight)
+                                            document.add_term(prefix + term, weight)
+                    
+                    document.set_data(pickle.dumps(
+                        (obj._meta.app_label, obj._meta.module_name, obj.pk, data),
+                        pickle.HIGHEST_PROTOCOL
+                    ))
+                    document.add_term(document_id)
+                    document.add_term(
+                        DOCUMENT_CT_TERM_PREFIX + u'%s.%s' %
+                        (obj._meta.app_label, obj._meta.module_name)
+                    )
+                    database.replace_document(document_id, document)
+            
+            except UnicodeDecodeError:
+                sys.stderr.write('Chunk failed.\n')
+                pass
         
         finally:
             database = None
