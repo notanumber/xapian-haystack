@@ -902,6 +902,14 @@ class XapianSearchQuery(BaseSearchQuery):
     It acts as an intermediary between the ``SearchQuerySet`` and the
     ``SearchBackend`` itself.
     """
+    def build_params(self, *args, **kwargs):
+        kwargs = super(BaseSearchQuery, self).build_params(*args, **kwargs)
+
+        if self.end_offset is not None:
+            kwargs['end_offset'] = self.end_offset - self.start_offset
+        
+        return kwargs
+
     def build_query(self):
         if not self.query_filter:
             query = xapian.Query('')
@@ -1234,6 +1242,7 @@ def _marshal_datetime(dt):
             dt.year, dt.month, dt.day, dt.hour,
             dt.minute, dt.second
         )
+<<<<<<< HEAD
 
 
 def run(self):
@@ -1296,3 +1305,5 @@ def run_mlt(self):
 class XapianEngine(BaseEngine):
     backend = XapianSearchBackend
     query = XapianSearchQuery
+=======
+>>>>>>> a845377... Removed leftover run and run_mlt methods.  Replaced with overriden build_params.  This should fix gh-85 and gh-82.
