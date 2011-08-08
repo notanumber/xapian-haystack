@@ -421,7 +421,9 @@ class SearchBackend(BaseSearchBackend):
             'queries': {},
         }
         
-        if not end_offset:
+        if end_offset:
+            end_offset = end_offset - start_offset
+        else:
             end_offset = database.get_doccount() - start_offset
         
         matches = self._get_enquire_mset(database, enquire, start_offset, end_offset)
