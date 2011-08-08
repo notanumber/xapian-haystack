@@ -2,7 +2,7 @@
 # Copyright (C) 2009, 2010 Trapeze
 
 __author__ = 'David Sauve'
-__version__ = (1, 1, 6, 'dev')
+__version__ = (1, 1, 6, 'beta')
 
 import time
 import datetime
