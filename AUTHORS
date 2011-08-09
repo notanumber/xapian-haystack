@@ -24,3 +24,4 @@ Thanks to:
     * liranz for pointing out a potential conflict with arguments pass into `SearchResult`
     * Jacob Kaplan-Moss for pointing out that write permission shouldn't be required for searching.
     * glassresistor for assistance troubleshooting an issue with boosting a phrase query & a patch to make weighting schemes overridable.
+    * James Addison for helping to debug an intermittent issue with `order_by` and `build_schema`.
