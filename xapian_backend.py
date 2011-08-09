@@ -1242,68 +1242,8 @@ def _marshal_datetime(dt):
             dt.year, dt.month, dt.day, dt.hour,
             dt.minute, dt.second
         )
-<<<<<<< HEAD
-
-
-def run(self):
-    """
-    Builds and executes the query. Returns a list of search results.
-    """
-    final_query = self.build_query()
-    kwargs = {
-        'start_offset': self.start_offset,
-    }
-
-    if self.order_by:
-        kwargs['sort_by'] = self.order_by
-
-    if self.end_offset is not None:
-        kwargs['end_offset'] = self.end_offset - self.start_offset
-
-    if self.highlight:
-        kwargs['highlight'] = self.highlight
-
-    if self.facets:
-        kwargs['facets'] = list(self.facets)
-
-    if self.date_facets:
-        kwargs['date_facets'] = self.date_facets
-
-    if self.query_facets:
-        kwargs['query_facets'] = self.query_facets
-
-    if self.narrow_queries:
-        kwargs['narrow_queries'] = self.narrow_queries
-
-    results = self.backend.search(final_query, **kwargs)
-    self._results = results.get('results', [])
-    self._hit_count = results.get('hits', 0)
-    self._facet_counts = results.get('facets', {})
-    self._spelling_suggestion = results.get('spelling_suggestion', None)
-
-
-def run_mlt(self):
-    """
-    Builds and executes the query. Returns a list of search results.
-    """
-    if self._more_like_this is False or self._mlt_instance is None:
-        raise MoreLikeThisError("No instance was provided to determine 'More Like This' results.")
-
-    additional_query_string = self.build_query()
-    kwargs = {
-        'start_offset': self.start_offset,
-    }
-
-    if self.end_offset is not None:
-        kwargs['end_offset'] = self.end_offset - self.start_offset
-
-    results = self.backend.more_like_this(self._mlt_instance, additional_query_string, **kwargs)
-    self._results = results.get('results', [])
-    self._hit_count = results.get('hits', 0)
 
 
 class XapianEngine(BaseEngine):
     backend = XapianSearchBackend
     query = XapianSearchQuery
-=======
->>>>>>> a845377... Removed leftover run and run_mlt methods.  Replaced with overriden build_params.  This should fix gh-85 and gh-82.
