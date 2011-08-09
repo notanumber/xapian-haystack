@@ -18,6 +18,7 @@ from django.utils.encoding import force_unicode
 
 from haystack import connections
 from haystack.backends import BaseEngine, BaseSearchBackend, BaseSearchQuery, SearchNode, log_query
+from haystack.constants import ID, DJANGO_CT, DJANGO_ID
 from haystack.exceptions import HaystackError, MissingDependency, MoreLikeThisError
 from haystack.fields import DateField, DateTimeField, IntegerField, FloatField, BooleanField, MultiValueField
 from haystack.models import SearchResult
@@ -590,10 +591,12 @@ class XapianSearchBackend(BaseSearchBackend):
         an indexed meta-data.
         """
         content_field_name = ''
-        schema_fields = []
-        column = 0
+        schema_fields = [
+            {'field_name': ID, 'type': 'text', 'multi_valued': 'false', 'column': 0},
+        ]
+        column = len(schema_fields)
         
-        for field_name, field_class in fields.items():
+        for field_name, field_class in sorted(fields.items(), key=lambda n: n[0]):
             if field_class.document is True:
                 content_field_name = field_class.index_fieldname
             
