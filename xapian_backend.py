@@ -131,26 +131,27 @@ class SearchBackend(BaseSearchBackend):
 
     inmemory_db = None
 
-    def __init__(self, site=None, language='english'):
+    def __init__(self, site=None, language=None):
         """
         Instantiates an instance of `SearchBackend`.
         
         Optional arguments:
             `site` -- The site to associate the backend with (default = None)
-            `stemming_language` -- The stemming language (default = 'english')
-        
-        Also sets the stemming language to be used to `stemming_language`.
+
         """
         super(SearchBackend, self).__init__(site)
         
         if not hasattr(settings, 'HAYSTACK_XAPIAN_PATH'):
             raise ImproperlyConfigured('You must specify a HAYSTACK_XAPIAN_PATH in your settings.')
+            
+        if language:
+            raise AttributeError('Language arg is now deprecated. Please use settings.HAYSTACK_XAPIAN_LANGUAGE instead.')
 
         if settings.HAYSTACK_XAPIAN_PATH != MEMORY_DB_NAME and \
            not os.path.exists(settings.HAYSTACK_XAPIAN_PATH):
             os.makedirs(settings.HAYSTACK_XAPIAN_PATH)
         
-        self.language = language
+        self.language = getattr(settings, 'HAYSTACK_XAPIAN_LANGUAGE', 'english')
         self._schema = None
         self._content_field_name = None
         
