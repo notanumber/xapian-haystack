@@ -906,7 +906,7 @@ class XapianSearchQuery(BaseSearchQuery):
     ``SearchBackend`` itself.
     """
     def build_params(self, *args, **kwargs):
-        kwargs = super(BaseSearchQuery, self).build_params(*args, **kwargs)
+        kwargs = super(XapianSearchQuery, self).build_params(*args, **kwargs)
 
         if self.end_offset is not None:
             kwargs['end_offset'] = self.end_offset - self.start_offset
