@@ -128,7 +128,7 @@ class XapianSearchBackend(BaseSearchBackend):
     """
     inmemory_db = None
 
-    def __init__(self, connection_alias, language='english', **connection_options):
+    def __init__(self, connection_alias, **connection_options):
         """
         Instantiates an instance of `SearchBackend`.
 
@@ -151,7 +151,7 @@ class XapianSearchBackend(BaseSearchBackend):
             os.makedirs(self.path)
 
         self.flags = connection_options.get('FLAGS', DEFAULT_XAPIAN_FLAGS)
-        self.language = language
+        self.language = getattr(settings, 'HAYSTACK_XAPIAN_LANGUAGE', 'english')
         self._schema = None
         self._content_field_name = None
 
