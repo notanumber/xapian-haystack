@@ -275,7 +275,7 @@ class XapianSearchBackend(BaseSearchBackend):
             pass
 
         finally:
-            database = None
+            database.close()
 
     def remove(self, obj):
         """
@@ -286,6 +286,7 @@ class XapianSearchBackend(BaseSearchBackend):
         """
         database = self._database(writable=True)
         database.delete_document(DOCUMENT_ID_TERM_PREFIX + get_identifier(obj))
+        database.close()
 
     def clear(self, models=[]):
         """
@@ -315,6 +316,7 @@ class XapianSearchBackend(BaseSearchBackend):
                     DOCUMENT_CT_TERM_PREFIX + '%s.%s' %
                     (model._meta.app_label, model._meta.module_name)
                 )
+        database.close()
 
     def document_count(self):
         try:
@@ -812,10 +814,10 @@ class XapianSearchBackend(BaseSearchBackend):
 
         Returns an instance of a xapian.Database or xapian.WritableDatabase
         """
-        if settings.HAYSTACK_XAPIAN_PATH == MEMORY_DB_NAME:
-            if not SearchBackend.inmemory_db:
-                SearchBackend.inmemory_db = xapian.inmemory_open()
-            return SearchBackend.inmemory_db
+        if self.path == MEMORY_DB_NAME:
+            if not self.inmemory_db:
+                self.inmemory_db = xapian.inmemory_open()
+            return self.inmemory_db
         if writable:
             database = xapian.WritableDatabase(self.path, xapian.DB_CREATE_OR_OPEN)
         else:
@@ -913,7 +915,7 @@ class XapianSearchQuery(BaseSearchQuery):
     ``SearchBackend`` itself.
     """
     def build_params(self, *args, **kwargs):
-        kwargs = super(SearchQuery, self).build_params(*args, **kwargs)
+        kwargs = super(XapianSearchQuery, self).build_params(*args, **kwargs)
 
         if self.end_offset is not None:
             kwargs['end_offset'] = self.end_offset - self.start_offset
@@ -978,7 +980,9 @@ class XapianSearchQuery(BaseSearchQuery):
                 if field == 'content':
                     query_list.append(self._content_field(term, is_not))
                 else:
-                    if filter_type == 'exact':
+                    if filter_type == 'contains':
+                        query_list.append(self._filter_contains(term, field, is_not))
+                    elif filter_type == 'exact':
                         query_list.append(self._filter_exact(term, field, is_not))
                     elif filter_type == 'gt':
                         query_list.append(self._filter_gt(term, field, is_not))
@@ -1025,7 +1029,7 @@ class XapianSearchQuery(BaseSearchQuery):
             else:
                 return self._term_query(term)
 
-    def _filter_exact(self, term, field, is_not):
+    def _filter_contains(self, term, field, is_not):
         """
         Private method that returns a xapian.Query that searches for `term`
         in a specified `field`.
@@ -1039,17 +1043,32 @@ class XapianSearchQuery(BaseSearchQuery):
             A xapian.Query
         """
         if ' ' in term:
-            if is_not:
-                return xapian.Query(
-                    xapian.Query.OP_AND_NOT, self._all_query(), self._phrase_query(term.split(), field)
-                )
-            else:
-                return self._phrase_query(term.split(), field)
+            return self._filter_exact(term, field, is_not)
         else:
             if is_not:
                 return xapian.Query(xapian.Query.OP_AND_NOT, self._all_query(), self._term_query(term, field))
             else:
                 return self._term_query(term, field)
+
+    def _filter_exact(self, term, field, is_not):
+        """
+        Private method that returns a xapian.Query that searches for an exact
+        match for `term` in a specified `field`.
+
+        Required arguments:
+            ``term`` -- The term to search for
+            ``field`` -- The field to search
+            ``is_not`` -- Invert the search results
+
+        Returns:
+            A xapian.Query
+        """
+        if is_not:
+            return xapian.Query(
+                xapian.Query.OP_AND_NOT, self._all_query(), self._phrase_query(term.split(), field)
+            )
+        else:
+            return self._phrase_query(term.split(), field)
 
     def _filter_in(self, term_list, field, is_not):
         """
