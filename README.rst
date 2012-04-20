@@ -13,7 +13,7 @@ Requirements
 
 - Python 2.4 (May work with 2.3, but untested)
 - Django 1.0.x
-- Django-Haystack 1.1.X (If you wish to use django-haystack 1.0.X, please use xapian-haystack 1.0.X)
+- Django-Haystack 2.0.X
 - Xapian 1.0.13+ (May work with earlier versions, but untested)
 
 Notes
@@ -33,13 +33,19 @@ Installation
     or
 
     ``pip install xapian-haystack``
-    
+
     or
 
     ``easy_install xapian-haystack``
 
-#. Add ``HAYSTACK_XAPIAN_PATH`` to ``settings.py``
-#. Set ``HAYSTACK_SEARCH_ENGINE`` to ``xapian``
+#. Set to something similar to:
+
+    HAYSTACK_CONNECTIONS = {
+        'default': {
+            'ENGINE': 'haystack.backends.xapian_backend.XapianEngine',
+            'PATH': os.path.join(os.path.dirname(__file__), 'xapian_index')
+        },
+    }
 
 Configuration
 -------------
@@ -96,7 +102,7 @@ xapian-haystack is maintained by `David Sauve <mailto:david.sauve@bag-of-holding
 License
 -------
 
-xapian-haystack is Copyright (c) 2009, 2010, 2011 David Sauve, 2009, 2010 Trapeze. It is free software, and may be redistributed under the terms specified in the LICENSE file. 
+xapian-haystack is Copyright (c) 2009, 2010, 2011, 2012 David Sauve, 2009, 2010 Trapeze. It is free software, and may be redistributed under the terms specified in the LICENSE file.
 
 Questions, Comments, Concerns:
 ------------------------------

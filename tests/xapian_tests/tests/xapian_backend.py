@@ -1,4 +1,4 @@
-# Copyright (C) 2009, 2010, 2011 David Sauve
+# Copyright (C) 2009, 2010, 2011, 2012 David Sauve
 # Copyright (C) 2009, 2010 Trapeze
 
 # Based on original code by Daniel Lindsley as part of the Haystack test suite.
