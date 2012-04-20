@@ -275,7 +275,7 @@ class SearchBackend(BaseSearchBackend):
             pass
         
         finally:
-            database = None
+            database.close()
     
     def remove(self, obj):
         """
@@ -286,6 +286,7 @@ class SearchBackend(BaseSearchBackend):
         """
         database = self._database(writable=True)
         database.delete_document(DOCUMENT_ID_TERM_PREFIX + get_identifier(obj))
+        database.close()
     
     def clear(self, models=[]):
         """
@@ -315,6 +316,7 @@ class SearchBackend(BaseSearchBackend):
                     DOCUMENT_CT_TERM_PREFIX + '%s.%s' %
                     (model._meta.app_label, model._meta.module_name)
                 )
+        database.close()
 
     def document_count(self):
         try:
