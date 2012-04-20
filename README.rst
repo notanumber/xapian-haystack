@@ -56,6 +56,8 @@ As well as the flags described `here <http://docs.haystacksearch.org/dev/setting
 
     - `HAYSTACK_XAPIAN_WEIGHTING_SCHEME` -- used to override the default weighting scheme used during search.  `HAYSTACK_XAPIAN_WEIGHTING_SCHEME` is assumed to be a tuple that corepsonds to the arguments to a BM25Weight constructor.  See `Xapian::BM25Weight::BM25Weight in the Xapian documentation <http://xapian.org/docs/apidoc/html/classXapian_1_1BM25Weight.html>`_ for further information.
 
+    - `HAYSTACK_XAPIAN_LANGUAGE` -- used to override the default stemming language.  By default, Xapian will stem all terms in english.
+
 Testing
 -------
 
