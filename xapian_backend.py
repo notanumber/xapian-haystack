@@ -13,6 +13,7 @@ import shutil
 import sys
 import warnings
 
+from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.utils.encoding import force_unicode
 
