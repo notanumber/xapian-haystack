@@ -26,9 +26,6 @@ Thanks to:
     * glassresistor for assistance troubleshooting an issue with boosting a phrase query & a patch to make weighting schemes overridable.
     * James Addison for helping to debug an intermittent issue with `order_by` and `build_schema`.
     * Michael Opitz for a patch that enables support for `inmemorydb`.
-<<<<<<< HEAD
     * Evgeniy Kirov for a patch that adds `HAYSTACK_XAPIAN_LANGUAGE` used for setting the stemming language.
     * domasx2 for a patch that explicitly closes the database when not in use.
-=======
-    * Evgeniy Kirov for a patch that adds `HAYSTACK_XAPIAN_LANGUAGE` used for setting the stemming language.
->>>>>>> fb4929854070f88e40896799a09c0781a3d3d562
+    * naktinis for a patch that fixed changes the behaviour of the `narrow_queries` argument of `search` so that queries are ANDed together rather than ORed.
