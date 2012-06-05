@@ -303,7 +303,6 @@ class XapianSearchBackend(BaseSearchBackend):
         the term `XCONTENTTYPE<app_name>.<model_name>`.  This will delete
         all documents with the specified model type.
         """
-        database = self._database(writable=True)
         if not models:
             # Because there does not appear to be a "clear all" method,
             # it's much quicker to remove the contents of the `self.path`
@@ -311,12 +310,13 @@ class XapianSearchBackend(BaseSearchBackend):
             if os.path.exists(self.path):
                 shutil.rmtree(self.path)
         else:
+            database = self._database(writable=True)
             for model in models:
                 database.delete_document(
                     DOCUMENT_CT_TERM_PREFIX + '%s.%s' %
                     (model._meta.app_label, model._meta.module_name)
                 )
-        database.close()
+            database.close()
 
     def document_count(self):
         try:
