@@ -259,14 +259,14 @@ class XapianSearchBackend(BaseSearchBackend):
                                         document.add_term(term, weight)
                                         document.add_term(prefix + term, weight)
 
-                document.set_data(pickle.dumps(
-                    (obj._meta.app_label, obj._meta.module_name, obj.pk, data),
+                document.set_data(pickle.dumps((obj._meta.app_label,
+                      obj._meta.concrete_model._meta.module_name, obj.pk, data),
                     pickle.HIGHEST_PROTOCOL
                 ))
                 document.add_term(document_id)
                 document.add_term(
                     DOCUMENT_CT_TERM_PREFIX + u'%s.%s' %
-                    (obj._meta.app_label, obj._meta.module_name)
+                    (obj._meta.app_label, obj._meta.concrete_model._meta.module_name)
                 )
                 database.replace_document(document_id, document)
 
