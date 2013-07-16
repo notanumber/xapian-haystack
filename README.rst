@@ -26,17 +26,7 @@ Notes
 Installation
 ------------
 
-#. Copy or symlink ``xapian_backend.py`` into ``haystack/backends/`` or install it by running one of the following commands:
-
-    ``python setup.py install``
-
-    or
-
-    ``pip install xapian-haystack``
-
-    or
-
-    ``easy_install xapian-haystack``
+#. Copy or symlink ``xapian_backend.py`` into ``haystack/backends/``. There is currently no version on pip.
 
 #. Set to something similar to:
 
