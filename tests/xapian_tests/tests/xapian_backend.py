@@ -1,11 +1,4 @@
-# Copyright (C) 2009, 2010, 2011, 2012 David Sauve
-# Copyright (C) 2009, 2010 Trapeze
-
-# Based on original code by Daniel Lindsley as part of the Haystack test suite.
-
 import datetime
-import os
-import shutil
 import sys
 import xapian
 
@@ -43,9 +36,6 @@ class XapianMockModel(models.Model):
 
     def __unicode__(self):
         return self.author
-
-    def hello(self):
-        return 'World!'
 
 
 class XapianMockSearchIndex(indexes.SearchIndex):
@@ -144,37 +134,29 @@ class XapianSearchBackendTestCase(TestCase):
         self.sample_objs[1].popularity = 35.5
         self.sample_objs[2].popularity = 972.0
 
-    def tearDown(self):
-        if os.path.exists(settings.HAYSTACK_CONNECTIONS['default']['PATH']):
-            shutil.rmtree(settings.HAYSTACK_CONNECTIONS['default']['PATH'])
+        self.backend.update(self.index, self.sample_objs)
 
+    def tearDown(self):
+        self.backend.clear()
         connections['default']._index = self.old_ui
         super(XapianSearchBackendTestCase, self).tearDown()
 
     def test_update(self):
-        self.backend.update(self.index, self.sample_objs)
-
         self.assertEqual(self.backend.document_count(), 3)
         self.assertEqual([result.pk for result in self.backend.search(xapian.Query(''))['results']], [1, 2, 3])
 
     def test_duplicate_update(self):
+        # Duplicates should be updated, not appended -- http://github.com/notanumber/xapian-haystack/issues/#issue/6
         self.backend.update(self.index, self.sample_objs)
-        self.backend.update(self.index, self.sample_objs)  # Duplicates should be updated, not appended -- http://github.com/notanumber/xapian-haystack/issues/#issue/6
 
         self.assertEqual(self.backend.document_count(), 3)
 
     def test_remove(self):
-        self.backend.update(self.index, self.sample_objs)
-        self.assertEqual(self.backend.document_count(), 3)
-
         self.backend.remove(self.sample_objs[0])
         self.assertEqual(self.backend.document_count(), 2)
         self.assertEqual([result.pk for result in self.backend.search(xapian.Query(''))['results']], [2, 3])
 
     def test_clear(self):
-        self.backend.update(self.index, self.sample_objs)
-        self.assertEqual(self.backend.document_count(), 3)
-
         self.backend.clear()
         self.assertEqual(self.backend.document_count(), 0)
 
@@ -194,9 +176,6 @@ class XapianSearchBackendTestCase(TestCase):
         self.assertEqual(self.backend.document_count(), 0)
 
     def test_search(self):
-        self.backend.update(self.index, self.sample_objs)
-        self.assertEqual(self.backend.document_count(), 3)
-
         self.assertEqual(self.backend.search(xapian.Query()), {'hits': 0, 'results': []})
         self.assertEqual(self.backend.search(xapian.Query(''))['hits'], 3)
         self.assertEqual([result.pk for result in self.backend.search(xapian.Query(''))['results']], [1, 2, 3])
@@ -207,25 +186,16 @@ class XapianSearchBackendTestCase(TestCase):
         self.assertTrue(isinstance(self.backend.search(xapian.Query('indexed'), result_class=MockSearchResult)['results'][0], MockSearchResult))
 
     def test_search_field_with_punctuation(self):
-        self.backend.update(self.index, self.sample_objs)
-        self.assertEqual(self.backend.document_count(), 3)
-
         # self.assertEqual(self.backend.search(xapian.Query('http://example.com/'))['hits'], 3)
         self.assertEqual([result.pk for result in self.backend.search(xapian.Query('http://example.com/1/'))['results']], [1])
 
     def test_search_by_mvf(self):
-        self.backend.update(self.index, self.sample_objs)
-        self.assertEqual(self.backend.document_count(), 3)
-
         self.assertEqual(self.backend.search(xapian.Query('ab'))['hits'], 1)
         self.assertEqual(self.backend.search(xapian.Query('b'))['hits'], 1)
         self.assertEqual(self.backend.search(xapian.Query('to'))['hits'], 1)
         self.assertEqual(self.backend.search(xapian.Query('one'))['hits'], 3)
 
     def test_field_facets(self):
-        self.backend.update(self.index, self.sample_objs)
-        self.assertEqual(self.backend.document_count(), 3)
-
         self.assertEqual(self.backend.search(xapian.Query(), facets=['name']), {'hits': 0, 'results': []})
         results = self.backend.search(xapian.Query('indexed'), facets=['name'])
         self.assertEqual(results['hits'], 3)
@@ -240,9 +210,6 @@ class XapianSearchBackendTestCase(TestCase):
         self.assertEqual(results['facets']['fields']['sites'], [('1', 1), ('3', 2), ('2', 2), ('4', 1), ('6', 2), ('9', 1)])
 
     def test_date_facets(self):
-        self.backend.update(self.index, self.sample_objs)
-        self.assertEqual(self.backend.document_count(), 3)
-
         self.assertEqual(self.backend.search(xapian.Query(), date_facets={'pub_date': {'start_date': datetime.datetime(2008, 10, 26), 'end_date': datetime.datetime(2009, 3, 26), 'gap_by': 'month'}}), {'hits': 0, 'results': []})
         results = self.backend.search(xapian.Query('indexed'), date_facets={'pub_date': {'start_date': datetime.datetime(2008, 10, 26), 'end_date': datetime.datetime(2009, 3, 26), 'gap_by': 'month'}})
         self.assertEqual(results['hits'], 3)
@@ -263,34 +230,22 @@ class XapianSearchBackendTestCase(TestCase):
         ])
 
     def test_query_facets(self):
-        self.backend.update(self.index, self.sample_objs)
-        self.assertEqual(self.backend.document_count(), 3)
-
         self.assertEqual(self.backend.search(xapian.Query(), query_facets={'name': 'da*'}), {'hits': 0, 'results': []})
         results = self.backend.search(xapian.Query('indexed'), query_facets={'name': 'da*'})
         self.assertEqual(results['hits'], 3)
         self.assertEqual(results['facets']['queries']['name'], ('da*', 3))
 
     def test_narrow_queries(self):
-        self.backend.update(self.index, self.sample_objs)
-        self.assertEqual(self.backend.document_count(), 3)
-
-        self.assertEqual(self.backend.search(xapian.Query(), narrow_queries=set(['name:david1'])), {'hits': 0, 'results': []})
-        results = self.backend.search(xapian.Query('indexed'), narrow_queries=set(['name:david1']))
+        self.assertEqual(self.backend.search(xapian.Query(), narrow_queries={'name:david1'}), {'hits': 0, 'results': []})
+        results = self.backend.search(xapian.Query('indexed'), narrow_queries={'name:david1'})
         self.assertEqual(results['hits'], 1)
 
     def test_highlight(self):
-        self.backend.update(self.index, self.sample_objs)
-        self.assertEqual(self.backend.document_count(), 3)
-
         self.assertEqual(self.backend.search(xapian.Query(), highlight=True), {'hits': 0, 'results': []})
         self.assertEqual(self.backend.search(xapian.Query('indexed'), highlight=True)['hits'], 3)
         self.assertEqual([result.highlighted['text'] for result in self.backend.search(xapian.Query('indexed'), highlight=True)['results']], ['<em>indexed</em>!\n1', '<em>indexed</em>!\n2', '<em>indexed</em>!\n3'])
 
     def test_spelling_suggestion(self):
-        self.backend.update(self.index, self.sample_objs)
-        self.assertEqual(self.backend.document_count(), 3)
-
         self.assertEqual(self.backend.search(xapian.Query('indxe'))['hits'], 0)
         self.assertEqual(self.backend.search(xapian.Query('indxe'))['spelling_suggestion'], 'indexed')
 
@@ -304,9 +259,6 @@ class XapianSearchBackendTestCase(TestCase):
         self.assertEqual(self.backend.search(xapian.Query('XNAMEdavid'))['spelling_suggestion'], 'david1')
 
     def test_more_like_this(self):
-        self.backend.update(self.index, self.sample_objs)
-        self.assertEqual(self.backend.document_count(), 3)
-
         results = self.backend.more_like_this(self.sample_objs[0])
         self.assertEqual(results['hits'], 2)
         self.assertEqual([result.pk for result in results['results']], [3, 2])
@@ -323,9 +275,6 @@ class XapianSearchBackendTestCase(TestCase):
         self.assertTrue(isinstance(self.backend.more_like_this(self.sample_objs[0], result_class=MockSearchResult)['results'][0], MockSearchResult))
 
     def test_order_by(self):
-        self.backend.update(self.index, self.sample_objs)
-        self.assertEqual(self.backend.document_count(), 3)
-
         results = self.backend.search(xapian.Query(''), sort_by=['pub_date'])
         self.assertEqual([result.pk for result in results['results']], [3, 2, 1])
 
@@ -363,9 +312,6 @@ class XapianSearchBackendTestCase(TestCase):
         self.assertEqual([result.pk for result in results['results']], [2, 3, 1])
 
     def test_verify_type(self):
-        self.backend.update(self.index, self.sample_objs)
-        self.assertEqual(self.backend.document_count(), 3)
-
         self.assertEqual(self.backend.search(xapian.Query(''))['hits'], 3)
         self.assertEqual([result.month for result in self.backend.search(xapian.Query(''))['results']], [u'02', u'02', u'02'])
 
@@ -445,13 +391,14 @@ class LiveXapianSearchQueryTestCase(TestCase):
         ui = UnifiedIndex()
         index = LiveXapianMockSearchIndex()
         ui.build(indexes=[index])
-        backend = connections['default'].get_backend()
+        self.backend = connections['default'].get_backend()
         connections['default']._index = ui
-        backend.update(index, MockModel.objects.all())
+        self.backend.update(index, MockModel.objects.all())
 
         self.sq = connections['default'].get_query()
 
     def tearDown(self):
+        self.backend.clear()
         connections['default']._index = self.old_ui
         super(LiveXapianSearchQueryTestCase, self).tearDown()
 
@@ -542,6 +489,7 @@ class LiveXapianSearchQuerySetTestCase(TestCase):
         self.sqs = SearchQuerySet()
 
     def tearDown(self):
+        self.backend.clear()
         connections['default']._index = self.old_ui
         super(LiveXapianSearchQuerySetTestCase, self).tearDown()
 
@@ -563,12 +511,11 @@ class XapianBoostBackendTestCase(TestCase):
     def setUp(self):
         super(XapianBoostBackendTestCase, self).setUp()
 
-        # Stow.
         self.old_ui = connections['default'].get_unified_index()
         self.ui = UnifiedIndex()
         self.index = XapianBoostMockSearchIndex()
         self.ui.build(indexes=[self.index])
-        self.sb = connections['default'].get_backend()
+        self.backend = connections['default'].get_backend()
         connections['default']._index = self.ui
 
         self.sample_objs = []
@@ -585,13 +532,14 @@ class XapianBoostBackendTestCase(TestCase):
             mock.pub_date = datetime.date(2009, 2, 25) - datetime.timedelta(days=i)
             self.sample_objs.append(mock)
 
+        self.backend.update(self.index, self.sample_objs)
+
     def tearDown(self):
+        self.backend.clear()
         connections['default']._index = self.old_ui
         super(XapianBoostBackendTestCase, self).tearDown()
 
     def test_boost(self):
-        self.sb.update(self.index, self.sample_objs)
-
         sqs = SearchQuerySet()
 
         self.assertEqual(len(sqs.all()), 4)
