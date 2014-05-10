@@ -182,6 +182,8 @@ class XapianBackendTestCase(TestCase):
         terms = get_terms(self.backend, '-a')
 
         self.assertFalse('tests.xapianmockmodel.1' in terms)
+        self.assertFalse('xapianmockmodel' in terms)
+        self.assertFalse('tests' in terms)
 
 
 class XapianSearchBackendTestCase(TestCase):
