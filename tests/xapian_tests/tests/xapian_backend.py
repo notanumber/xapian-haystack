@@ -167,13 +167,21 @@ class XapianBackendTestCase(TestCase):
 
     def test_app_is_not_split(self):
         """
-        Tests that the app path is not being split
+        Tests that the app path is not split
         and added as independent terms.
         """
         terms = get_terms(self.backend, '-a')
 
         self.assertFalse('tests' in terms)
         self.assertFalse('Ztest' in terms)
+
+    def test_app_is_not_indexed(self):
+        """
+        Tests that the app path is not indexed.
+        """
+        terms = get_terms(self.backend, '-a')
+
+        self.assertFalse('tests.xapianmockmodel.1' in terms)
 
 
 class XapianSearchBackendTestCase(TestCase):
