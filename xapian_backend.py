@@ -1,9 +1,3 @@
-# Copyright (C) 2009, 2010, 2011, 2012 David Sauve
-# Copyright (C) 2009, 2010 Trapeze
-
-__author__ = 'David Sauve'
-__version__ = (2, 0, 0)
-
 import time
 import datetime
 import cPickle as pickle
@@ -26,11 +20,15 @@ from haystack.utils import get_identifier
 try:
     import xapian
 except ImportError:
-    raise MissingDependency("The 'xapian' backend requires the installation of 'xapian'. Please refer to the documentation.")
+    raise MissingDependency("The 'xapian' backend requires the installation of 'Xapian'. "
+                            "Please refer to the documentation.")
 
 
+# The prefix we add to identify that the term refers to a specific ID.
 DOCUMENT_ID_TERM_PREFIX = 'Q'
+# The prefix we add to identify that the term refers to a specific Field.
 DOCUMENT_CUSTOM_TERM_PREFIX = 'X'
+# The prefix we add to identify that the term refers to specific ContentType.
 DOCUMENT_CT_TERM_PREFIX = DOCUMENT_CUSTOM_TERM_PREFIX + 'CONTENTTYPE'
 
 MEMORY_DB_NAME = ':memory:'
@@ -50,6 +48,9 @@ class InvalidIndexError(HaystackError):
 
 
 class XHValueRangeProcessor(xapian.ValueRangeProcessor):
+    """
+    A Processor to construct ranges of values
+    """
     def __init__(self, backend):
         # FIXME: This needs to get smarter about pulling the right backend.
         self.backend = backend or XapianSearchBackend()
@@ -143,7 +144,8 @@ class XapianSearchBackend(BaseSearchBackend):
         super(XapianSearchBackend, self).__init__(connection_alias, **connection_options)
 
         if not 'PATH' in connection_options:
-            raise ImproperlyConfigured("You must specify a 'PATH' in your settings for connection '%s'." % connection_alias)
+            raise ImproperlyConfigured("You must specify a 'PATH' in your settings for connection '%s'."
+                                       % connection_alias)
 
         self.path = connection_options.get('PATH')
 
@@ -152,6 +154,7 @@ class XapianSearchBackend(BaseSearchBackend):
 
         self.flags = connection_options.get('FLAGS', DEFAULT_XAPIAN_FLAGS)
         self.language = getattr(settings, 'HAYSTACK_XAPIAN_LANGUAGE', 'english')
+
         self._schema = None
         self._content_field_name = None
 
@@ -288,7 +291,7 @@ class XapianSearchBackend(BaseSearchBackend):
         database.delete_document(DOCUMENT_ID_TERM_PREFIX + get_identifier(obj))
         database.close()
 
-    def clear(self, models=[]):
+    def clear(self, models=[], commit=True):
         """
         Clear all instances of `models` from the database or all models, if
         not specified.
@@ -471,7 +474,7 @@ class XapianSearchBackend(BaseSearchBackend):
             `additional_query` -- An additional query to narrow results
             `start_offset` -- The starting offset (default=0)
             `end_offset` -- The ending offset (default=None), if None, then all documents
-            `limit_to_registered_models` -- Limit returned results to models registered in the current `SearchSite` (default = True)
+            `limit_to_registered_models` -- Limit returned results to models registered in the search (default = True)
 
         Returns:
             A dictionary with the following keys:
@@ -589,11 +592,16 @@ class XapianSearchBackend(BaseSearchBackend):
         """
         Build the schema from fields.
 
-        Required arguments:
-            ``fields`` -- A list of fields in the index
+        :param fields: A list of fields in the index
+        :returns: list of dictionaries
 
-        Returns a list of fields in dictionary format ready for inclusion in
-        an indexed meta-data.
+        Each dictionary has the keys
+         field_name: The name of the field index
+         type: what type of value it is
+         'multi_valued': if it allows more than one value
+         'column': a number identifying it
+         'type': the type of the field
+         'multi_valued': 'false', 'column': 0}
         """
         content_field_name = ''
         schema_fields = [
@@ -628,9 +636,10 @@ class XapianSearchBackend(BaseSearchBackend):
                 schema_fields.append(field_data)
                 column += 1
 
-        return (content_field_name, schema_fields)
+        return content_field_name, schema_fields
 
-    def _do_highlight(self, content, query, tag='em'):
+    @staticmethod
+    def _do_highlight(content, query, tag='em'):
         """
         Highlight `query` terms in `content` with html `tag`.
 
@@ -678,7 +687,8 @@ class XapianSearchBackend(BaseSearchBackend):
 
         return facet_dict
 
-    def _do_date_facets(self, results, date_facets):
+    @staticmethod
+    def _do_date_facets(results, date_facets):
         """
         Private method that facets a document by date ranges
 
@@ -738,7 +748,7 @@ class XapianSearchBackend(BaseSearchBackend):
                 elif gap_type == 'second':
                     date_range += datetime.timedelta(seconds=int(gap_value))
 
-            facet_list = sorted(facet_list, key=lambda n: n[0], reverse=True)
+            facet_list = sorted(facet_list, key=lambda x: x[0], reverse=True)
 
             for result in results:
                 result_date = getattr(result, date_facet)
@@ -780,7 +790,8 @@ class XapianSearchBackend(BaseSearchBackend):
 
         return facet_dict
 
-    def _do_spelling_suggestion(self, database, query, spelling_query):
+    @staticmethod
+    def _do_spelling_suggestion(database, query, spelling_query):
         """
         Private method that returns a single spelling suggestion based on
         `spelling_query` or `query`.
@@ -828,7 +839,8 @@ class XapianSearchBackend(BaseSearchBackend):
 
         return database
 
-    def _get_enquire_mset(self, database, enquire, start_offset, end_offset):
+    @staticmethod
+    def _get_enquire_mset(database, enquire, start_offset, end_offset):
         """
         A safer version of Xapian.enquire.get_mset
 
@@ -847,7 +859,8 @@ class XapianSearchBackend(BaseSearchBackend):
             database.reopen()
             return enquire.get_mset(start_offset, end_offset)
 
-    def _get_document_data(self, database, document):
+    @staticmethod
+    def _get_document_data(database, document):
         """
         A safer version of Xapian.document.get_data
 
@@ -932,9 +945,9 @@ class XapianSearchQuery(BaseSearchQuery):
             subqueries = [
                 xapian.Query(
                     xapian.Query.OP_SCALE_WEIGHT, xapian.Query('%s%s.%s' % (
-                            DOCUMENT_CT_TERM_PREFIX,
-                            model._meta.app_label, model._meta.module_name
-                        )
+                        DOCUMENT_CT_TERM_PREFIX,
+                        model._meta.app_label, model._meta.module_name
+                    )
                     ), 0  # Pure boolean sub-query
                 ) for model in self.models
             ]
@@ -1094,7 +1107,8 @@ class XapianSearchQuery(BaseSearchQuery):
                     self._term_query(term, field)
                 )
         if is_not:
-            return xapian.Query(xapian.Query.OP_AND_NOT, self._all_query(), xapian.Query(xapian.Query.OP_OR, query_list))
+            return xapian.Query(xapian.Query.OP_AND_NOT, self._all_query(),
+                                xapian.Query(xapian.Query.OP_OR, query_list))
         else:
             return xapian.Query(xapian.Query.OP_OR, query_list)
 
@@ -1134,9 +1148,9 @@ class XapianSearchQuery(BaseSearchQuery):
         pos, begin, end = vrp('%s:%s' % (field, _marshal_value(term)), '*')
         if is_not:
             return xapian.Query(xapian.Query.OP_AND_NOT,
-                self._all_query(),
-                xapian.Query(xapian.Query.OP_VALUE_RANGE, pos, begin, end)
-            )
+                                self._all_query(),
+                                xapian.Query(xapian.Query.OP_VALUE_RANGE, pos, begin, end)
+                                )
         return xapian.Query(xapian.Query.OP_VALUE_RANGE, pos, begin, end)
 
     def _filter_lte(self, term, field, is_not):
@@ -1148,12 +1162,13 @@ class XapianSearchQuery(BaseSearchQuery):
         pos, begin, end = vrp('%s:' % field, '%s' % _marshal_value(term))
         if is_not:
             return xapian.Query(xapian.Query.OP_AND_NOT,
-                self._all_query(),
-                xapian.Query(xapian.Query.OP_VALUE_RANGE, pos, begin, end)
-            )
+                                self._all_query(),
+                                xapian.Query(xapian.Query.OP_VALUE_RANGE, pos, begin, end)
+                                )
         return xapian.Query(xapian.Query.OP_VALUE_RANGE, pos, begin, end)
 
-    def _all_query(self):
+    @staticmethod
+    def _all_query():
         """
         Private method that returns a xapian.Query that returns all documents,
 
@@ -1197,7 +1212,8 @@ class XapianSearchQuery(BaseSearchQuery):
             xapian.Query(unstemmed)
         )
 
-    def _phrase_query(self, term_list, field=None):
+    @staticmethod
+    def _phrase_query(term_list, field=None):
         """
         Private method that returns a phrase based xapian.Query that searches
         for terms in `term_list.
