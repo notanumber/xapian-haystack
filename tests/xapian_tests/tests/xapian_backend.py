@@ -1,6 +1,8 @@
 import datetime
 import sys
 import xapian
+import subprocess
+import os
 
 from django.conf import settings
 from django.db import models
@@ -15,6 +17,12 @@ from haystack.utils.loading import UnifiedIndex
 
 from core.models import MockTag, MockModel, AnotherMockModel, AFourthMockModel
 from core.tests.mocks import MockSearchResult
+
+
+def get_terms(backend, *args):
+    result = subprocess.check_output(['delve'] + list(args) + [backend.path], env=os.environ.copy())
+    result = result.split(": ")[1]
+    return result.split(" ")
 
 
 class XapianMockModel(models.Model):
@@ -103,6 +111,59 @@ class XapianBoostMockSearchIndex(indexes.SearchIndex):
 
     def get_model(self):
         return AFourthMockModel
+
+
+class XapianSimpleMockIndex(indexes.SearchIndex):
+    text = indexes.CharField(document=True)
+    author = indexes.CharField(model_attr='author')
+    pub_date = indexes.DateTimeField(model_attr='pub_date')
+
+    def get_model(self):
+        return MockModel
+
+    def prepare_text(self, obj):
+        return 'this_is_a_word'
+
+
+class XapianBackendTestCase(TestCase):
+    def setUp(self):
+        super(XapianBackendTestCase, self).setUp()
+
+        self.old_ui = connections['default'].get_unified_index()
+        self.ui = UnifiedIndex()
+        self.index = XapianSimpleMockIndex()
+        self.ui.build(indexes=[self.index])
+        self.backend = connections['default'].get_backend()
+        connections['default']._index = self.ui
+
+        self.sample_objs = []
+
+        mock = XapianMockModel()
+        mock.id = 1
+        mock.author = 'david'
+        mock.pub_date = datetime.date(2009, 2, 25)
+
+        self.backend.update(self.index, [mock])
+
+    def test_fields(self):
+        """
+        Tests that all fields are in the database
+        """
+        terms = get_terms(self.backend, '-a')
+
+        for field in ['id', 'author', 'pub_date', 'text']:
+            is_inside = False
+            for term in terms:
+                if "X%s" % field.upper() in term:
+                    is_inside = True
+                    break
+            self.assertTrue(is_inside, field)
+
+    def test_text(self):
+        terms = get_terms(self.backend, '-a')
+
+        self.assertTrue('this_is_a_word' in terms)
+        self.assertTrue('Zthis_is_a_word' in terms)
 
 
 class XapianSearchBackendTestCase(TestCase):
@@ -417,7 +478,9 @@ class LiveXapianSearchQueryTestCase(TestCase):
 
     def test_build_query_gte(self):
         self.sq.add_filter(SQ(name__gte='m'))
-        self.assertEqual(str(self.sq.build_query()), u'Xapian::Query(VALUE_RANGE 2 m zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz)')
+        self.assertEqual(str(self.sq.build_query()), u'Xapian::Query(VALUE_RANGE 2 m zzzzzzzzzzzzzzzzzzzzzzzzzzzz'
+                                                     u'zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz'
+                                                     u'zzzzzzzzzzzzzz)')
 
     def test_build_query_lt(self):
         self.sq.add_filter(SQ(name__lt='m'))
