@@ -165,6 +165,16 @@ class XapianBackendTestCase(TestCase):
         self.assertTrue('this_is_a_word' in terms)
         self.assertTrue('Zthis_is_a_word' in terms)
 
+    def test_app_is_not_split(self):
+        """
+        Tests that the app path is not being split
+        and added as independent terms.
+        """
+        terms = get_terms(self.backend, '-a')
+
+        self.assertFalse('tests' in terms)
+        self.assertFalse('Ztest' in terms)
+
 
 class XapianSearchBackendTestCase(TestCase):
     def setUp(self):
