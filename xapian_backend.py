@@ -155,19 +155,25 @@ class XapianSearchBackend(BaseSearchBackend):
         self.flags = connection_options.get('FLAGS', DEFAULT_XAPIAN_FLAGS)
         self.language = getattr(settings, 'HAYSTACK_XAPIAN_LANGUAGE', 'english')
 
+        self._fields = None
         self._schema = None
         self._content_field_name = None
 
+    def _get_schema_and_content_field_name(self):
+        fields = connections[self.connection_alias].get_unified_index().all_searchfields()
+        if self._fields != fields:
+            self._fields = fields
+            self._content_field_name, self._schema = self.build_schema(self._fields)
+        return self._content_field_name, self._schema
+
     @property
     def schema(self):
-        if not self._schema:
-            self._content_field_name, self._schema = self.build_schema(connections[self.connection_alias].get_unified_index().all_searchfields())
+        _, self._schema = self._get_schema_and_content_field_name()
         return self._schema
 
     @property
     def content_field_name(self):
-        if not self._content_field_name:
-            self._content_field_name, self._schema = self.build_schema(connections[self.connection_alias].get_unified_index().all_searchfields())
+        self._content_field_name, _ = self._get_schema_and_content_field_name()
         return self._content_field_name
 
     def update(self, index, iterable):
