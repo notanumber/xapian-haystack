@@ -237,7 +237,11 @@ class XapianSearchBackend(BaseSearchBackend):
                             weight = int(weights[field['field_name']])
                         except KeyError:
                             weight = 1
-                        if field['type'] == 'text' and field['field_name'] != 'id':
+                        if field['field_name'] == 'id':
+                            term = _marshal_term(value)
+                            document.add_term(prefix + term, weight)
+                            document.add_value(field['column'], _marshal_value(value))
+                        elif field['type'] == 'text':
                             if field['multi_valued'] == 'false':
                                 term = _marshal_term(value)
                                 term_generator.index_text(term, weight)
