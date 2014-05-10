@@ -21,7 +21,7 @@ from core.tests.mocks import MockSearchResult
 
 def get_terms(backend, *args):
     result = subprocess.check_output(['delve'] + list(args) + [backend.path], env=os.environ.copy())
-    result = result.split(": ")[1]
+    result = result.split(": ")[1].strip()
     return result.split(" ")
 
 
