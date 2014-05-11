@@ -138,7 +138,7 @@ class XapianBackendTestCase(TestCase):
 
         self.sample_objs = []
 
-        mock = XapianMockModel()
+        mock = self.index.get_model()()
         mock.id = 1
         mock.author = 'david'
         mock.pub_date = datetime.date(2009, 2, 25)
