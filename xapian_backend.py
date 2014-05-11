@@ -1,3 +1,5 @@
+from __future__ import unicode_literals
+
 import time
 import datetime
 import cPickle as pickle
@@ -72,22 +74,22 @@ class XHValueRangeProcessor(xapian.ValueRangeProcessor):
             if field_dict['field_name'] == field_name:
                 if not begin:
                     if field_dict['type'] == 'text':
-                        begin = u'a'  # TODO: A better way of getting a min text value?
+                        begin = 'a'  # TODO: A better way of getting a min text value?
                     elif field_dict['type'] == 'long':
                         begin = -sys.maxint - 1
                     elif field_dict['type'] == 'float':
                         begin = float('-inf')
                     elif field_dict['type'] == 'date' or field_dict['type'] == 'datetime':
-                        begin = u'00010101000000'
+                        begin = '00010101000000'
                 elif end == '*':
                     if field_dict['type'] == 'text':
-                        end = u'z' * 100  # TODO: A better way of getting a max text value?
+                        end = 'z' * 100  # TODO: A better way of getting a max text value?
                     elif field_dict['type'] == 'long':
                         end = sys.maxint
                     elif field_dict['type'] == 'float':
                         end = float('inf')
                     elif field_dict['type'] == 'date' or field_dict['type'] == 'datetime':
-                        end = u'99990101000000'
+                        end = '99990101000000'
                 if field_dict['type'] == 'float':
                     begin = _marshal_value(float(begin))
                     end = _marshal_value(float(end))
@@ -854,7 +856,7 @@ class XapianSearchBackend(BaseSearchBackend):
             try:
                 database = xapian.Database(self.path)
             except xapian.DatabaseOpeningError:
-                raise InvalidIndexError(u'Unable to open index at %s' % self.path)
+                raise InvalidIndexError('Unable to open index at %s' % self.path)
 
         return database
 
@@ -1238,13 +1240,13 @@ def _marshal_value(value):
         value = _marshal_date(value)
     elif isinstance(value, bool):
         if value:
-            value = u't'
+            value = 't'
         else:
-            value = u'f'
+            value = 'f'
     elif isinstance(value, float):
         value = xapian.sortable_serialise(value)
     elif isinstance(value, (int, long)):
-        value = u'%012d' % value
+        value = '%012d' % value
     else:
         value = force_unicode(value).lower()
     return value
@@ -1264,17 +1266,17 @@ def _marshal_term(term):
 
 
 def _marshal_date(d):
-    return u'%04d%02d%02d000000' % (d.year, d.month, d.day)
+    return '%04d%02d%02d000000' % (d.year, d.month, d.day)
 
 
 def _marshal_datetime(dt):
     if dt.microsecond:
-        return u'%04d%02d%02d%02d%02d%02d%06d' % (
+        return '%04d%02d%02d%02d%02d%02d%06d' % (
             dt.year, dt.month, dt.day, dt.hour,
             dt.minute, dt.second, dt.microsecond
         )
     else:
-        return u'%04d%02d%02d%02d%02d%02d' % (
+        return '%04d%02d%02d%02d%02d%02d' % (
             dt.year, dt.month, dt.day, dt.hour,
             dt.minute, dt.second
         )
