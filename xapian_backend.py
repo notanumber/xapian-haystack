@@ -15,7 +15,7 @@ from haystack.backends import BaseEngine, BaseSearchBackend, BaseSearchQuery, Se
 from haystack.constants import ID
 from haystack.exceptions import HaystackError, MissingDependency
 from haystack.models import SearchResult
-from haystack.utils import get_identifier
+from haystack.utils import get_identifier, get_model_ct
 
 try:
     import xapian
@@ -290,8 +290,7 @@ class XapianSearchBackend(BaseSearchBackend):
                 ))
                 document.add_term(document_id)
                 document.add_term(
-                    DOCUMENT_CT_TERM_PREFIX + u'%s.%s' %
-                    (obj._meta.app_label, obj._meta.module_name)
+                    DOCUMENT_CT_TERM_PREFIX + get_model_ct(obj)
                 )
                 database.replace_document(document_id, document)
 
@@ -338,8 +337,7 @@ class XapianSearchBackend(BaseSearchBackend):
             database = self._database(writable=True)
             for model in models:
                 database.delete_document(
-                    DOCUMENT_CT_TERM_PREFIX + '%s.%s' %
-                    (model._meta.app_label, model._meta.module_name)
+                    DOCUMENT_CT_TERM_PREFIX + get_model_ct(model)
                 )
             database.close()
 
@@ -954,9 +952,9 @@ class XapianSearchQuery(BaseSearchQuery):
         if self.models:
             subqueries = [
                 xapian.Query(
-                    xapian.Query.OP_SCALE_WEIGHT, xapian.Query('%s%s.%s' % (
+                    xapian.Query.OP_SCALE_WEIGHT, xapian.Query('%s%s' % (
                         DOCUMENT_CT_TERM_PREFIX,
-                        model._meta.app_label, model._meta.module_name
+                        get_model_ct(model)
                     )
                     ), 0  # Pure boolean sub-query
                 ) for model in self.models
