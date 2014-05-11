@@ -123,6 +123,9 @@ class HaystackBackendTestCase(object):
     def get_index(self):
         raise NotImplementedError
 
+    def get_objects(self):
+        raise NotImplementedError
+
     def setUp(self):
         self.old_ui = connections['default'].get_unified_index()
         self.ui = UnifiedIndex()
@@ -132,6 +135,7 @@ class HaystackBackendTestCase(object):
         connections['default']._index = self.ui
 
     def tearDown(self):
+        self.backend.clear()
         connections['default']._index = self.old_ui
 
 
@@ -149,10 +153,6 @@ class XapianBackendTestCase(HaystackBackendTestCase, TestCase):
         mock.pub_date = datetime.date(2009, 2, 25)
 
         self.backend.update(self.index, [mock])
-
-    def tearDown(self):
-        self.backend.clear()
-        super(XapianBackendTestCase, self).tearDown()
 
     def test_fields(self):
         """
@@ -222,10 +222,6 @@ class XapianSearchBackendTestCase(HaystackBackendTestCase, TestCase):
         self.sample_objs[2].popularity = 972.0
 
         self.backend.update(self.index, self.sample_objs)
-
-    def tearDown(self):
-        self.backend.clear()
-        super(XapianSearchBackendTestCase, self).tearDown()
 
     def test_update(self):
         self.assertEqual(self.backend.document_count(), 3)
@@ -479,10 +475,6 @@ class LiveXapianSearchQueryTestCase(HaystackBackendTestCase, TestCase):
 
         self.sq = connections['default'].get_query()
 
-    def tearDown(self):
-        self.backend.clear()
-        super(LiveXapianSearchQueryTestCase, self).tearDown()
-
     def test_get_spelling(self):
         self.sq.add_filter(SQ(content='indxd'))
         self.assertEqual(self.sq.get_spelling_suggestion(), u'indexed')
@@ -567,10 +559,6 @@ class LiveXapianSearchQuerySetTestCase(HaystackBackendTestCase, TestCase):
         self.sq = connections['default'].get_query()
         self.sqs = SearchQuerySet()
 
-    def tearDown(self):
-        self.backend.clear()
-        super(LiveXapianSearchQuerySetTestCase, self).tearDown()
-
     def test_result_class(self):
         # Assert that we're defaulting to ``SearchResult``.
         sqs = self.sqs.all()
@@ -620,10 +608,6 @@ class XapianBoostBackendTestCase(HaystackBackendTestCase, TestCase):
             self.sample_objs.append(mock)
 
         self.backend.update(self.index, self.sample_objs)
-
-    def tearDown(self):
-        self.backend.clear()
-        super(XapianBoostBackendTestCase, self).tearDown()
 
     def test_boost(self):
         sqs = SearchQuerySet()
