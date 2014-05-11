@@ -2,7 +2,7 @@ from __future__ import unicode_literals
 
 import time
 import datetime
-import cPickle as pickle
+import pickle
 import os
 import re
 import shutil
