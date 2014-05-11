@@ -1035,11 +1035,11 @@ class XapianSearchQuery(BaseSearchQuery):
             if is_not:
                 return xapian.Query(
                     xapian.Query.OP_AND_NOT, self._all_query(), self._phrase_query(
-                        term.split(), self.backend.content_field_name
+                        term.split(), self.backend.content_field_name, is_content=True
                     )
                 )
             else:
-                return self._phrase_query(term.split(), self.backend.content_field_name)
+                return self._phrase_query(term.split(), self.backend.content_field_name, is_content=True)
         else:
             if is_not:
                 return xapian.Query(xapian.Query.OP_AND_NOT, self._all_query(), self._term_query(term))
@@ -1217,7 +1217,7 @@ class XapianSearchQuery(BaseSearchQuery):
         )
 
     @staticmethod
-    def _phrase_query(term_list, field=None):
+    def _phrase_query(term_list, field=None, is_content=False):
         """
         Private method that returns a phrase based xapian.Query that searches
         for terms in `term_list.
@@ -1229,16 +1229,9 @@ class XapianSearchQuery(BaseSearchQuery):
         Returns:
             A xapian.Query
         """
-        if field:
-            return xapian.Query(
-                xapian.Query.OP_PHRASE, [
-                    '%s%s%s' % (
-                        DOCUMENT_CUSTOM_TERM_PREFIX, field.upper(), term
-                    ) for term in term_list
-                ]
-            )
-        else:
-            return xapian.Query(xapian.Query.OP_PHRASE, term_list)
+        if field and not is_content:
+            term_list = ['%s%s%s' % (DOCUMENT_CUSTOM_TERM_PREFIX, field.upper(), term) for term in term_list]
+        return xapian.Query(xapian.Query.OP_PHRASE, term_list)
 
 
 def _marshal_value(value):
