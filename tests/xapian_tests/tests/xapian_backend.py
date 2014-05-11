@@ -393,7 +393,6 @@ class XapianSearchBackendTestCase(TestCase):
         self.assertEqual([result.pk for result in results['results']], [2, 3, 1])
 
     def test_verify_type(self):
-        self.assertEqual(self.backend.search(xapian.Query(''))['hits'], 3)
         self.assertEqual([result.month for result in self.backend.search(xapian.Query(''))['results']], [u'02', u'02', u'02'])
 
     def test__marshal_value(self):
@@ -432,7 +431,6 @@ class XapianSearchBackendTestCase(TestCase):
         ])
 
     def test_parse_query(self):
-        self.backend.update(self.index, self.sample_objs)
         self.assertEqual(str(self.backend.parse_query('indexed')), 'Xapian::Query(Zindex:(pos=1))')
         self.assertEqual(str(self.backend.parse_query('name:david')), 'Xapian::Query(ZXNAMEdavid:(pos=1))')
 
