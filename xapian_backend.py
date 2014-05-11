@@ -948,11 +948,9 @@ class XapianSearchQuery(BaseSearchQuery):
         if self.models:
             subqueries = [
                 xapian.Query(
-                    xapian.Query.OP_SCALE_WEIGHT, xapian.Query('%s%s' % (
-                        DOCUMENT_CT_TERM_PREFIX,
-                        get_model_ct(model)
-                    )
-                    ), 0  # Pure boolean sub-query
+                    xapian.Query.OP_SCALE_WEIGHT,
+                    xapian.Query('%s%s' % (DOCUMENT_CT_TERM_PREFIX, get_model_ct(model))),
+                    0  # Pure boolean sub-query
                 ) for model in self.models
             ]
             query = xapian.Query(
@@ -1031,20 +1029,16 @@ class XapianSearchQuery(BaseSearchQuery):
         Returns:
             A xapian.Query
         """
+        # it is more than one term, we build a PHRASE
         if ' ' in term:
-            if is_not:
-                return xapian.Query(
-                    xapian.Query.OP_AND_NOT, self._all_query(), self._phrase_query(
-                        term.split(), self.backend.content_field_name, is_content=True
-                    )
-                )
-            else:
-                return self._phrase_query(term.split(), self.backend.content_field_name, is_content=True)
+            query = self._phrase_query(term.split(), self.backend.content_field_name, is_content=True)
         else:
-            if is_not:
-                return xapian.Query(xapian.Query.OP_AND_NOT, self._all_query(), self._term_query(term))
-            else:
-                return self._term_query(term)
+            query = self._term_query(term)
+
+        if is_not:
+            return xapian.Query(xapian.Query.OP_AND_NOT, self._all_query(), query)
+        else:
+            return query
 
     def _filter_contains(self, term, field, is_not):
         """
@@ -1062,10 +1056,11 @@ class XapianSearchQuery(BaseSearchQuery):
         if ' ' in term:
             return self._filter_exact(term, field, is_not)
         else:
+            query = self._term_query(term, field)
             if is_not:
-                return xapian.Query(xapian.Query.OP_AND_NOT, self._all_query(), self._term_query(term, field))
+                return xapian.Query(xapian.Query.OP_AND_NOT, self._all_query(), query)
             else:
-                return self._term_query(term, field)
+                return query
 
     def _filter_exact(self, term, field, is_not):
         """
@@ -1080,12 +1075,11 @@ class XapianSearchQuery(BaseSearchQuery):
         Returns:
             A xapian.Query
         """
+        query = self._phrase_query(term.split(), field)
         if is_not:
-            return xapian.Query(
-                xapian.Query.OP_AND_NOT, self._all_query(), self._phrase_query(term.split(), field)
-            )
+            return xapian.Query(xapian.Query.OP_AND_NOT, self._all_query(), query)
         else:
-            return self._phrase_query(term.split(), field)
+            return query
 
     def _filter_in(self, term_list, field, is_not):
         """
