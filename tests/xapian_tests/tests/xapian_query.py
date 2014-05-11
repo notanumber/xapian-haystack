@@ -1,6 +1,3 @@
-# Copyright (C) 2009, 2010, 2011, 2012 David Sauve
-# Copyright (C) 2009, 2010 Trapeze
-
 import datetime
 import os
 import shutil
@@ -155,7 +152,11 @@ class XapianSearchQueryTestCase(TestCase):
         self.assertEqual(str(self.sq.build_query()), u'Xapian::Query(((Zhello OR hello) AND 0 * XCONTENTTYPEcore.mockmodel))')
 
         self.sq.add_model(AnotherMockModel)
-        self.assertTrue(str(self.sq.build_query()) in u'Xapian::Query(((Zhello OR hello) AND (0 * XCONTENTTYPEcore.anothermockmodel OR 0 * XCONTENTTYPEcore.mockmodel)))' or u'Xapian::Query(((Zhello OR hello) AND (0 * XCONTENTTYPEcore.mockmodel OR 0 * XCONTENTTYPEcore.anothermockmodel)))')
+
+        self.assertTrue(str(self.sq.build_query()) in (
+            u'Xapian::Query(((Zhello OR hello) AND (0 * XCONTENTTYPEcore.anothermockmodel OR 0 * XCONTENTTYPEcore.mockmodel)))',
+            u'Xapian::Query(((Zhello OR hello) AND (0 * XCONTENTTYPEcore.mockmodel OR 0 * XCONTENTTYPEcore.anothermockmodel)))')
+        )
 
     def test_build_query_with_punctuation(self):
         self.sq.add_filter(SQ(content='http://www.example.com'))
