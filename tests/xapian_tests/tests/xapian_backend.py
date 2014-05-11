@@ -100,19 +100,6 @@ class XapianMockSearchIndex(indexes.SearchIndex):
         return ''
 
 
-class XapianBoostMockSearchIndex(indexes.SearchIndex):
-    text = indexes.CharField(
-        document=True, use_template=True,
-        template_name='search/indexes/core/mockmodel_template.txt'
-    )
-    author = indexes.CharField(model_attr='author', weight=2.0)
-    editor = indexes.CharField(model_attr='editor')
-    pub_date = indexes.DateField(model_attr='pub_date')
-
-    def get_model(self):
-        return AFourthMockModel
-
-
 class XapianSimpleMockIndex(indexes.SearchIndex):
     text = indexes.CharField(document=True)
     author = indexes.CharField(model_attr='author')
@@ -125,25 +112,47 @@ class XapianSimpleMockIndex(indexes.SearchIndex):
         return 'this_is_a_word'
 
 
-class XapianBackendTestCase(TestCase):
-    def setUp(self):
-        super(XapianBackendTestCase, self).setUp()
+class HaystackBackendTestCase(object):
+    """
+    An abstract TestCase that implements a hack to ensure connections
+    has the mock index
 
+    It has a method get_index() that returns a SearchIndex
+    that must be overwritten.
+    """
+    def get_index(self):
+        raise NotImplementedError
+
+    def setUp(self):
         self.old_ui = connections['default'].get_unified_index()
         self.ui = UnifiedIndex()
-        self.index = XapianSimpleMockIndex()
+        self.index = self.get_index()
         self.ui.build(indexes=[self.index])
         self.backend = connections['default'].get_backend()
         connections['default']._index = self.ui
 
-        self.sample_objs = []
+    def tearDown(self):
+        connections['default']._index = self.old_ui
 
-        mock = self.index.get_model()()
+
+class XapianBackendTestCase(HaystackBackendTestCase, TestCase):
+
+    def get_index(self):
+        return XapianSimpleMockIndex()
+
+    def setUp(self):
+        super(XapianBackendTestCase, self).setUp()
+
+        mock = XapianMockModel()
         mock.id = 1
         mock.author = 'david'
         mock.pub_date = datetime.date(2009, 2, 25)
 
         self.backend.update(self.index, [mock])
+
+    def tearDown(self):
+        self.backend.clear()
+        super(XapianBackendTestCase, self).tearDown()
 
     def test_fields(self):
         """
@@ -186,16 +195,13 @@ class XapianBackendTestCase(TestCase):
         self.assertFalse('tests' in terms)
 
 
-class XapianSearchBackendTestCase(TestCase):
+class XapianSearchBackendTestCase(HaystackBackendTestCase, TestCase):
+
+    def get_index(self):
+        return XapianMockSearchIndex()
+
     def setUp(self):
         super(XapianSearchBackendTestCase, self).setUp()
-
-        self.old_ui = connections['default'].get_unified_index()
-        self.ui = UnifiedIndex()
-        self.index = XapianMockSearchIndex()
-        self.ui.build(indexes=[self.index])
-        self.backend = connections['default'].get_backend()
-        connections['default']._index = self.ui
 
         self.sample_objs = []
 
@@ -219,7 +225,6 @@ class XapianSearchBackendTestCase(TestCase):
 
     def tearDown(self):
         self.backend.clear()
-        connections['default']._index = self.old_ui
         super(XapianSearchBackendTestCase, self).tearDown()
 
     def test_update(self):
@@ -393,7 +398,8 @@ class XapianSearchBackendTestCase(TestCase):
         self.assertEqual([result.pk for result in results['results']], [2, 3, 1])
 
     def test_verify_type(self):
-        self.assertEqual([result.month for result in self.backend.search(xapian.Query(''))['results']], [u'02', u'02', u'02'])
+        self.assertEqual([result.month for result in self.backend.search(xapian.Query(''))['results']],
+                         [u'02', u'02', u'02'])
 
     def test__marshal_value(self):
         self.assertEqual(_marshal_value('abc'), u'abc')
@@ -457,28 +463,24 @@ class LiveXapianMockSearchIndex(indexes.SearchIndex):
         return MockModel
 
 
-class LiveXapianSearchQueryTestCase(TestCase):
+class LiveXapianSearchQueryTestCase(HaystackBackendTestCase, TestCase):
     """
     SearchQuery specific tests
     """
     fixtures = ['initial_data.json']
 
+    def get_index(self):
+        return LiveXapianMockSearchIndex()
+
     def setUp(self):
         super(LiveXapianSearchQueryTestCase, self).setUp()
 
-        self.old_ui = connections['default'].get_unified_index()
-        ui = UnifiedIndex()
-        index = LiveXapianMockSearchIndex()
-        ui.build(indexes=[index])
-        self.backend = connections['default'].get_backend()
-        connections['default']._index = ui
-        self.backend.update(index, MockModel.objects.all())
+        self.backend.update(self.index, MockModel.objects.all())
 
         self.sq = connections['default'].get_query()
 
     def tearDown(self):
         self.backend.clear()
-        connections['default']._index = self.old_ui
         super(LiveXapianSearchQueryTestCase, self).tearDown()
 
     def test_get_spelling(self):
@@ -549,29 +551,24 @@ class LiveXapianSearchQueryTestCase(TestCase):
         settings.DEBUG = old_debug
 
 
-class LiveXapianSearchQuerySetTestCase(TestCase):
+class LiveXapianSearchQuerySetTestCase(HaystackBackendTestCase, TestCase):
     """
     SearchQuerySet specific tests
     """
     fixtures = ['initial_data.json']
 
+    def get_index(self):
+        return LiveXapianMockSearchIndex()
+
     def setUp(self):
         super(LiveXapianSearchQuerySetTestCase, self).setUp()
 
-        self.old_ui = connections['default'].get_unified_index()
-        self.ui = UnifiedIndex()
-        self.index = LiveXapianMockSearchIndex()
-        self.ui.build(indexes=[self.index])
-        self.backend = connections['default'].get_backend()
-        connections['default']._index = self.ui
         self.backend.update(self.index, MockModel.objects.all())
-
         self.sq = connections['default'].get_query()
         self.sqs = SearchQuerySet()
 
     def tearDown(self):
         self.backend.clear()
-        connections['default']._index = self.old_ui
         super(LiveXapianSearchQuerySetTestCase, self).tearDown()
 
     def test_result_class(self):
@@ -588,19 +585,28 @@ class LiveXapianSearchQuerySetTestCase(TestCase):
         self.assertTrue(isinstance(sqs[0], SearchResult))
 
 
-class XapianBoostBackendTestCase(TestCase):
+class XapianBoostMockSearchIndex(indexes.SearchIndex):
+    text = indexes.CharField(
+        document=True, use_template=True,
+        template_name='search/indexes/core/mockmodel_template.txt'
+    )
+    author = indexes.CharField(model_attr='author', weight=2.0)
+    editor = indexes.CharField(model_attr='editor')
+    pub_date = indexes.DateField(model_attr='pub_date')
+
+    def get_model(self):
+        return AFourthMockModel
+
+
+class XapianBoostBackendTestCase(HaystackBackendTestCase, TestCase):
+
+    def get_index(self):
+        return XapianBoostMockSearchIndex()
+
     def setUp(self):
         super(XapianBoostBackendTestCase, self).setUp()
 
-        self.old_ui = connections['default'].get_unified_index()
-        self.ui = UnifiedIndex()
-        self.index = XapianBoostMockSearchIndex()
-        self.ui.build(indexes=[self.index])
-        self.backend = connections['default'].get_backend()
-        connections['default']._index = self.ui
-
         self.sample_objs = []
-
         for i in xrange(1, 5):
             mock = AFourthMockModel()
             mock.id = i
@@ -617,7 +623,6 @@ class XapianBoostBackendTestCase(TestCase):
 
     def tearDown(self):
         self.backend.clear()
-        connections['default']._index = self.old_ui
         super(XapianBoostBackendTestCase, self).tearDown()
 
     def test_boost(self):
