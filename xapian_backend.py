@@ -54,8 +54,7 @@ class XHValueRangeProcessor(xapian.ValueRangeProcessor):
     A Processor to construct ranges of values
     """
     def __init__(self, backend):
-        # FIXME: This needs to get smarter about pulling the right backend.
-        self.backend = backend or XapianSearchBackend()
+        self.backend = backend
         xapian.ValueRangeProcessor.__init__(self)
 
     def __call__(self, begin, end):
@@ -244,9 +243,6 @@ class XapianSearchBackend(BaseSearchBackend):
                     if field['field_name'] in data.keys():
                         prefix = DOCUMENT_CUSTOM_TERM_PREFIX + field['field_name'].upper()
                         value = data[field['field_name']]
-
-                        #print(prefix, value, field['type'], field['field_name'])
-
                         try:
                             weight = int(weights[field['field_name']])
                         except KeyError:
@@ -314,7 +310,7 @@ class XapianSearchBackend(BaseSearchBackend):
         database.delete_document(DOCUMENT_ID_TERM_PREFIX + get_identifier(obj))
         database.close()
 
-    def clear(self, models=[], commit=True):
+    def clear(self, models=(), commit=True):
         """
         Clear all instances of `models` from the database or all models, if
         not specified.
@@ -385,7 +381,8 @@ class XapianSearchBackend(BaseSearchBackend):
             `query_facets` -- Facet results on queries (default = None)
             `narrow_queries` -- Narrow queries (default = None)
             `spelling_query` -- An optional query to execute spelling suggestion on
-            `limit_to_registered_models` -- Limit returned results to models registered in the current `SearchSite` (default = True)
+            `limit_to_registered_models` -- Limit returned results to models registered in
+            the current `SearchSite` (default = True)
 
         Returns:
             A dictionary with the following keys:
@@ -1134,10 +1131,10 @@ class XapianSearchQuery(BaseSearchQuery):
         return self.backend.parse_query('%s:%s*' % (field, term))
 
     def _filter_gt(self, term, field, is_not):
-        return self._filter_lte(term, field, is_not=(is_not != True))
+        return self._filter_lte(term, field, is_not=not is_not)
 
     def _filter_lt(self, term, field, is_not):
-        return self._filter_gte(term, field, is_not=(is_not != True))
+        return self._filter_gte(term, field, is_not=not is_not)
 
     def _filter_gte(self, term, field, is_not):
         """
