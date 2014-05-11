@@ -347,6 +347,20 @@ class XapianSearchBackend(BaseSearchBackend):
         except InvalidIndexError:
             return 0
 
+    def _build_models_query(self, query):
+        """
+        Builds a query from `query` that filters to documents only from registered models.
+        """
+        registered_models_ct = self.build_models_list()
+        if registered_models_ct:
+            restrictions = [xapian.Query('%s%s' % (DOCUMENT_CT_TERM_PREFIX, model_ct))
+                            for model_ct in registered_models_ct]
+            limit_query = xapian.Query(xapian.Query.OP_OR, restrictions)
+
+            query = xapian.Query(xapian.Query.OP_AND, query, limit_query)
+
+        return query
+
     @log_query
     def search(self, query, sort_by=None, start_offset=0, end_offset=None,
                fields='', highlight=False, facets=None, date_facets=None,
@@ -412,17 +426,7 @@ class XapianSearchBackend(BaseSearchBackend):
             )
 
         if limit_to_registered_models:
-            registered_models = self.build_models_list()
-
-            if len(registered_models) > 0:
-                query = xapian.Query(
-                    xapian.Query.OP_AND, query,
-                    xapian.Query(
-                        xapian.Query.OP_OR,  [
-                            xapian.Query('%s%s' % (DOCUMENT_CT_TERM_PREFIX, model)) for model in registered_models
-                        ]
-                    )
-                )
+            query = self._build_models_query(query)
 
         enquire = xapian.Enquire(database)
         if hasattr(settings, 'HAYSTACK_XAPIAN_WEIGHTING_SCHEME'):
@@ -538,18 +542,10 @@ class XapianSearchBackend(BaseSearchBackend):
         query = xapian.Query(
             xapian.Query.OP_AND_NOT, [query, DOCUMENT_ID_TERM_PREFIX + get_identifier(model_instance)]
         )
-        if limit_to_registered_models:
-            registered_models = self.build_models_list()
 
-            if len(registered_models) > 0:
-                query = xapian.Query(
-                    xapian.Query.OP_AND, query,
-                    xapian.Query(
-                        xapian.Query.OP_OR,  [
-                            xapian.Query('%s%s' % (DOCUMENT_CT_TERM_PREFIX, model)) for model in registered_models
-                        ]
-                    )
-                )
+        if limit_to_registered_models:
+            query = self._build_models_query(query)
+
         if additional_query:
             query = xapian.Query(
                 xapian.Query.OP_AND, query, additional_query
