@@ -155,26 +155,35 @@ class XapianSearchBackend(BaseSearchBackend):
         self.flags = connection_options.get('FLAGS', DEFAULT_XAPIAN_FLAGS)
         self.language = getattr(settings, 'HAYSTACK_XAPIAN_LANGUAGE', 'english')
 
+        # these 4 attributes are caches populated in `build_schema`
+        # they are checked in `_update_cache`
         self._fields = None
         self._schema = None
         self._content_field_name = None
+        self._columns = {}
 
-    def _get_schema_and_content_field_name(self):
+    def _update_cache(self):
         fields = connections[self.connection_alias].get_unified_index().all_searchfields()
         if self._fields != fields:
             self._fields = fields
             self._content_field_name, self._schema = self.build_schema(self._fields)
-        return self._content_field_name, self._schema
 
     @property
     def schema(self):
-        _, self._schema = self._get_schema_and_content_field_name()
+        self._update_cache()
         return self._schema
 
     @property
     def content_field_name(self):
-        self._content_field_name, _ = self._get_schema_and_content_field_name()
+        self._update_cache()
         return self._content_field_name
+
+    def column(self, field_name):
+        """
+        Returns the column in the database of a given field name.
+        """
+        self._update_cache()
+        return self._columns[field_name]
 
     def update(self, index, iterable):
         """
@@ -233,6 +242,9 @@ class XapianSearchBackend(BaseSearchBackend):
                     if field['field_name'] in data.keys():
                         prefix = DOCUMENT_CUSTOM_TERM_PREFIX + field['field_name'].upper()
                         value = data[field['field_name']]
+
+                        #print(prefix, value, field['type'], field['field_name'])
+
                         try:
                             weight = int(weights[field['field_name']])
                         except KeyError:
@@ -428,7 +440,7 @@ class XapianSearchBackend(BaseSearchBackend):
                     sort_field = sort_field[1:]  # Strip the '-'
                 else:
                     reverse = False  # Reverse is inverted in Xapian -- http://trac.xapian.org/ticket/311
-                sorter.add(self._value_column(sort_field), reverse)
+                sorter.add(self.column(sort_field), reverse)
 
             enquire.set_sort_by_key_then_relevance(sorter, True)
 
@@ -617,6 +629,8 @@ class XapianSearchBackend(BaseSearchBackend):
         schema_fields = [
             {'field_name': ID, 'type': 'text', 'multi_valued': 'false', 'column': 0},
         ]
+        self._columns[ID] = 0
+
         column = len(schema_fields)
 
         for field_name, field_class in sorted(fields.items(), key=lambda n: n[0]):
@@ -644,6 +658,7 @@ class XapianSearchBackend(BaseSearchBackend):
                     field_data['multi_valued'] = 'true'
 
                 schema_fields.append(field_data)
+                self._columns[field_data['field_name']] = column
                 column += 1
 
         return content_field_name, schema_fields
@@ -899,21 +914,6 @@ class XapianSearchBackend(BaseSearchBackend):
         return self._get_enquire_mset(
             database, enquire, 0, database.get_doccount()
         ).size()
-
-    def _value_column(self, field):
-        """
-        Private method that returns the column value slot in the database
-        for a given field.
-
-        Required arguemnts:
-            `field` -- The field to lookup
-
-        Returns an integer with the column location (0 indexed).
-        """
-        for field_dict in self.schema:
-            if field_dict['field_name'] == field:
-                return field_dict['column']
-        return 0
 
     def _multi_value_field(self, field):
         """
