@@ -10,7 +10,7 @@ import sys
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
-from django.utils.encoding import force_unicode
+from django.utils.encoding import force_text
 
 from haystack import connections
 from haystack.backends import BaseEngine, BaseSearchBackend, BaseSearchQuery, SearchNode, log_query
@@ -1248,7 +1248,7 @@ def _marshal_value(value):
     elif isinstance(value, (int, long)):
         value = '%012d' % value
     else:
-        value = force_unicode(value).lower()
+        value = force_text(value).lower()
     return value
 
 
@@ -1261,7 +1261,7 @@ def _marshal_term(term):
     elif isinstance(term, datetime.date):
         term = _marshal_date(term)
     else:
-        term = force_unicode(term).lower()
+        term = force_text(term).lower()
     return term
 
 
