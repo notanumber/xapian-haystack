@@ -1,0 +1,22 @@
+language: python
+python:
+  - "2.7"
+
+# command to install dependencies
+install:
+  - pip install -r requirements.txt
+  - cd ..
+  - git clone https://github.com/toastdriven/django-haystack.git
+  - sudo apt-get install -qq libxapian22 xapian-tools python-xapian
+  - ln -s /usr/lib/python2.7/dist-packages/xapian $VIRTUAL_ENV/lib/python2.7/site-packages/.
+
+# move xapian-haystack to django-haystack
+before_script:
+  - cp xapian-haystack/xapian_backend.py django-haystack/haystack/backends
+  - cp -r xapian-haystack/tests/* django-haystack/tests/
+
+# command to run tests
+script:
+  - cd django-haystack/tests/
+  - export PYTHONPATH=`pwd`/..:`pwd`
+  - django-admin.py test xapian_tests --settings=xapian_settings
