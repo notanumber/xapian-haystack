@@ -1,8 +1,8 @@
 Xapian backend for Django-Haystack
 ==================================
 
-.. image:: https://travis-ci.org/jorgecarleitao/xapian-haystack.svg?branch=master
-   :target: https://travis-ci.org/jorgecarleitao/xapian-haystack
+.. image:: https://travis-ci.org/notanumber/xapian-haystack.svg?branch=master
+   :target: https://travis-ci.org/notanumber/xapian-haystack
 
 .. _Django-Haystack: http://haystacksearch.org/
 
@@ -108,7 +108,7 @@ all the steps to run the test suite on your machine.
 Source
 ------
 
-.. _github: http://github.com/jorgecarleitao/xapian-haystack/
+.. _github: http://github.com/notanumber/xapian-haystack/
 
 The source code can be found in github_.
 
