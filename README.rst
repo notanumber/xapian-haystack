@@ -68,7 +68,7 @@ You can test the installation was successful by running::
 
 Finally, install Xapian-haystack by running::
 
-    pip install git+https://github.com/jorgecarleitao/xapian-haystack.git
+    pip install git+https://github.com/notanumber/xapian-haystack.git
 
 Configuration
 -------------
