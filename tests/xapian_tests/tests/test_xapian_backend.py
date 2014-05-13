@@ -12,7 +12,7 @@ from django.test import TestCase
 
 from haystack import connections, reset_search_queries
 from haystack import indexes
-from haystack.backends.xapian_backend import _marshal_value
+from haystack.backends.xapian_backend import InvalidIndexError, _marshal_value
 from haystack.models import SearchResult
 from haystack.query import SearchQuerySet, SQ
 from haystack.utils.loading import UnifiedIndex
@@ -453,6 +453,24 @@ class XapianSearchBackendTestCase(HaystackBackendTestCase, TestCase):
                          'Xapian::Query(VALUE_RANGE 14 000000000010 %012d)' % sys.maxint)
         self.assertEqual(str(self.backend.parse_query('popularity:25.5..100.0')),
                          b'Xapian::Query(VALUE_RANGE 7 \xb2` \xba@)')
+
+    def test_more_like_this_with_unindexed_model(self):
+        """
+        Tests that more_like_this raises an error when it is called
+         with an unindexed model and if silently_fail is True.
+         Also tests the other way around.
+        """
+        mock = XapianMockModel()
+        mock.id = 10
+        mock.author = 'david10'
+
+        try:
+            self.assertEqual(self.backend.more_like_this(mock)['results'], [])
+        except InvalidIndexError:
+            self.fail("InvalidIndexError raised when silently_fail is True")
+
+        self.backend.silently_fail = False
+        self.assertRaises(InvalidIndexError, self.backend.more_like_this, mock)
 
 
 class LiveXapianMockSearchIndex(indexes.SearchIndex):
