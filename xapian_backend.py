@@ -230,67 +230,78 @@ class XapianSearchBackend(BaseSearchBackend):
         through the use of the :method:xapian.sortable_serialise method.
         """
         database = self._database(writable=True)
+
         try:
+            term_generator = xapian.TermGenerator()
+            term_generator.set_database(database)
+            term_generator.set_stemmer(xapian.Stem(self.language))
+            if self.include_spelling is True:
+                term_generator.set_flags(xapian.TermGenerator.FLAG_SPELLING)
+
             for obj in iterable:
                 document = xapian.Document()
-
-                term_generator = xapian.TermGenerator()
-                term_generator.set_database(database)
-                term_generator.set_stemmer(xapian.Stem(self.language))
-                if self.include_spelling is True:
-                    term_generator.set_flags(xapian.TermGenerator.FLAG_SPELLING)
                 term_generator.set_document(document)
 
                 data = index.full_prepare(obj)
                 weights = index.get_field_weights()
                 for field in self.schema:
-                    if field['field_name'] in data.keys():
-                        prefix = TERM_PREFIXES['field'] + field['field_name'].upper()
-                        value = data[field['field_name']]
-                        try:
-                            weight = int(weights[field['field_name']])
-                        except KeyError:
-                            weight = 1
-                        if field['field_name'] in ('id', 'django_id', 'django_ct'):
-                            term = value
+                    # not supported fields are ignored.
+                    if field['field_name'] not in data.keys():
+                        continue
 
-                            # django_id is always an integer, thus we are going to send
-                            # it to _marshal_value to garantee it can be sorted as a number.
-                            if field['field_name'] == 'django_id':
-                                term = int(term)
-                            term = _marshal_value(term)
-                            document.add_term(TERM_PREFIXES[field['field_name']] + term, weight)
-                            document.add_value(field['column'], term)
-                        elif field['type'] == 'text':
-                            if field['multi_valued'] == 'false':
-                                term = _marshal_term(value)
+                    if field['field_name'] in weights:
+                        weight = int(weights[field['field_name']])
+                    else:
+                        weight = 1
+
+                    if field['field_name'] in ('id', 'django_id', 'django_ct'):
+                        term = data[field['field_name']]
+
+                        # django_id is always an integer, thus we send
+                        # it to _marshal_value as int to guarantee it
+                        # is stored as a sortable number.
+                        if field['field_name'] == 'django_id':
+                            term = int(term)
+                        term = _marshal_value(term)
+
+                        document.add_term(TERM_PREFIXES[field['field_name']] + term, weight)
+                        document.add_value(field['column'], term)
+                    elif field['type'] == 'text':
+                        value = data[field['field_name']]
+                        prefix = TERM_PREFIXES['field'] + field['field_name'].upper()
+
+                        if field['multi_valued'] == 'false':
+                            term = _marshal_term(value)
+                            term_generator.index_text(term, weight)
+                            term_generator.index_text(term, weight, prefix)
+                            if len(term.split()) == 1:
+                                document.add_term(term, weight)
+                                document.add_term(prefix + term, weight)
+                            document.add_value(field['column'], _marshal_value(value))
+                        else:
+                            for term in value:
+                                term = _marshal_term(term)
                                 term_generator.index_text(term, weight)
                                 term_generator.index_text(term, weight, prefix)
                                 if len(term.split()) == 1:
                                     document.add_term(term, weight)
                                     document.add_term(prefix + term, weight)
+                    else:
+                        value = data[field['field_name']]
+                        prefix = TERM_PREFIXES['field'] + field['field_name'].upper()
+
+                        if field['multi_valued'] == 'false':
+                            term = _marshal_term(value)
+                            if len(term.split()) == 1:
+                                document.add_term(term, weight)
+                                document.add_term(prefix + term, weight)
                                 document.add_value(field['column'], _marshal_value(value))
-                            else:
-                                for term in value:
-                                    term = _marshal_term(term)
-                                    term_generator.index_text(term, weight)
-                                    term_generator.index_text(term, weight, prefix)
-                                    if len(term.split()) == 1:
-                                        document.add_term(term, weight)
-                                        document.add_term(prefix + term, weight)
                         else:
-                            if field['multi_valued'] == 'false':
-                                term = _marshal_term(value)
+                            for term in value:
+                                term = _marshal_term(term)
                                 if len(term.split()) == 1:
                                     document.add_term(term, weight)
                                     document.add_term(prefix + term, weight)
-                                    document.add_value(field['column'], _marshal_value(value))
-                            else:
-                                for term in value:
-                                    term = _marshal_term(term)
-                                    if len(term.split()) == 1:
-                                        document.add_term(term, weight)
-                                        document.add_term(prefix + term, weight)
 
                 # store data without indexing it
                 document.set_data(pickle.dumps(
