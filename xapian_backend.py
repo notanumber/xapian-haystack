@@ -14,7 +14,7 @@ from django.utils.encoding import force_text
 
 from haystack import connections
 from haystack.backends import BaseEngine, BaseSearchBackend, BaseSearchQuery, SearchNode, log_query
-from haystack.constants import ID
+from haystack.constants import ID, DJANGO_ID, DJANGO_CT
 from haystack.exceptions import HaystackError, MissingDependency
 from haystack.models import SearchResult
 from haystack.utils import get_identifier, get_model_ct
@@ -26,12 +26,17 @@ except ImportError:
                             "Please refer to the documentation.")
 
 
-# The prefix we add to identify that the term refers to a specific ID.
-DOCUMENT_ID_TERM_PREFIX = 'Q'
-# The prefix we add to identify that the term refers to a specific Field.
-DOCUMENT_CUSTOM_TERM_PREFIX = 'X'
-# The prefix we add to identify that the term refers to specific ContentType.
-DOCUMENT_CT_TERM_PREFIX = DOCUMENT_CUSTOM_TERM_PREFIX + 'CONTENTTYPE'
+# this maps the different reserved fields to prefixes used to
+# create the database:
+# id str: unique document id.
+# django_id int: id of the django model instance.
+# django_ct str: of the content type of the django model.
+# field str: name of the field of the index.
+TERM_PREFIXES = {'id': 'Q',
+                 'django_id': 'QQ',
+                 'django_ct': 'CONTENTTYPE',
+                 'field': 'X'
+                 }
 
 MEMORY_DB_NAME = ':memory:'
 
@@ -104,9 +109,9 @@ class XHExpandDecider(xapian.ExpandDecider):
         Return True if the term should be used for expanding the search
         query, False otherwise.
 
-        Currently, we only want to ignore terms beginning with `DOCUMENT_CT_TERM_PREFIX`
+        Ignore terms related with the content type of objects.
         """
-        if term.startswith(DOCUMENT_CT_TERM_PREFIX):
+        if term.startswith(TERM_PREFIXES['django_ct']):
             return False
         return True
 
@@ -236,21 +241,26 @@ class XapianSearchBackend(BaseSearchBackend):
                     term_generator.set_flags(xapian.TermGenerator.FLAG_SPELLING)
                 term_generator.set_document(document)
 
-                document_id = DOCUMENT_ID_TERM_PREFIX + get_identifier(obj)
                 data = index.full_prepare(obj)
                 weights = index.get_field_weights()
                 for field in self.schema:
                     if field['field_name'] in data.keys():
-                        prefix = DOCUMENT_CUSTOM_TERM_PREFIX + field['field_name'].upper()
+                        prefix = TERM_PREFIXES['field'] + field['field_name'].upper()
                         value = data[field['field_name']]
                         try:
                             weight = int(weights[field['field_name']])
                         except KeyError:
                             weight = 1
-                        if field['field_name'] == 'id':
-                            term = _marshal_term(value)
-                            document.add_term(prefix + term, weight)
-                            document.add_value(field['column'], _marshal_value(value))
+                        if field['field_name'] in ('id', 'django_id', 'django_ct'):
+                            term = value
+
+                            # django_id is always an integer, thus we are going to send
+                            # it to _marshal_value to garantee it can be sorted as a number.
+                            if field['field_name'] == 'django_id':
+                                term = int(term)
+                            term = _marshal_value(term)
+                            document.add_term(TERM_PREFIXES[field['field_name']] + term, weight)
+                            document.add_value(field['column'], term)
                         elif field['type'] == 'text':
                             if field['multi_valued'] == 'false':
                                 term = _marshal_term(value)
@@ -282,14 +292,17 @@ class XapianSearchBackend(BaseSearchBackend):
                                         document.add_term(term, weight)
                                         document.add_term(prefix + term, weight)
 
+                # store data without indexing it
                 document.set_data(pickle.dumps(
                     (obj._meta.app_label, obj._meta.module_name, obj.pk, data),
                     pickle.HIGHEST_PROTOCOL
                 ))
+
+                # add the id of the document
+                document_id = TERM_PREFIXES['id'] + get_identifier(obj)
                 document.add_term(document_id)
-                document.add_term(
-                    DOCUMENT_CT_TERM_PREFIX + get_model_ct(obj)
-                )
+
+                # finally, replace or add the document to the database
                 database.replace_document(document_id, document)
 
         except UnicodeDecodeError:
@@ -307,7 +320,7 @@ class XapianSearchBackend(BaseSearchBackend):
         should be unique to this object.
         """
         database = self._database(writable=True)
-        database.delete_document(DOCUMENT_ID_TERM_PREFIX + get_identifier(obj))
+        database.delete_document(TERM_PREFIXES['id'] + get_identifier(obj))
         database.close()
 
     def clear(self, models=(), commit=True):
@@ -334,9 +347,7 @@ class XapianSearchBackend(BaseSearchBackend):
         else:
             database = self._database(writable=True)
             for model in models:
-                database.delete_document(
-                    DOCUMENT_CT_TERM_PREFIX + get_model_ct(model)
-                )
+                database.delete_document(TERM_PREFIXES['django_ct'] + get_model_ct(model))
             database.close()
 
     def document_count(self):
@@ -351,7 +362,7 @@ class XapianSearchBackend(BaseSearchBackend):
         """
         registered_models_ct = self.build_models_list()
         if registered_models_ct:
-            restrictions = [xapian.Query('%s%s' % (DOCUMENT_CT_TERM_PREFIX, model_ct))
+            restrictions = [xapian.Query('%s%s' % (TERM_PREFIXES['django_ct'], model_ct))
                             for model_ct in registered_models_ct]
             limit_query = xapian.Query(xapian.Query.OP_OR, restrictions)
 
@@ -520,7 +531,7 @@ class XapianSearchBackend(BaseSearchBackend):
         if result_class is None:
             result_class = SearchResult
 
-        query = xapian.Query(DOCUMENT_ID_TERM_PREFIX + get_identifier(model_instance))
+        query = xapian.Query(TERM_PREFIXES['id'] + get_identifier(model_instance))
 
         enquire = xapian.Enquire(database)
         enquire.set_query(query)
@@ -539,7 +550,7 @@ class XapianSearchBackend(BaseSearchBackend):
             match.document.termlist_count()
         )
         query = xapian.Query(
-            xapian.Query.OP_AND_NOT, [query, DOCUMENT_ID_TERM_PREFIX + get_identifier(model_instance)]
+            xapian.Query.OP_AND_NOT, [query, TERM_PREFIXES['id'] + get_identifier(model_instance)]
         )
 
         if limit_to_registered_models:
@@ -590,12 +601,17 @@ class XapianSearchBackend(BaseSearchBackend):
         qp.set_database(self._database())
         qp.set_stemmer(xapian.Stem(self.language))
         qp.set_stemming_strategy(xapian.QueryParser.STEM_SOME)
-        qp.add_boolean_prefix('django_ct', DOCUMENT_CT_TERM_PREFIX)
+        qp.add_boolean_prefix('django_ct', TERM_PREFIXES['django_ct'])
 
         for field_dict in self.schema:
+            # since 'django_ct' has a boolean_prefix,
+            # we ignore it here.
+            if field_dict['field_name'] == 'django_ct':
+                continue
+
             qp.add_prefix(
                 field_dict['field_name'],
-                DOCUMENT_CUSTOM_TERM_PREFIX + field_dict['field_name'].upper()
+                TERM_PREFIXES['field'] + field_dict['field_name'].upper()
             )
 
         vrp = XHValueRangeProcessor(self)
@@ -620,9 +636,22 @@ class XapianSearchBackend(BaseSearchBackend):
         """
         content_field_name = ''
         schema_fields = [
-            {'field_name': ID, 'type': 'text', 'multi_valued': 'false', 'column': 0},
+            {'field_name': ID,
+             'type': 'text',
+             'multi_valued': 'false',
+             'column': 0},
+            {'field_name': DJANGO_ID,
+             'type': 'long',
+             'multi_valued': 'false',
+             'column': 1},
+            {'field_name': DJANGO_CT,
+             'type': 'text',
+             'multi_valued': 'false',
+             'column': 2},
         ]
         self._columns[ID] = 0
+        self._columns[DJANGO_ID] = 1
+        self._columns[DJANGO_CT] = 2
 
         column = len(schema_fields)
 
@@ -948,7 +977,7 @@ class XapianSearchQuery(BaseSearchQuery):
             subqueries = [
                 xapian.Query(
                     xapian.Query.OP_SCALE_WEIGHT,
-                    xapian.Query('%s%s' % (DOCUMENT_CT_TERM_PREFIX, get_model_ct(model))),
+                    xapian.Query('%s%s' % (TERM_PREFIXES['django_ct'], get_model_ct(model))),
                     0  # Pure boolean sub-query
                 ) for model in self.models
             ]
@@ -1188,16 +1217,14 @@ class XapianSearchQuery(BaseSearchQuery):
         """
         stem = xapian.Stem(self.backend.language)
 
-        if field == 'id':
-            return xapian.Query('%s%s' % (DOCUMENT_ID_TERM_PREFIX, term))
-        elif field == 'django_ct':
-            return xapian.Query('%s%s' % (DOCUMENT_CT_TERM_PREFIX, term))
+        if field in ('id', 'django_id', 'django_ct'):
+            return xapian.Query('%s%s' % (TERM_PREFIXES[field], term))
         elif field:
             stemmed = 'Z%s%s%s' % (
-                DOCUMENT_CUSTOM_TERM_PREFIX, field.upper(), stem(term)
+                TERM_PREFIXES['field'], field.upper(), stem(term)
             )
             unstemmed = '%s%s%s' % (
-                DOCUMENT_CUSTOM_TERM_PREFIX, field.upper(), term
+                TERM_PREFIXES['field'], field.upper(), term
             )
         else:
             stemmed = 'Z%s' % stem(term)
@@ -1223,7 +1250,7 @@ class XapianSearchQuery(BaseSearchQuery):
             A xapian.Query
         """
         if field and not is_content:
-            term_list = ['%s%s%s' % (DOCUMENT_CUSTOM_TERM_PREFIX, field.upper(), term) for term in term_list]
+            term_list = ['%s%s%s' % (TERM_PREFIXES['field'], field.upper(), term) for term in term_list]
         return xapian.Query(xapian.Query.OP_PHRASE, term_list)
 
 
