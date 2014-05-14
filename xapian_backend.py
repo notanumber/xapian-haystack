@@ -266,42 +266,22 @@ class XapianSearchBackend(BaseSearchBackend):
 
                         document.add_term(TERM_PREFIXES[field['field_name']] + term, weight)
                         document.add_value(field['column'], term)
-                    elif field['type'] == 'text':
-                        value = data[field['field_name']]
-                        prefix = TERM_PREFIXES['field'] + field['field_name'].upper()
-
-                        if field['multi_valued'] == 'false':
-                            term = _marshal_term(value)
-                            term_generator.index_text(term, weight)
-                            term_generator.index_text(term, weight, prefix)
-                            if len(term.split()) == 1:
-                                document.add_term(term, weight)
-                                document.add_term(prefix + term, weight)
-                            document.add_value(field['column'], _marshal_value(value))
-                        else:
-                            for term in value:
-                                term = _marshal_term(term)
-                                term_generator.index_text(term, weight)
-                                term_generator.index_text(term, weight, prefix)
-                                if len(term.split()) == 1:
-                                    document.add_term(term, weight)
-                                    document.add_term(prefix + term, weight)
                     else:
                         value = data[field['field_name']]
                         prefix = TERM_PREFIXES['field'] + field['field_name'].upper()
 
                         if field['multi_valued'] == 'false':
-                            term = _marshal_term(value)
+                            document.add_value(field['column'], _marshal_value(value))
+                            value = [value]
+
+                        for term in value:
+                            term = _marshal_term(term)
+                            if field['type'] == 'text':
+                                term_generator.index_text(term, weight)
+                                term_generator.index_text(term, weight, prefix)
                             if len(term.split()) == 1:
                                 document.add_term(term, weight)
                                 document.add_term(prefix + term, weight)
-                                document.add_value(field['column'], _marshal_value(value))
-                        else:
-                            for term in value:
-                                term = _marshal_term(term)
-                                if len(term.split()) == 1:
-                                    document.add_term(term, weight)
-                                    document.add_term(prefix + term, weight)
 
                 # store data without indexing it
                 document.set_data(pickle.dumps(
