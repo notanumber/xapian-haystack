@@ -151,13 +151,13 @@ class XapianSearchQueryTestCase(TestCase):
     def test_build_query_with_models(self):
         self.sq.add_filter(SQ(content='hello'))
         self.sq.add_model(MockModel)
-        self.assertEqual(str(self.sq.build_query()), 'Xapian::Query(((Zhello OR hello) AND 0 * XCONTENTTYPEcore.mockmodel))')
+        self.assertEqual(str(self.sq.build_query()), 'Xapian::Query(((Zhello OR hello) AND 0 * CONTENTTYPEcore.mockmodel))')
 
         self.sq.add_model(AnotherMockModel)
 
         self.assertTrue(str(self.sq.build_query()) in (
-            'Xapian::Query(((Zhello OR hello) AND (0 * XCONTENTTYPEcore.anothermockmodel OR 0 * XCONTENTTYPEcore.mockmodel)))',
-            'Xapian::Query(((Zhello OR hello) AND (0 * XCONTENTTYPEcore.mockmodel OR 0 * XCONTENTTYPEcore.anothermockmodel)))'))
+            'Xapian::Query(((Zhello OR hello) AND (0 * CONTENTTYPEcore.anothermockmodel OR 0 * CONTENTTYPEcore.mockmodel)))',
+            'Xapian::Query(((Zhello OR hello) AND (0 * CONTENTTYPEcore.mockmodel OR 0 * CONTENTTYPEcore.anothermockmodel)))'))
 
     def test_build_query_with_punctuation(self):
         self.sq.add_filter(SQ(content='http://www.example.com'))

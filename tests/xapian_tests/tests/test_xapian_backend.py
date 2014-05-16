@@ -161,8 +161,7 @@ class XapianBackendTestCase(HaystackBackendTestCase, TestCase):
         Tests that all fields are in the database
         """
         terms = get_terms(self.backend, '-a')
-
-        for field in ['id', 'author', 'pub_date', 'text']:
+        for field in ['author', 'pub_date', 'text']:
             is_inside = False
             for term in terms:
                 if "X%s" % field.upper() in term:
@@ -415,23 +414,25 @@ class XapianSearchBackendTestCase(HaystackBackendTestCase, TestCase):
     def test_build_schema(self):
         (content_field_name, fields) = self.backend.build_schema(connections['default'].get_unified_index().all_searchfields())
         self.assertEqual(content_field_name, 'text')
-        self.assertEqual(len(fields), 15)
+        self.assertEqual(len(fields), 14 + 3)
         self.assertEqual(fields, [
             {'column': 0, 'type': 'text', 'field_name': 'id', 'multi_valued': 'false'},
-            {'column': 1, 'type': 'text', 'field_name': 'empty', 'multi_valued': 'false'},
-            {'column': 2, 'type': 'date', 'field_name': 'exp_date', 'multi_valued': 'false'},
-            {'column': 3, 'type': 'boolean', 'field_name': 'flag', 'multi_valued': 'false'},
-            {'column': 4, 'type': 'text', 'field_name': 'keys', 'multi_valued': 'true'},
-            {'column': 5, 'type': 'text', 'field_name': 'name', 'multi_valued': 'false'},
-            {'column': 6, 'type': 'text', 'field_name': 'name_exact', 'multi_valued': 'false'},
-            {'column': 7, 'type': 'float', 'field_name': 'popularity', 'multi_valued': 'false'},
-            {'column': 8, 'type': 'date', 'field_name': 'pub_date', 'multi_valued': 'false'},
-            {'column': 9, 'type': 'text', 'field_name': 'sites', 'multi_valued': 'true'},
-            {'column': 10, 'type': 'text', 'field_name': 'tags', 'multi_valued': 'true'},
-            {'column': 11, 'type': 'text', 'field_name': 'text', 'multi_valued': 'false'},
-            {'column': 12, 'type': 'text', 'field_name': 'titles', 'multi_valued': 'true'},
-            {'column': 13, 'type': 'text', 'field_name': 'url', 'multi_valued': 'false'},
-            {'column': 14, 'type': 'long', 'field_name': 'value', 'multi_valued': 'false'}
+            {'column': 1, 'type': 'long', 'field_name': 'django_id', 'multi_valued': 'false'},
+            {'column': 2, 'type': 'text', 'field_name': 'django_ct', 'multi_valued': 'false'},
+            {'column': 3, 'type': 'text', 'field_name': 'empty', 'multi_valued': 'false'},
+            {'column': 4, 'type': 'date', 'field_name': 'exp_date', 'multi_valued': 'false'},
+            {'column': 5, 'type': 'boolean', 'field_name': 'flag', 'multi_valued': 'false'},
+            {'column': 6, 'type': 'text', 'field_name': 'keys', 'multi_valued': 'true'},
+            {'column': 7, 'type': 'text', 'field_name': 'name', 'multi_valued': 'false'},
+            {'column': 8, 'type': 'text', 'field_name': 'name_exact', 'multi_valued': 'false'},
+            {'column': 9, 'type': 'float', 'field_name': 'popularity', 'multi_valued': 'false'},
+            {'column': 10, 'type': 'date', 'field_name': 'pub_date', 'multi_valued': 'false'},
+            {'column': 11, 'type': 'text', 'field_name': 'sites', 'multi_valued': 'true'},
+            {'column': 12, 'type': 'text', 'field_name': 'tags', 'multi_valued': 'true'},
+            {'column': 13, 'type': 'text', 'field_name': 'text', 'multi_valued': 'false'},
+            {'column': 14, 'type': 'text', 'field_name': 'titles', 'multi_valued': 'true'},
+            {'column': 15, 'type': 'text', 'field_name': 'url', 'multi_valued': 'false'},
+            {'column': 16, 'type': 'long', 'field_name': 'value', 'multi_valued': 'false'}
         ])
 
     def test_parse_query(self):
@@ -444,15 +445,39 @@ class XapianSearchBackendTestCase(HaystackBackendTestCase, TestCase):
             self.assertEqual(str(self.backend.parse_query('name:da*')), 'Xapian::Query((XNAMEdavid1:(pos=1) OR XNAMEdavid2:(pos=1) OR XNAMEdavid3:(pos=1)))')
 
         self.assertEqual(str(self.backend.parse_query('name:david1..david2')),
-                         'Xapian::Query(VALUE_RANGE 5 david1 david2)')
+                         'Xapian::Query(VALUE_RANGE 7 david1 david2)')
         self.assertEqual(str(self.backend.parse_query('value:0..10')),
-                         'Xapian::Query(VALUE_RANGE 14 000000000000 000000000010)')
+                         'Xapian::Query(VALUE_RANGE 16 000000000000 000000000010)')
         self.assertEqual(str(self.backend.parse_query('value:..10')),
-                         'Xapian::Query(VALUE_RANGE 14 %012d 000000000010)' % (-sys.maxint - 1))
+                         'Xapian::Query(VALUE_RANGE 16 %012d 000000000010)' % (-sys.maxint - 1))
         self.assertEqual(str(self.backend.parse_query('value:10..*')),
-                         'Xapian::Query(VALUE_RANGE 14 000000000010 %012d)' % sys.maxint)
+                         'Xapian::Query(VALUE_RANGE 16 000000000010 %012d)' % sys.maxint)
         self.assertEqual(str(self.backend.parse_query('popularity:25.5..100.0')),
-                         b'Xapian::Query(VALUE_RANGE 7 \xb2` \xba@)')
+                         b'Xapian::Query(VALUE_RANGE 9 \xb2` \xba@)')
+
+    def test_order_by_django_id(self):
+        self.backend.clear()
+        self.sample_objs = []
+        number_list = range(1, 101)
+        for i in number_list:
+            mock = XapianMockModel()
+            mock.id = i
+            mock.author = 'david%s' % i
+            mock.pub_date = datetime.date(2009, 2, 25) - datetime.timedelta(days=i)
+            mock.exp_date = datetime.date(2009, 2, 23) + datetime.timedelta(days=i)
+            mock.value = i * 5
+            mock.flag = bool(i % 2)
+            mock.slug = 'http://example.com/%d/' % i
+            mock.url = 'http://example.com/%d/' % i
+            mock.popularity = i*2
+            self.sample_objs.append(mock)
+
+        self.backend.clear()
+        self.backend.update(self.index, self.sample_objs)
+
+        results = self.backend.search(xapian.Query(''), sort_by=['-django_id'])
+        self.assertEqual(results['hits'], len(number_list))
+        self.assertEqual([result.pk for result in results['results']], list(reversed(number_list)))
 
     def test_more_like_this_with_unindexed_model(self):
         """
@@ -511,21 +536,21 @@ class LiveXapianSearchQueryTestCase(HaystackBackendTestCase, TestCase):
 
     def test_build_query_gt(self):
         self.sq.add_filter(SQ(name__gt='m'))
-        self.assertEqual(str(self.sq.build_query()), 'Xapian::Query((<alldocuments> AND_NOT VALUE_RANGE 2 a m))')
+        self.assertEqual(str(self.sq.build_query()), 'Xapian::Query((<alldocuments> AND_NOT VALUE_RANGE 4 a m))')
 
     def test_build_query_gte(self):
         self.sq.add_filter(SQ(name__gte='m'))
-        self.assertEqual(str(self.sq.build_query()), 'Xapian::Query(VALUE_RANGE 2 m zzzzzzzzzzzzzzzzzzzzzzzzzzzz'
+        self.assertEqual(str(self.sq.build_query()), 'Xapian::Query(VALUE_RANGE 4 m zzzzzzzzzzzzzzzzzzzzzzzzzzzz'
                                                      'zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz'
                                                      'zzzzzzzzzzzzzz)')
 
     def test_build_query_lt(self):
         self.sq.add_filter(SQ(name__lt='m'))
-        self.assertEqual(str(self.sq.build_query()), 'Xapian::Query((<alldocuments> AND_NOT VALUE_RANGE 2 m zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz))')
+        self.assertEqual(str(self.sq.build_query()), 'Xapian::Query((<alldocuments> AND_NOT VALUE_RANGE 4 m zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz))')
 
     def test_build_query_lte(self):
         self.sq.add_filter(SQ(name__lte='m'))
-        self.assertEqual(str(self.sq.build_query()), 'Xapian::Query(VALUE_RANGE 2 a m)')
+        self.assertEqual(str(self.sq.build_query()), 'Xapian::Query(VALUE_RANGE 4 a m)')
 
     def test_build_query_multiple_filter_types(self):
         self.sq.add_filter(SQ(content='why'))
@@ -534,7 +559,7 @@ class LiveXapianSearchQueryTestCase(HaystackBackendTestCase, TestCase):
         self.sq.add_filter(SQ(created__lt=datetime.datetime(2009, 2, 12, 12, 13, 0)))
         self.sq.add_filter(SQ(title__gte='B'))
         self.sq.add_filter(SQ(id__in=[1, 2, 3]))
-        self.assertEqual(str(self.sq.build_query()), 'Xapian::Query(((Zwhi OR why) AND VALUE_RANGE 3 00010101000000 20090210015900 AND (<alldocuments> AND_NOT VALUE_RANGE 2 a david) AND (<alldocuments> AND_NOT VALUE_RANGE 1 20090212121300 99990101000000) AND VALUE_RANGE 5 b zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz AND (Q1 OR Q2 OR Q3)))')
+        self.assertEqual(str(self.sq.build_query()), 'Xapian::Query(((Zwhi OR why) AND VALUE_RANGE 5 00010101000000 20090210015900 AND (<alldocuments> AND_NOT VALUE_RANGE 4 a david) AND (<alldocuments> AND_NOT VALUE_RANGE 3 20090212121300 99990101000000) AND VALUE_RANGE 7 b zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz AND (Q1 OR Q2 OR Q3)))')
 
     def test_log_query(self):
         reset_search_queries()
