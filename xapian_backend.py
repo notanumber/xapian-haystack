@@ -530,8 +530,17 @@ class XapianSearchBackend(BaseSearchBackend):
         if not end_offset:
             end_offset = database.get_doccount()
 
+        match = None
         for match in self._get_enquire_mset(database, enquire, 0, end_offset):
             rset.add_document(match.docid)
+
+        if match is None:
+            if not self.silently_fail:
+                raise InvalidIndexError('Instance %s with id "%d" not indexed' %
+                                        (get_identifier(model_instance), model_instance.id))
+            else:
+                return {'results': [],
+                        'hits': 0}
 
         query = xapian.Query(
             xapian.Query.OP_ELITE_SET,
