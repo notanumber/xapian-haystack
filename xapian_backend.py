@@ -1159,20 +1159,24 @@ class XapianSearchQuery(BaseSearchQuery):
             )
         return self.backend.parse_query('%s:%s*' % (field_name, term))
 
-    def _phrase_query(self, term_list, field_name, is_content=False):
+    def _phrase_query(self, term_list, field_name):
         """
-        Private method that returns a phrase based xapian.Query that searches
-        for terms in `term_list.
+        Returns a query that matches exact terms and with
+        positional order (i.e. ["this", "thing"] != ["thing", "this"])
 
-        Required arguments:
-            ``term_list`` -- The terms to search for
-            ``field`` -- The field to search (If `None`, all fields)
-
-        Returns:
-            A xapian.Query
+        If `field_name` is given, this match is restricted to the field.
         """
-        if field_name and not is_content:
-            term_list = ['%s%s%s' % (TERM_PREFIXES['field'], field_name.upper(), term) for term in term_list]
+        prefix = ''
+        if field_name in ('id', 'django_id', 'django_ct'):
+            prefix = TERM_PREFIXES[field_name]
+        elif field_name:
+            prefix = TERM_PREFIXES['field']
+
+        if field_name:
+            term_list = ['%s%s%s' % (prefix,
+                                     field_name.upper(),
+                                     term) for term in term_list]
+
         return xapian.Query(xapian.Query.OP_PHRASE, term_list)
 
     def _term_query(self, term, field_name, field_type, exact=False):
