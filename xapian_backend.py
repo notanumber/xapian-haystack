@@ -1011,7 +1011,7 @@ class XapianSearchQuery(BaseSearchQuery):
                 expression, term = child
                 field_name, filter_type = search_node.split_expression(expression)
 
-                # Handle when we've got a ``ValuesListQuerySet``...
+                # Handle `ValuesListQuerySet`.
                 if hasattr(term, 'values_list'):
                     term = list(term)
 
@@ -1021,24 +1021,38 @@ class XapianSearchQuery(BaseSearchQuery):
                     term = _marshal_term(term)
 
                 if field_name == 'content':
-                    query_list.append(self._content_field(term, is_not))
-                else:
+                    # content is the generic search:
+                    # force no field_name search
+                    # and the field_type to be 'text'.
+                    field_name = None
+                    field_type = 'text'
+
+                    query_list.append(self._filter_contains(term, field_name, field_type, is_not))
+                    # when filter has no filter_type, haystack uses
+                    # filter_type = 'contains'. Here we remove it
+                    # since the above query is already doing this
                     if filter_type == 'contains':
-                        query_list.append(self._filter_contains(term, field_name, None, is_not))
-                    elif filter_type == 'exact':
-                        query_list.append(self._filter_exact(term, field_name, None, is_not))
-                    elif filter_type == 'gt':
-                        query_list.append(self._filter_gt(term, field_name, is_not))
-                    elif filter_type == 'gte':
-                        query_list.append(self._filter_gte(term, field_name, is_not))
-                    elif filter_type == 'lt':
-                        query_list.append(self._filter_lt(term, field_name, is_not))
-                    elif filter_type == 'lte':
-                        query_list.append(self._filter_lte(term, field_name, is_not))
-                    elif filter_type == 'startswith':
-                        query_list.append(self._filter_startswith(term, field_name, None, is_not))
-                    elif filter_type == 'in':
-                        query_list.append(self._filter_in(term, field_name, None, is_not))
+                        filter_type = None
+                else:
+                    # pick the field_type from the backend
+                    field_type = self.backend.schema[self.backend.column(field_name)]['type']
+
+                if filter_type == 'contains':
+                    query_list.append(self._filter_contains(term, field_name, field_type, is_not))
+                elif filter_type == 'exact':
+                    query_list.append(self._filter_exact(term, field_name, field_type, is_not))
+                elif filter_type == 'in':
+                    query_list.append(self._filter_in(term, field_name, field_type, is_not))
+                elif filter_type == 'startswith':
+                    query_list.append(self._filter_startswith(term, field_name, field_type, is_not))
+                elif filter_type == 'gt':
+                    query_list.append(self._filter_gt(term, field_name, is_not))
+                elif filter_type == 'gte':
+                    query_list.append(self._filter_gte(term, field_name, is_not))
+                elif filter_type == 'lt':
+                    query_list.append(self._filter_lt(term, field_name, is_not))
+                elif filter_type == 'lte':
+                    query_list.append(self._filter_lte(term, field_name, is_not))
 
         if search_node.connector == 'OR':
             return xapian.Query(xapian.Query.OP_OR, query_list)
@@ -1053,29 +1067,6 @@ class XapianSearchQuery(BaseSearchQuery):
             A xapian.Query
         """
         return xapian.Query('')
-
-    def _content_field(self, term, is_not):
-        """
-        Private method that returns a xapian.Query that searches for `value`
-        in all fields.
-
-        Required arguments:
-            ``term`` -- The term to search for
-            ``is_not`` -- Invert the search results
-
-        Returns:
-            A xapian.Query
-        """
-        # it is more than one term, we build a PHRASE
-        if ' ' in term:
-            query = self._phrase_query(term.split(), self.backend.content_field_name, is_content=True)
-        else:
-            query = self._term_query(term, None, None)
-
-        if is_not:
-            return xapian.Query(xapian.Query.OP_AND_NOT, self._all_query(), query)
-        else:
-            return query
 
     def _filter_contains(self, term, field_name, field_type, is_not):
         """
