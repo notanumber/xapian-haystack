@@ -32,7 +32,7 @@ Requirements
 - Django-Haystack 2.0.X
 - Xapian 1.0.13+
 
-In particular, this we build this backend on `Travis`_ using:
+In particular, we build this backend on `Travis`_ using:
 
 - Python 2.7.6
 - Django 1.6.4
@@ -76,9 +76,9 @@ The backend has the following optional settings:
 - ``HAYSTACK_XAPIAN_LANGUAGE``: the stemming language; the default is `english` and the list of available languages
   can be found `here <http://xapian.org/docs/apidoc/html/classXapian_1_1Stem.html>`_.
 
-- ``HAYSTACK_XAPIAN_WEIGHTING_SCHEME``: the weighting scheme used for documents;
-  the default is `BM25 <https://en.wikipedia.org/wiki/Okapi_BM25>`_ but others can be chosen from
-  `this list <http://getting-started-with-xapian.readthedocs.org/en/latest/howtos/weighting_scheme.html>`_.
+- ``HAYSTACK_XAPIAN_WEIGHTING_SCHEME``: a tuple with parameters to be passed to the weighting scheme
+  `BM25 <https://en.wikipedia.org/wiki/Okapi_BM25>`_.
+  By default, it uses the same parameters as Xapian recommends; this setting allows you to change them.
 
 - ``HAYSTACK_XAPIAN_FLAGS``: the options used to parse `AutoQueries`;
   the default is ``FLAG_PHRASE | FLAG_BOOLEAN | FLAG_LOVEHATE | FLAG_WILDCARD | FLAG_PURE_NOT``
