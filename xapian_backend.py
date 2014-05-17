@@ -16,6 +16,7 @@ from haystack import connections
 from haystack.backends import BaseEngine, BaseSearchBackend, BaseSearchQuery, SearchNode, log_query
 from haystack.constants import ID, DJANGO_ID, DJANGO_CT
 from haystack.exceptions import HaystackError, MissingDependency
+from haystack.inputs import AutoQuery
 from haystack.models import SearchResult
 from haystack.utils import get_identifier, get_model_ct
 
@@ -1010,6 +1011,15 @@ class XapianSearchQuery(BaseSearchQuery):
             else:
                 expression, term = child
                 field_name, filter_type = search_node.split_expression(expression)
+
+                # Identify and parse AutoQuery
+                if isinstance(term, AutoQuery):
+                    if field_name != 'content':
+                        query = '%s:%s' % (field_name, term.prepare(self))
+                    else:
+                        query = term.prepare(self)
+                    query_list.append(self.backend.parse_query(query))
+                    continue
 
                 # Handle `ValuesListQuerySet`.
                 if hasattr(term, 'values_list'):
