@@ -1092,27 +1092,16 @@ class XapianSearchQuery(BaseSearchQuery):
 
     def _filter_in(self, term_list, field_name, field_type, is_not):
         """
-        Private method that returns a xapian.Query that searches for any term
-        of `value_list` in a specified `field`.
+        Returns a query that matches exactly ANY term in term_list.
 
-        Required arguments:
-            ``term_list`` -- The terms to search for
-            ``field`` -- The field to search
-            ``is_not`` -- Invert the search results
-
-        Returns:
-            A xapian.Query
+        Notice that:
+         A in {B,C} <=> (A = B or A = C)
+         ~(A in {B,C}) <=> ~(A = B or A = C)
+        Because OP_AND_NOT(C, D) <=> (C and ~D), then D=(A in {B,C}) requires `is_not=False`.
         """
-        query_list = []
-        for term in term_list:
-            if ' ' in term:
-                query_list.append(
-                    self._phrase_query(term.split(), field_name)
-                )
-            else:
-                query_list.append(
-                    self._term_query(term, field_name, field_type)
-                )
+        query_list = [self._filter_exact(term, field_name, field_type, is_not=False)
+                      for term in term_list]
+
         if is_not:
             return xapian.Query(xapian.Query.OP_AND_NOT, self._all_query(),
                                 xapian.Query(xapian.Query.OP_OR, query_list))
