@@ -1121,18 +1121,14 @@ class XapianSearchQuery(BaseSearchQuery):
 
     def _filter_exact(self, term, field_name, field_type, is_not):
         """
-        Private method that returns a xapian.Query that searches for an exact
-        match for `term` in a specified `field`.
-
-        Required arguments:
-            ``term`` -- The term to search for
-            ``field`` -- The field to search
-            ``is_not`` -- Invert the search results
-
-        Returns:
-            A xapian.Query
+        Returns a query that matches exactly the un-stemmed term
+        with positional order.
         """
-        query = self._phrase_query(term.split(), field_name)
+        if ' ' in term:
+            query = self._phrase_query(term.split(), field_name)
+        else:
+            query = self._term_query(term, field_name, field_type, exact=True)
+
         if is_not:
             return xapian.Query(xapian.Query.OP_AND_NOT, self._all_query(), query)
         else:
