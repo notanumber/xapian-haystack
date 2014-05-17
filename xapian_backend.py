@@ -1009,7 +1009,7 @@ class XapianSearchQuery(BaseSearchQuery):
                 )
             else:
                 expression, term = child
-                field, filter_type = search_node.split_expression(expression)
+                field_name, filter_type = search_node.split_expression(expression)
 
                 # Handle when we've got a ``ValuesListQuerySet``...
                 if hasattr(term, 'values_list'):
@@ -1020,25 +1020,25 @@ class XapianSearchQuery(BaseSearchQuery):
                 else:
                     term = _marshal_term(term)
 
-                if field == 'content':
+                if field_name == 'content':
                     query_list.append(self._content_field(term, is_not))
                 else:
                     if filter_type == 'contains':
-                        query_list.append(self._filter_contains(term, field, is_not))
+                        query_list.append(self._filter_contains(term, field_name, is_not))
                     elif filter_type == 'exact':
-                        query_list.append(self._filter_exact(term, field, is_not))
+                        query_list.append(self._filter_exact(term, field_name, is_not))
                     elif filter_type == 'gt':
-                        query_list.append(self._filter_gt(term, field, is_not))
+                        query_list.append(self._filter_gt(term, field_name, is_not))
                     elif filter_type == 'gte':
-                        query_list.append(self._filter_gte(term, field, is_not))
+                        query_list.append(self._filter_gte(term, field_name, is_not))
                     elif filter_type == 'lt':
-                        query_list.append(self._filter_lt(term, field, is_not))
+                        query_list.append(self._filter_lt(term, field_name, is_not))
                     elif filter_type == 'lte':
-                        query_list.append(self._filter_lte(term, field, is_not))
+                        query_list.append(self._filter_lte(term, field_name, is_not))
                     elif filter_type == 'startswith':
-                        query_list.append(self._filter_startswith(term, field, is_not))
+                        query_list.append(self._filter_startswith(term, field_name, is_not))
                     elif filter_type == 'in':
-                        query_list.append(self._filter_in(term, field, is_not))
+                        query_list.append(self._filter_in(term, field_name, is_not))
 
         if search_node.connector == 'OR':
             return xapian.Query(xapian.Query.OP_OR, query_list)
