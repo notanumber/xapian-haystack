@@ -1139,6 +1139,13 @@ class XapianSearchQuery(BaseSearchQuery):
             return xapian.Query(xapian.Query.OP_AND_NOT, self._all_query(), query)
         return query
 
+    def _or_query(self, term_list, field, field_type, exact=False):
+        """
+        Joins each item of term_list decorated by _term_query with an OR.
+        """
+        term_list = [self._term_query(term, field, field_type, exact) for term in term_list]
+        return xapian.Query(xapian.Query.OP_OR, term_list)
+
     def _phrase_query(self, term_list, field_name):
         """
         Returns a query that matches exact terms and with
