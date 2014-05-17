@@ -1068,27 +1068,17 @@ class XapianSearchQuery(BaseSearchQuery):
         """
         return xapian.Query('')
 
-    def _filter_contains(self, term, field_name, field_type, is_not):
+    def _filter_contains(self, sentence, field_name, field_type, is_not):
         """
-        Private method that returns a xapian.Query that searches for `term`
-        in a specified `field`.
-
-        Required arguments:
-            ``term`` -- The term to search for
-            ``field`` -- The field to search
-            ``is_not`` -- Invert the search results
-
-        Returns:
-            A xapian.Query
+        Splits the sentence in terms and join them with OR,
+        using stemmed and un-stemmed.
         """
-        if ' ' in term:
-            return self._filter_exact(term, field_name, field_type, is_not)
+        query = self._or_query(sentence.split(), field_name, field_type)
+
+        if is_not:
+            return xapian.Query(xapian.Query.OP_AND_NOT, self._all_query(), query)
         else:
-            query = self._term_query(term, field_name, field_type)
-            if is_not:
-                return xapian.Query(xapian.Query.OP_AND_NOT, self._all_query(), query)
-            else:
-                return query
+            return query
 
     def _filter_in(self, term_list, field_name, field_type, is_not):
         """
