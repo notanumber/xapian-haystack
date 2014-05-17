@@ -366,6 +366,18 @@ class XapianSearchBackend(BaseSearchBackend):
 
         return query
 
+    def _check_field_names(self, field_names):
+        """
+        Raises InvalidIndexError if any of a field_name in field_names is
+        not indexed.
+        """
+        if field_names:
+            for field_name in field_names:
+                try:
+                    self.column(field_name)
+                except KeyError:
+                    raise InvalidIndexError('Trying to use non indexed field "%s"' % field_name)
+
     @log_query
     def search(self, query, sort_by=None, start_offset=0, end_offset=None,
                fields='', highlight=False, facets=None, date_facets=None,
@@ -413,6 +425,10 @@ class XapianSearchBackend(BaseSearchBackend):
                 'results': [],
                 'hits': 0,
             }
+
+        self._check_field_names(facets)
+        self._check_field_names(date_facets)
+        self._check_field_names(query_facets)
 
         database = self._database()
 

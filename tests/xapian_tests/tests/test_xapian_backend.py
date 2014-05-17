@@ -305,6 +305,12 @@ class XapianSearchBackendTestCase(HaystackBackendTestCase, TestCase):
         self.assertEqual(results['facets']['fields']['sites'],
                          [('1', 1), ('3', 2), ('2', 2), ('4', 1), ('6', 2), ('9', 1)])
 
+    def test_raise_index_error_on_wrong_field(self):
+        """
+        Regression test for #109.
+        """
+        self.assertRaises(InvalidIndexError, self.backend.search, xapian.Query(''), facets=['dsdas'])
+
     def test_date_facets(self):
         facets = {'pub_date': {'start_date': datetime.datetime(2008, 10, 26),
                                'end_date': datetime.datetime(2009, 3, 26),
