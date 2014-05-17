@@ -1140,24 +1140,19 @@ class XapianSearchQuery(BaseSearchQuery):
 
     def _filter_startswith(self, term, field_name, field_type, is_not):
         """
-        Private method that returns a xapian.Query that searches for any term
-        that begins with `term` in a specified `field`.
-
-        Required arguments:
-            ``term`` -- The terms to search for
-            ``field`` -- The field to search
-            ``is_not`` -- Invert the search results
-
-        Returns:
-            A xapian.Query
+        Returns a startswith query on the un-stemmed term.
         """
+        # TODO: if field_type is of type long, we need to marsh the value.
+        if field_name:
+            query_string = '%s:%s*' % (field_name, term)
+        else:
+            query_string = '%s*' % term
+
+        query = self.backend.parse_query(query_string)
+
         if is_not:
-            return xapian.Query(
-                xapian.Query.OP_AND_NOT,
-                self._all_query(),
-                self.backend.parse_query('%s:%s*' % (field_name, term)),
-            )
-        return self.backend.parse_query('%s:%s*' % (field_name, term))
+            return xapian.Query(xapian.Query.OP_AND_NOT, self._all_query(), query)
+        return query
 
     def _phrase_query(self, term_list, field_name):
         """
