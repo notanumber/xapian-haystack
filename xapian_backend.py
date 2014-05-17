@@ -1045,6 +1045,15 @@ class XapianSearchQuery(BaseSearchQuery):
         else:
             return xapian.Query(xapian.Query.OP_AND, query_list)
 
+    def _all_query(self):
+        """
+        Private method that returns a xapian.Query that returns all documents,
+
+        Returns:
+            A xapian.Query
+        """
+        return xapian.Query('')
+
     def _content_field(self, term, is_not):
         """
         Private method that returns a xapian.Query that searches for `value`
@@ -1090,25 +1099,6 @@ class XapianSearchQuery(BaseSearchQuery):
             else:
                 return query
 
-    def _filter_exact(self, term, field, is_not):
-        """
-        Private method that returns a xapian.Query that searches for an exact
-        match for `term` in a specified `field`.
-
-        Required arguments:
-            ``term`` -- The term to search for
-            ``field`` -- The field to search
-            ``is_not`` -- Invert the search results
-
-        Returns:
-            A xapian.Query
-        """
-        query = self._phrase_query(term.split(), field)
-        if is_not:
-            return xapian.Query(xapian.Query.OP_AND_NOT, self._all_query(), query)
-        else:
-            return query
-
     def _filter_in(self, term_list, field, is_not):
         """
         Private method that returns a xapian.Query that searches for any term
@@ -1138,6 +1128,25 @@ class XapianSearchQuery(BaseSearchQuery):
         else:
             return xapian.Query(xapian.Query.OP_OR, query_list)
 
+    def _filter_exact(self, term, field, is_not):
+        """
+        Private method that returns a xapian.Query that searches for an exact
+        match for `term` in a specified `field`.
+
+        Required arguments:
+            ``term`` -- The term to search for
+            ``field`` -- The field to search
+            ``is_not`` -- Invert the search results
+
+        Returns:
+            A xapian.Query
+        """
+        query = self._phrase_query(term.split(), field)
+        if is_not:
+            return xapian.Query(xapian.Query.OP_AND_NOT, self._all_query(), query)
+        else:
+            return query
+
     def _filter_startswith(self, term, field, is_not):
         """
         Private method that returns a xapian.Query that searches for any term
@@ -1159,49 +1168,21 @@ class XapianSearchQuery(BaseSearchQuery):
             )
         return self.backend.parse_query('%s:%s*' % (field, term))
 
-    def _filter_gt(self, term, field, is_not):
-        return self._filter_lte(term, field, is_not=not is_not)
+    def _phrase_query(self, term_list, field=None, is_content=False):
+        """
+        Private method that returns a phrase based xapian.Query that searches
+        for terms in `term_list.
 
-    def _filter_lt(self, term, field, is_not):
-        return self._filter_gte(term, field, is_not=not is_not)
-
-    def _filter_gte(self, term, field, is_not):
-        """
-        Private method that returns a xapian.Query that searches for any term
-        that is greater than `term` in a specified `field`.
-        """
-        vrp = XHValueRangeProcessor(self.backend)
-        pos, begin, end = vrp('%s:%s' % (field, _marshal_value(term)), '*')
-        if is_not:
-            return xapian.Query(xapian.Query.OP_AND_NOT,
-                                self._all_query(),
-                                xapian.Query(xapian.Query.OP_VALUE_RANGE, pos, begin, end)
-                                )
-        return xapian.Query(xapian.Query.OP_VALUE_RANGE, pos, begin, end)
-
-    def _filter_lte(self, term, field, is_not):
-        """
-        Private method that returns a xapian.Query that searches for any term
-        that is less than `term` in a specified `field`.
-        """
-        vrp = XHValueRangeProcessor(self.backend)
-        pos, begin, end = vrp('%s:' % field, '%s' % _marshal_value(term))
-        if is_not:
-            return xapian.Query(xapian.Query.OP_AND_NOT,
-                                self._all_query(),
-                                xapian.Query(xapian.Query.OP_VALUE_RANGE, pos, begin, end)
-                                )
-        return xapian.Query(xapian.Query.OP_VALUE_RANGE, pos, begin, end)
-
-    @staticmethod
-    def _all_query():
-        """
-        Private method that returns a xapian.Query that returns all documents,
+        Required arguments:
+            ``term_list`` -- The terms to search for
+            ``field`` -- The field to search (If `None`, all fields)
 
         Returns:
             A xapian.Query
         """
-        return xapian.Query('')
+        if field and not is_content:
+            term_list = ['%s%s%s' % (TERM_PREFIXES['field'], field.upper(), term) for term in term_list]
+        return xapian.Query(xapian.Query.OP_PHRASE, term_list)
 
     def _term_query(self, term, field=None):
         """
@@ -1236,22 +1217,39 @@ class XapianSearchQuery(BaseSearchQuery):
             xapian.Query(unstemmed)
         )
 
-    @staticmethod
-    def _phrase_query(term_list, field=None, is_content=False):
-        """
-        Private method that returns a phrase based xapian.Query that searches
-        for terms in `term_list.
+    def _filter_gt(self, term, field, is_not):
+        return self._filter_lte(term, field, is_not=not is_not)
 
-        Required arguments:
-            ``term_list`` -- The terms to search for
-            ``field`` -- The field to search (If `None`, all fields)
+    def _filter_lt(self, term, field, is_not):
+        return self._filter_gte(term, field, is_not=not is_not)
 
-        Returns:
-            A xapian.Query
+    def _filter_gte(self, term, field, is_not):
         """
-        if field and not is_content:
-            term_list = ['%s%s%s' % (TERM_PREFIXES['field'], field.upper(), term) for term in term_list]
-        return xapian.Query(xapian.Query.OP_PHRASE, term_list)
+        Private method that returns a xapian.Query that searches for any term
+        that is greater than `term` in a specified `field`.
+        """
+        vrp = XHValueRangeProcessor(self.backend)
+        pos, begin, end = vrp('%s:%s' % (field, _marshal_value(term)), '*')
+        if is_not:
+            return xapian.Query(xapian.Query.OP_AND_NOT,
+                                self._all_query(),
+                                xapian.Query(xapian.Query.OP_VALUE_RANGE, pos, begin, end)
+                                )
+        return xapian.Query(xapian.Query.OP_VALUE_RANGE, pos, begin, end)
+
+    def _filter_lte(self, term, field, is_not):
+        """
+        Private method that returns a xapian.Query that searches for any term
+        that is less than `term` in a specified `field`.
+        """
+        vrp = XHValueRangeProcessor(self.backend)
+        pos, begin, end = vrp('%s:' % field, '%s' % _marshal_value(term))
+        if is_not:
+            return xapian.Query(xapian.Query.OP_AND_NOT,
+                                self._all_query(),
+                                xapian.Query(xapian.Query.OP_VALUE_RANGE, pos, begin, end)
+                                )
+        return xapian.Query(xapian.Query.OP_VALUE_RANGE, pos, begin, end)
 
 
 def _marshal_value(value):
