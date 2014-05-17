@@ -1177,36 +1177,40 @@ class XapianSearchQuery(BaseSearchQuery):
 
     def _term_query(self, term, field_name, field_type, exact=False):
         """
-        Private method that returns a term based xapian.Query that searches
-        for `term`.
+        Constructs a query of a single term.
 
-        Required arguments:
-            ``term`` -- The term to search for
-            ``field`` -- The field to search (If `None`, all fields)
-
-        Returns:
-            A xapian.Query
+        If `field_name` is not `None`, the term is search on that field only.
+        If exact is `True`, the search is restricted to non-stemmed boolean match.
         """
-        stem = xapian.Stem(self.backend.language)
-
         if field_name in ('id', 'django_id', 'django_ct'):
+            # to ensure the value is serialized correctly.
+            if field_name == 'django_id':
+                term = int(term)
+            term = _marshal_value(term)
             return xapian.Query('%s%s' % (TERM_PREFIXES[field_name], term))
-        elif field_name:
-            stemmed = 'Z%s%s%s' % (
-                TERM_PREFIXES['field'], field_name.upper(), stem(term)
-            )
-            unstemmed = '%s%s%s' % (
-                TERM_PREFIXES['field'], field_name.upper(), term
-            )
-        else:
-            stemmed = 'Z%s' % stem(term)
-            unstemmed = term
 
-        return xapian.Query(
-            xapian.Query.OP_OR,
-            xapian.Query(stemmed),
-            xapian.Query(unstemmed)
-        )
+        constructor = '{prefix}{term}'
+        # "" is to do a boolean match, but only works on indexed terms
+        # (constraint on Xapian side)
+        if exact and field_type == 'text':
+            constructor = '"{prefix}{term}"'
+
+        prefix = ''
+        if field_name:
+            prefix = TERM_PREFIXES['field'] + field_name.upper()
+            term = _marshal_value(term)
+
+        unstemmed = constructor.format(prefix=prefix, term=term)
+        if exact:
+            return xapian.Query(unstemmed)
+        else:
+            stem = xapian.Stem(self.backend.language)
+            stemmed = 'Z' + constructor.format(prefix=prefix, term=stem(term))
+
+            return xapian.Query(xapian.Query.OP_OR,
+                                xapian.Query(stemmed),
+                                xapian.Query(unstemmed)
+                                )
 
     def _filter_gt(self, term, field, is_not):
         return self._filter_lte(term, field, is_not=not is_not)
