@@ -1114,10 +1114,9 @@ class XapianSearchQuery(BaseSearchQuery):
         with positional order.
         """
         if ' ' in term:
-            query = self._phrase_query(term.split(), field_name)
+            query = self._phrase_query(term.split(), field_name, field_type)
         else:
-            query = self._term_query(term, field_name, field_type, exact=True)
-
+            query = self._term_query(term, field_name, field_type, exact=True, stemmed=False)
         if is_not:
             return xapian.Query(xapian.Query.OP_AND_NOT, self._all_query(), query)
         else:
@@ -1146,33 +1145,31 @@ class XapianSearchQuery(BaseSearchQuery):
         term_list = [self._term_query(term, field, field_type, exact) for term in term_list]
         return xapian.Query(xapian.Query.OP_OR, term_list)
 
-    def _phrase_query(self, term_list, field_name):
+    def _phrase_query(self, term_list, field_name, field_type):
         """
-        Returns a query that matches exact terms and with
+        Returns a query that matches exact terms with
         positional order (i.e. ["this", "thing"] != ["thing", "this"])
+        and no stem.
 
-        If `field_name` is given, this match is restricted to the field.
+        If `field_name` is not `None`, restrict to the field.
         """
-        prefix = ''
-        if field_name in ('id', 'django_id', 'django_ct'):
-            prefix = TERM_PREFIXES[field_name]
-        elif field_name:
-            prefix = TERM_PREFIXES['field']
+        term_list = [self._term_query(term, field_name, field_type,
+                                      stemmed=False) for term in term_list]
 
-        if field_name:
-            term_list = ['%s%s%s' % (prefix,
-                                     field_name.upper(),
-                                     term) for term in term_list]
+        query = xapian.Query(xapian.Query.OP_PHRASE, term_list)
+        return query
 
-        return xapian.Query(xapian.Query.OP_PHRASE, term_list)
-
-    def _term_query(self, term, field_name, field_type, exact=False):
+    def _term_query(self, term, field_name, field_type, exact=False, stemmed=True):
         """
         Constructs a query of a single term.
 
         If `field_name` is not `None`, the term is search on that field only.
-        If exact is `True`, the search is restricted to non-stemmed boolean match.
+        If exact is `True`, the search is restricted to boolean matches.
         """
+        # using stemmed terms in exact query is not acceptable.
+        if stemmed:
+            assert not exact
+
         if field_name in ('id', 'django_id', 'django_ct'):
             # to ensure the value is serialized correctly.
             if field_name == 'django_id':
@@ -1191,17 +1188,17 @@ class XapianSearchQuery(BaseSearchQuery):
             prefix = TERM_PREFIXES['field'] + field_name.upper()
             term = _marshal_value(term)
 
-        unstemmed = constructor.format(prefix=prefix, term=term)
-        if exact:
-            return xapian.Query(unstemmed)
-        else:
+        unstemmed_term = constructor.format(prefix=prefix, term=term)
+        if stemmed:
             stem = xapian.Stem(self.backend.language)
-            stemmed = 'Z' + constructor.format(prefix=prefix, term=stem(term))
+            stemmed_term = 'Z' + constructor.format(prefix=prefix, term=stem(term))
 
             return xapian.Query(xapian.Query.OP_OR,
-                                xapian.Query(stemmed),
-                                xapian.Query(unstemmed)
+                                xapian.Query(stemmed_term),
+                                xapian.Query(unstemmed_term)
                                 )
+        else:
+            return unstemmed_term
 
     def _filter_gt(self, term, field, is_not):
         return self._filter_lte(term, field, is_not=not is_not)
