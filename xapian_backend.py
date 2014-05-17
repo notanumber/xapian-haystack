@@ -49,6 +49,10 @@ DEFAULT_XAPIAN_FLAGS = (
     xapian.QueryParser.FLAG_PURE_NOT
 )
 
+# number of documents checked by default when building facets
+# this must be improved to be relative to the total number of docs.
+DEFAULT_CHECK_AT_LEAST = 1000
+
 
 class InvalidIndexError(HaystackError):
     """Raised when an index can not be opened."""
@@ -458,6 +462,12 @@ class XapianSearchBackend(BaseSearchBackend):
         if not end_offset:
             end_offset = database.get_doccount() - start_offset
 
+        ## prepare spies in case of facets
+        if facets:
+            facets_spies = self._prepare_facet_field_spies(facets)
+            for spy in facets_spies:
+                enquire.add_matchspy(spy)
+
         matches = self._get_enquire_mset(database, enquire, start_offset, end_offset)
 
         for match in matches:
@@ -473,9 +483,18 @@ class XapianSearchBackend(BaseSearchBackend):
             )
 
         if facets:
-            facets_dict['fields'] = self._do_field_facets(results, facets)
+            # pick single valued facets from spies
+            single_facets_dict = self._process_facet_field_spies(facets_spies)
+
+            # pick multivalued valued facets from results
+            multi_facets_dict = self._do_multivalued_field_facets(results, facets)
+
+            # merge both results (http://stackoverflow.com/a/38990/931303)
+            facets_dict['fields'] = dict(list(single_facets_dict.items()) + list(multi_facets_dict.items()))
+
         if date_facets:
             facets_dict['dates'] = self._do_date_facets(results, date_facets)
+
         if query_facets:
             facets_dict['queries'] = self._do_query_facets(results, query_facets)
 
@@ -708,33 +727,56 @@ class XapianSearchBackend(BaseSearchBackend):
 
         return content
 
-    def _do_field_facets(self, results, field_facets):
+    def _prepare_facet_field_spies(self, facets):
         """
-        Private method that facets a document by field name.
+        Returns a list of spies based on the facets
+        used to count frequencies.
+        """
+        spies = []
+        for facet in facets:
+            slot = self.column(facet)
+            spy = xapian.ValueCountMatchSpy(slot)
+            # add attribute "slot" to know which column this spy is targeting.
+            spy.slot = slot
+            spies.append(spy)
+        return spies
 
-        Fields of type MultiValueField will be faceted on each item in the
-        (containing) list.
+    def _process_facet_field_spies(self, spies):
+        """
+        Returns a dict of facet names with lists of
+        tuples of the form (term, term_frequency)
+        from a list of spies that observed the enquire.
+        """
+        facet_dict = {}
+        for spy in spies:
+            field = self.schema[spy.slot]
+            field_name = field['field_name']
+            facet_dict[field_name] = []
+            for facet in spy.values():
+                facet_dict[field_name].append((_xapian_to_python(facet.term), facet.termfreq))
+        return facet_dict
 
-        Required arguments:
-            `results` -- A list SearchResults to facet
-            `field_facets` -- A list of fields to facet on
+    def _do_multivalued_field_facets(self, results, field_facets):
+        """
+        Implements a multivalued field facet on the results.
+
+        This is implemented using brute force - O(N^2) -
+        because Xapian does not have it implemented yet
+        (see http://trac.xapian.org/ticket/199)
         """
         facet_dict = {}
 
-        # DS_TODO: Improve this algorithm.  Currently, runs in O(N^2), ouch.
         for field in field_facets:
             facet_list = {}
+            if not self._multi_value_field(field):
+                continue
 
             for result in results:
                 field_value = getattr(result, field)
-                if self._multi_value_field(field):
-                    for item in field_value:  # Facet each item in a MultiValueField
-                        facet_list[item] = facet_list.get(item, 0) + 1
-                else:
-                    facet_list[field_value] = facet_list.get(field_value, 0) + 1
+                for item in field_value:  # Facet each item in a MultiValueField
+                    facet_list[item] = facet_list.get(item, 0) + 1
 
             facet_dict[field] = facet_list.items()
-
         return facet_dict
 
     @staticmethod
@@ -834,7 +876,6 @@ class XapianSearchBackend(BaseSearchBackend):
         eg. {'name': ('a*', 5)}
         """
         facet_dict = {}
-
         for field, query in dict(query_facets).items():
             facet_dict[field] = (query, self.search(self.parse_query(query))['hits'])
 
@@ -890,7 +931,7 @@ class XapianSearchBackend(BaseSearchBackend):
         return database
 
     @staticmethod
-    def _get_enquire_mset(database, enquire, start_offset, end_offset):
+    def _get_enquire_mset(database, enquire, start_offset, end_offset, checkatleast=DEFAULT_CHECK_AT_LEAST):
         """
         A safer version of Xapian.enquire.get_mset
 
@@ -904,10 +945,10 @@ class XapianSearchBackend(BaseSearchBackend):
             `end_offset` -- The end offset to pass to `enquire.get_mset`
         """
         try:
-            return enquire.get_mset(start_offset, end_offset)
+            return enquire.get_mset(start_offset, end_offset, checkatleast)
         except xapian.DatabaseModifiedError:
             database.reopen()
-            return enquire.get_mset(start_offset, end_offset)
+            return enquire.get_mset(start_offset, end_offset, checkatleast)
 
     @staticmethod
     def _get_document_data(database, document):
@@ -1256,6 +1297,14 @@ def _marshal_value(value):
         value = '%012d' % value
     else:
         value = force_text(value).lower()
+    return value
+
+
+def _xapian_to_python(value):
+    if value == 't':
+        return True
+    elif value == 'f':
+        return False
     return value
 
 
