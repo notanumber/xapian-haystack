@@ -1024,9 +1024,9 @@ class XapianSearchQuery(BaseSearchQuery):
                     query_list.append(self._content_field(term, is_not))
                 else:
                     if filter_type == 'contains':
-                        query_list.append(self._filter_contains(term, field_name, is_not))
+                        query_list.append(self._filter_contains(term, field_name, None, is_not))
                     elif filter_type == 'exact':
-                        query_list.append(self._filter_exact(term, field_name, is_not))
+                        query_list.append(self._filter_exact(term, field_name, None, is_not))
                     elif filter_type == 'gt':
                         query_list.append(self._filter_gt(term, field_name, is_not))
                     elif filter_type == 'gte':
@@ -1036,9 +1036,9 @@ class XapianSearchQuery(BaseSearchQuery):
                     elif filter_type == 'lte':
                         query_list.append(self._filter_lte(term, field_name, is_not))
                     elif filter_type == 'startswith':
-                        query_list.append(self._filter_startswith(term, field_name, is_not))
+                        query_list.append(self._filter_startswith(term, field_name, None, is_not))
                     elif filter_type == 'in':
-                        query_list.append(self._filter_in(term, field_name, is_not))
+                        query_list.append(self._filter_in(term, field_name, None, is_not))
 
         if search_node.connector == 'OR':
             return xapian.Query(xapian.Query.OP_OR, query_list)
@@ -1070,14 +1070,14 @@ class XapianSearchQuery(BaseSearchQuery):
         if ' ' in term:
             query = self._phrase_query(term.split(), self.backend.content_field_name, is_content=True)
         else:
-            query = self._term_query(term)
+            query = self._term_query(term, None, None)
 
         if is_not:
             return xapian.Query(xapian.Query.OP_AND_NOT, self._all_query(), query)
         else:
             return query
 
-    def _filter_contains(self, term, field, is_not):
+    def _filter_contains(self, term, field_name, field_type, is_not):
         """
         Private method that returns a xapian.Query that searches for `term`
         in a specified `field`.
@@ -1091,15 +1091,15 @@ class XapianSearchQuery(BaseSearchQuery):
             A xapian.Query
         """
         if ' ' in term:
-            return self._filter_exact(term, field, is_not)
+            return self._filter_exact(term, field_name, field_type, is_not)
         else:
-            query = self._term_query(term, field)
+            query = self._term_query(term, field_name, field_type)
             if is_not:
                 return xapian.Query(xapian.Query.OP_AND_NOT, self._all_query(), query)
             else:
                 return query
 
-    def _filter_in(self, term_list, field, is_not):
+    def _filter_in(self, term_list, field_name, field_type, is_not):
         """
         Private method that returns a xapian.Query that searches for any term
         of `value_list` in a specified `field`.
@@ -1116,11 +1116,11 @@ class XapianSearchQuery(BaseSearchQuery):
         for term in term_list:
             if ' ' in term:
                 query_list.append(
-                    self._phrase_query(term.split(), field)
+                    self._phrase_query(term.split(), field_name)
                 )
             else:
                 query_list.append(
-                    self._term_query(term, field)
+                    self._term_query(term, field_name, field_type)
                 )
         if is_not:
             return xapian.Query(xapian.Query.OP_AND_NOT, self._all_query(),
@@ -1128,7 +1128,7 @@ class XapianSearchQuery(BaseSearchQuery):
         else:
             return xapian.Query(xapian.Query.OP_OR, query_list)
 
-    def _filter_exact(self, term, field, is_not):
+    def _filter_exact(self, term, field_name, field_type, is_not):
         """
         Private method that returns a xapian.Query that searches for an exact
         match for `term` in a specified `field`.
@@ -1141,13 +1141,13 @@ class XapianSearchQuery(BaseSearchQuery):
         Returns:
             A xapian.Query
         """
-        query = self._phrase_query(term.split(), field)
+        query = self._phrase_query(term.split(), field_name)
         if is_not:
             return xapian.Query(xapian.Query.OP_AND_NOT, self._all_query(), query)
         else:
             return query
 
-    def _filter_startswith(self, term, field, is_not):
+    def _filter_startswith(self, term, field_name, field_type, is_not):
         """
         Private method that returns a xapian.Query that searches for any term
         that begins with `term` in a specified `field`.
@@ -1164,11 +1164,11 @@ class XapianSearchQuery(BaseSearchQuery):
             return xapian.Query(
                 xapian.Query.OP_AND_NOT,
                 self._all_query(),
-                self.backend.parse_query('%s:%s*' % (field, term)),
+                self.backend.parse_query('%s:%s*' % (field_name, term)),
             )
-        return self.backend.parse_query('%s:%s*' % (field, term))
+        return self.backend.parse_query('%s:%s*' % (field_name, term))
 
-    def _phrase_query(self, term_list, field=None, is_content=False):
+    def _phrase_query(self, term_list, field_name, is_content=False):
         """
         Private method that returns a phrase based xapian.Query that searches
         for terms in `term_list.
@@ -1180,11 +1180,11 @@ class XapianSearchQuery(BaseSearchQuery):
         Returns:
             A xapian.Query
         """
-        if field and not is_content:
-            term_list = ['%s%s%s' % (TERM_PREFIXES['field'], field.upper(), term) for term in term_list]
+        if field_name and not is_content:
+            term_list = ['%s%s%s' % (TERM_PREFIXES['field'], field_name.upper(), term) for term in term_list]
         return xapian.Query(xapian.Query.OP_PHRASE, term_list)
 
-    def _term_query(self, term, field=None):
+    def _term_query(self, term, field_name, field_type, exact=False):
         """
         Private method that returns a term based xapian.Query that searches
         for `term`.
@@ -1198,14 +1198,14 @@ class XapianSearchQuery(BaseSearchQuery):
         """
         stem = xapian.Stem(self.backend.language)
 
-        if field in ('id', 'django_id', 'django_ct'):
-            return xapian.Query('%s%s' % (TERM_PREFIXES[field], term))
-        elif field:
+        if field_name in ('id', 'django_id', 'django_ct'):
+            return xapian.Query('%s%s' % (TERM_PREFIXES[field_name], term))
+        elif field_name:
             stemmed = 'Z%s%s%s' % (
-                TERM_PREFIXES['field'], field.upper(), stem(term)
+                TERM_PREFIXES['field'], field_name.upper(), stem(term)
             )
             unstemmed = '%s%s%s' % (
-                TERM_PREFIXES['field'], field.upper(), term
+                TERM_PREFIXES['field'], field_name.upper(), term
             )
         else:
             stemmed = 'Z%s' % stem(term)
