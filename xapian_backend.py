@@ -832,7 +832,7 @@ class XapianSearchBackend(BaseSearchBackend):
         """
         facet_dict = {}
 
-        for field, query in query_facets.iteritems():
+        for field, query in dict(query_facets).items():
             facet_dict[field] = (query, self.search(self.parse_query(query))['hits'])
 
         return facet_dict

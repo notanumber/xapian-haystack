@@ -500,7 +500,7 @@ class XapianSearchBackendTestCase(HaystackBackendTestCase, TestCase):
 
 class LiveXapianMockSearchIndex(indexes.SearchIndex):
     text = indexes.CharField(document=True, use_template=True)
-    name = indexes.CharField(model_attr='author')
+    name = indexes.CharField(model_attr='author', faceted=True)
     pub_date = indexes.DateField(model_attr='pub_date')
     created = indexes.DateField()
     title = indexes.CharField()
@@ -559,7 +559,12 @@ class LiveXapianSearchQueryTestCase(HaystackBackendTestCase, TestCase):
         self.sq.add_filter(SQ(created__lt=datetime.datetime(2009, 2, 12, 12, 13, 0)))
         self.sq.add_filter(SQ(title__gte='B'))
         self.sq.add_filter(SQ(id__in=[1, 2, 3]))
-        self.assertEqual(str(self.sq.build_query()), 'Xapian::Query(((Zwhi OR why) AND VALUE_RANGE 5 00010101000000 20090210015900 AND (<alldocuments> AND_NOT VALUE_RANGE 4 a david) AND (<alldocuments> AND_NOT VALUE_RANGE 3 20090212121300 99990101000000) AND VALUE_RANGE 7 b zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz AND (Q1 OR Q2 OR Q3)))')
+        self.assertEqual(str(self.sq.build_query()),
+                         'Xapian::Query(((Zwhi OR why) AND VALUE_RANGE 6 00010101000000 20090210015900 AND '
+                         '(<alldocuments> AND_NOT VALUE_RANGE 4 a david) AND '
+                         '(<alldocuments> AND_NOT VALUE_RANGE 3 20090212121300 99990101000000) AND '
+                         'VALUE_RANGE 8 b zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz AND '
+                         '(Q1 OR Q2 OR Q3)))')
 
     def test_log_query(self):
         reset_search_queries()
@@ -621,6 +626,9 @@ class LiveXapianSearchQuerySetTestCase(HaystackBackendTestCase, TestCase):
         # Reset to default.
         sqs = self.sqs.result_class(None).all()
         self.assertTrue(isinstance(sqs[0], SearchResult))
+
+    def test_facet(self):
+        self.assertEqual(len(self.sqs.facet('name').facet_counts()['fields']['name']), 3)
 
 
 class XapianBoostMockSearchIndex(indexes.SearchIndex):
