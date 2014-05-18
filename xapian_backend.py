@@ -1342,16 +1342,10 @@ def _marshal_date(d):
 
 
 def _marshal_datetime(dt):
-    if dt.microsecond:
-        return '%04d%02d%02d%02d%02d%02d%06d' % (
-            dt.year, dt.month, dt.day, dt.hour,
-            dt.minute, dt.second, dt.microsecond
-        )
-    else:
-        return '%04d%02d%02d%02d%02d%02d' % (
-            dt.year, dt.month, dt.day, dt.hour,
-            dt.minute, dt.second
-        )
+    return '%04d%02d%02d%02d%02d%02d' % (
+        dt.year, dt.month, dt.day, dt.hour,
+        dt.minute, dt.second
+    )
 
 
 class XapianEngine(BaseEngine):

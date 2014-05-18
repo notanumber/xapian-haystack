@@ -453,7 +453,6 @@ class XapianSearchBackendTestCase(HaystackBackendTestCase, TestCase):
         self.assertEqual(_marshal_value(datetime.datetime(2009, 5, 9, 16, 14)), '20090509161400')
         self.assertEqual(_marshal_value(datetime.datetime(2009, 5, 9, 0, 0)), '20090509000000')
         self.assertEqual(_marshal_value(datetime.datetime(1899, 5, 18, 0, 0)), '18990518000000')
-        self.assertEqual(_marshal_value(datetime.datetime(2009, 5, 18, 1, 16, 30, 250)), '20090518011630000250')
 
     def test_build_schema(self):
         search_fields = connections['default'].get_unified_index().all_searchfields()
