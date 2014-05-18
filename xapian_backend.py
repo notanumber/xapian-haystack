@@ -80,7 +80,7 @@ class XHValueRangeProcessor(xapian.ValueRangeProcessor):
                 if not begin:
                     if field_dict['type'] == 'text':
                         begin = 'a'  # TODO: A better way of getting a min text value?
-                    elif field_dict['type'] == 'long':
+                    elif field_dict['type'] == 'integer':
                         begin = -sys.maxint - 1
                     elif field_dict['type'] == 'float':
                         begin = float('-inf')
@@ -89,7 +89,7 @@ class XHValueRangeProcessor(xapian.ValueRangeProcessor):
                 elif end == '*':
                     if field_dict['type'] == 'text':
                         end = 'z' * 100  # TODO: A better way of getting a max text value?
-                    elif field_dict['type'] == 'long':
+                    elif field_dict['type'] == 'integer':
                         end = sys.maxint
                     elif field_dict['type'] == 'float':
                         end = float('inf')
@@ -98,9 +98,9 @@ class XHValueRangeProcessor(xapian.ValueRangeProcessor):
                 if field_dict['type'] == 'float':
                     begin = _marshal_value(float(begin))
                     end = _marshal_value(float(end))
-                elif field_dict['type'] == 'long':
-                    begin = _marshal_value(long(begin))
-                    end = _marshal_value(long(end))
+                elif field_dict['type'] == 'integer':
+                    begin = _marshal_value(int(begin))
+                    end = _marshal_value(int(end))
                 return field_dict['column'], str(begin), str(end)
 
 
@@ -642,7 +642,7 @@ class XapianSearchBackend(BaseSearchBackend):
              'multi_valued': 'false',
              'column': 0},
             {'field_name': DJANGO_ID,
-             'type': 'long',
+             'type': 'integer',
              'multi_valued': 'false',
              'column': 1},
             {'field_name': DJANGO_CT,
@@ -668,10 +668,12 @@ class XapianSearchBackend(BaseSearchBackend):
                     'column': column,
                 }
 
-                if field_class.field_type in ['date', 'datetime']:
+                if field_class.field_type == 'date':
                     field_data['type'] = 'date'
+                elif field_class.field_type == 'datetime':
+                    field_data['type'] = 'datetime'
                 elif field_class.field_type == 'integer':
-                    field_data['type'] = 'long'
+                    field_data['type'] = 'integer'
                 elif field_class.field_type == 'float':
                     field_data['type'] = 'float'
                 elif field_class.field_type == 'boolean':
@@ -1126,7 +1128,7 @@ class XapianSearchQuery(BaseSearchQuery):
         """
         Returns a startswith query on the un-stemmed term.
         """
-        # TODO: if field_type is of type long, we need to marsh the value.
+        # TODO: if field_type is of type integer, we need to marsh the value.
         if field_name:
             query_string = '%s:%s*' % (field_name, term)
         else:
@@ -1250,7 +1252,7 @@ def _marshal_value(value):
             value = 'f'
     elif isinstance(value, float):
         value = xapian.sortable_serialise(value)
-    elif isinstance(value, (int, long)):
+    elif isinstance(value, int):
         value = '%012d' % value
     else:
         value = force_text(value).lower()

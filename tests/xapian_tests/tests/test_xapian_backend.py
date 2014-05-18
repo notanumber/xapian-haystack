@@ -457,7 +457,7 @@ class XapianSearchBackendTestCase(HaystackBackendTestCase, TestCase):
         self.assertEqual(len(fields), 14 + 3)
         self.assertEqual(fields, [
             {'column': 0, 'type': 'text', 'field_name': 'id', 'multi_valued': 'false'},
-            {'column': 1, 'type': 'long', 'field_name': 'django_id', 'multi_valued': 'false'},
+            {'column': 1, 'type': 'integer', 'field_name': 'django_id', 'multi_valued': 'false'},
             {'column': 2, 'type': 'text', 'field_name': 'django_ct', 'multi_valued': 'false'},
             {'column': 3, 'type': 'text', 'field_name': 'empty', 'multi_valued': 'false'},
             {'column': 4, 'type': 'date', 'field_name': 'exp_date', 'multi_valued': 'false'},
@@ -472,7 +472,7 @@ class XapianSearchBackendTestCase(HaystackBackendTestCase, TestCase):
             {'column': 13, 'type': 'text', 'field_name': 'text', 'multi_valued': 'false'},
             {'column': 14, 'type': 'text', 'field_name': 'titles', 'multi_valued': 'true'},
             {'column': 15, 'type': 'text', 'field_name': 'url', 'multi_valued': 'false'},
-            {'column': 16, 'type': 'long', 'field_name': 'value', 'multi_valued': 'false'}
+            {'column': 16, 'type': 'integer', 'field_name': 'value', 'multi_valued': 'false'}
         ])
 
     def test_parse_query(self):
