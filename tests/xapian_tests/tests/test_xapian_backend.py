@@ -22,9 +22,10 @@ from core.tests.mocks import MockSearchResult
 
 
 def get_terms(backend, *args):
-    result = subprocess.check_output(['delve'] + list(args) + [backend.path], env=os.environ.copy())
-    result = result.split(b": ")[1].strip()
-    return result.split(b" ")
+    result = subprocess.check_output(['delve'] + list(args) + [backend.path],
+                                     env=os.environ.copy()).decode('utf-8')
+    result = result.split(": ")[1].strip()
+    return result.split(" ")
 
 
 def pks(results):
@@ -109,13 +110,41 @@ class XapianMockSearchIndex(indexes.SearchIndex):
 class XapianSimpleMockIndex(indexes.SearchIndex):
     text = indexes.CharField(document=True)
     author = indexes.CharField(model_attr='author')
-    pub_date = indexes.DateTimeField(model_attr='pub_date')
+    url = indexes.CharField()
+
+    datetime = indexes.DateTimeField(model_attr='pub_date')
+    date = indexes.DateField()
+
+    number = indexes.IntegerField()
+    float_number = indexes.FloatField()
+    decimal_number = indexes.DecimalField()
 
     def get_model(self):
         return MockModel
 
     def prepare_text(self, obj):
         return 'this_is_a_word'
+
+    def prepare_author(self, obj):
+        return 'david'
+
+    def prepare_url(self, obj):
+        return 'http://example.com/1/'
+
+    def prepare_datetime(self, obj):
+        return datetime.datetime(2009, 2, 25, 1, 1, 1)
+
+    def prepare_date(self, obj):
+        return datetime.date(2008, 8, 8)
+
+    def prepare_number(self, obj):
+        return 123456789
+
+    def prepare_float_number(self, obj):
+        return 123.123456789
+
+    def prepare_decimal_number(self, obj):
+        return '22.34'
 
 
 class HaystackBackendTestCase(object):
@@ -152,32 +181,9 @@ class XapianBackendTestCase(HaystackBackendTestCase, TestCase):
 
     def setUp(self):
         super(XapianBackendTestCase, self).setUp()
-
         mock = XapianMockModel()
         mock.id = 1
-        mock.author = 'david'
-        mock.pub_date = datetime.datetime(2009, 2, 25)
-
         self.backend.update(self.index, [mock])
-
-    def test_fields(self):
-        """
-        Tests that all fields are in the database
-        """
-        terms = get_terms(self.backend, '-a')
-        for field in ['author', 'pub_date', 'text']:
-            is_inside = False
-            for term in terms:
-                if "X%s" % field.upper() in term:
-                    is_inside = True
-                    break
-            self.assertTrue(is_inside, field)
-
-    def test_text(self):
-        terms = get_terms(self.backend, '-a')
-
-        self.assertTrue('this_is_a_word' in terms)
-        self.assertTrue('Zthis_is_a_word' in terms)
 
     def test_app_is_not_split(self):
         """
@@ -198,6 +204,76 @@ class XapianBackendTestCase(HaystackBackendTestCase, TestCase):
         self.assertFalse('tests.xapianmockmodel.1' in terms)
         self.assertFalse('xapianmockmodel' in terms)
         self.assertFalse('tests' in terms)
+
+    def test_fields_exist(self):
+        """
+        Tests that all fields are in the database
+        """
+        terms = get_terms(self.backend, '-a')
+        for field in ['author', 'datetime', 'text', 'url']:
+            is_inside = False
+            for term in terms:
+                if term.startswith("X%s" % field.upper()):
+                    is_inside = True
+                    break
+            self.assertTrue(is_inside, field)
+
+    def test_text_field(self):
+        terms = get_terms(self.backend, '-a')
+        self.assertTrue('this_is_a_word' in terms)
+        self.assertTrue('Zthis_is_a_word' in terms)
+        self.assertTrue('ZXTEXTthis_is_a_word' in terms)
+        self.assertTrue('XTEXTthis_is_a_word' in terms)
+
+    def test_author_field(self):
+        terms = get_terms(self.backend, '-a')
+
+        self.assertTrue('XAUTHORdavid' in terms)
+        self.assertTrue('ZXAUTHORdavid' in terms)
+        self.assertTrue('Zdavid' in terms)
+        self.assertTrue('david' in terms)
+
+    def test_datetime_field(self):
+        terms = get_terms(self.backend, '-a')
+
+        self.assertFalse('XDATETIME20090225000000' in terms)
+        self.assertFalse('ZXDATETIME20090225000000' in terms)
+        self.assertFalse('20090225000000' in terms)
+
+        self.assertTrue('XDATETIME2009-02-25' in terms)
+        self.assertTrue('2009-02-25' in terms)
+        self.assertTrue('01:01:01' in terms)
+        self.assertTrue('XDATETIME01:01:01' in terms)
+
+    def test_date_field(self):
+        terms = get_terms(self.backend, '-a')
+
+        self.assertTrue('XDATE2008-08-08' in terms)
+        self.assertTrue('2008-08-08' in terms)
+        self.assertFalse('XDATE00:00:00' in terms)
+        self.assertFalse('00:00:00' in terms)
+
+    def test_url_field(self):
+        terms = get_terms(self.backend, '-a')
+        self.assertTrue('http://example.com/1/' in terms)
+
+    def test_integer_field(self):
+        terms = get_terms(self.backend, '-a')
+        self.assertTrue('123456789' in terms)
+        self.assertTrue('XNUMBER123456789' in terms)
+        self.assertFalse('ZXNUMBER123456789' in terms)
+
+    def test_float_field(self):
+        terms = get_terms(self.backend, '-a')
+        self.assertTrue('123.123456789' in terms)
+        self.assertTrue('XFLOAT_NUMBER123.123456789' in terms)
+        self.assertFalse('ZXFLOAT_NUMBER123.123456789' in terms)
+
+    def test_decimal_field(self):
+        terms = get_terms(self.backend, '-a')
+        self.assertTrue('22.34' in terms)
+        self.assertTrue('XDECIMAL_NUMBER22.34' in terms)
+        self.assertFalse('ZXDECIMAL_NUMBER22.34' in terms)
 
 
 class XapianSearchBackendTestCase(HaystackBackendTestCase, TestCase):
@@ -276,7 +352,6 @@ class XapianSearchBackendTestCase(HaystackBackendTestCase, TestCase):
                                    MockSearchResult))
 
     def test_search_field_with_punctuation(self):
-        #self.assertEqual(self.backend.search(xapian.Query('http://example.com/'))['hits'], 3)
         self.assertEqual(pks(self.backend.search(xapian.Query('http://example.com/1/'))['results']),
                          [1])
 
