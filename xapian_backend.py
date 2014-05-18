@@ -1318,7 +1318,7 @@ class XapianSearchQuery(BaseSearchQuery):
         unstemmed_term = constructor.format(prefix=prefix, term=term)
         if stemmed:
             stem = xapian.Stem(self.backend.language)
-            stemmed_term = 'Z' + constructor.format(prefix=prefix, term=stem(term))
+            stemmed_term = 'Z' + constructor.format(prefix=prefix, term=stem(term).decode('utf-8'))
 
             return xapian.Query(xapian.Query.OP_OR,
                                 xapian.Query(stemmed_term),

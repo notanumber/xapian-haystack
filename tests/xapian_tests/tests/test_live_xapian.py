@@ -1,3 +1,5 @@
+from __future__ import unicode_literals
+
 import datetime
 from django.test import TestCase
 
@@ -7,6 +9,7 @@ from haystack.query import SearchQuerySet
 
 from xapian_tests.models import Document
 from xapian_tests.search_indexes import DocumentIndex
+from xapian_tests.tests.test_xapian_backend import get_terms
 
 
 def pks(results):
@@ -25,7 +28,7 @@ class LiveXapianTestCase(TestCase):
                  datetime.date(year=2010, month=2, day=1),
                  datetime.date(year=2010, month=3, day=1)]
 
-        summaries = ['This is a huge summary',
+        summaries = ['This is a huge corrup\xe7\xe3o summary',
                      'This is a medium summary',
                      'This is a small summary']
 
@@ -119,8 +122,8 @@ class LiveXapianTestCase(TestCase):
         self.assertEqual(pks(self.queryset.filter(django_id__in=[2, 4])),
                          pks(Document.objects.filter(id__in=[2, 4])))
 
-        self.assertEqual(pks(self.queryset.models(Document)),
-                         pks(Document.objects.all()))
+        self.assertEqual(set(pks(self.queryset.models(Document))),
+                         set(pks(Document.objects.all())))
 
     def test_field_startswith(self):
         self.assertEqual(len(self.queryset.filter(name__startswith='magaz')), 4)
@@ -134,20 +137,20 @@ class LiveXapianTestCase(TestCase):
         self.assertEqual(len(self.queryset.filter(name=AutoQuery("8 AND 4"))), 0)
 
     def test_value_range(self):
-        self.assertEqual(pks(self.queryset.filter(number__lt=3)),
-                         pks(Document.objects.filter(number__lt=3)))
+        self.assertEqual(set(pks(self.queryset.filter(number__lt=3))),
+                         set(pks(Document.objects.filter(number__lt=3))))
 
-        self.assertEqual(pks(self.queryset.filter(django_id__gte=6)),
-                         pks(Document.objects.filter(id__gte=6)))
+        self.assertEqual(set(pks(self.queryset.filter(django_id__gte=6))),
+                         set(pks(Document.objects.filter(id__gte=6))))
 
     def test_date_range(self):
         date = datetime.date(year=2010, month=2, day=1)
-        self.assertEqual(pks(self.queryset.filter(date__gte=date)),
-                         pks(Document.objects.filter(date__gte=date)))
+        self.assertEqual(set(pks(self.queryset.filter(date__gte=date))),
+                         set(pks(Document.objects.filter(date__gte=date))))
 
         date = datetime.date(year=2010, month=3, day=1)
-        self.assertEqual(pks(self.queryset.filter(date__lte=date)),
-                         pks(Document.objects.filter(date__lte=date)))
+        self.assertEqual(set(pks(self.queryset.filter(date__lte=date))),
+                         set(pks(Document.objects.filter(date__lte=date))))
 
     def test_order_by(self):
         # private order
@@ -166,3 +169,9 @@ class LiveXapianTestCase(TestCase):
         self.assertEqual(pks(self.queryset.order_by("-date")),
                          pks(Document.objects.order_by("-date")))
 
+    def test_non_ascii_search(self):
+        """
+        Regression test for #119.
+        """
+        self.assertEqual(pks(self.queryset.filter(content='corrup\xe7\xe3o')),
+                         pks(Document.objects.filter(summary__contains='corrup\xe7\xe3o')))

@@ -111,6 +111,7 @@ class XapianSimpleMockIndex(indexes.SearchIndex):
     text = indexes.CharField(document=True)
     author = indexes.CharField(model_attr='author')
     url = indexes.CharField()
+    non_anscii = indexes.CharField()
 
     datetime = indexes.DateTimeField(model_attr='pub_date')
     date = indexes.DateField()
@@ -130,6 +131,9 @@ class XapianSimpleMockIndex(indexes.SearchIndex):
 
     def prepare_url(self, obj):
         return 'http://example.com/1/'
+
+    def prepare_non_anscii(self, obj):
+        return 'thsi sdas das corrup\xe7\xe3o das'
 
     def prepare_datetime(self, obj):
         return datetime.datetime(2009, 2, 25, 1, 1, 1)
@@ -274,6 +278,10 @@ class XapianBackendTestCase(HaystackBackendTestCase, TestCase):
         self.assertTrue('22.34' in terms)
         self.assertTrue('XDECIMAL_NUMBER22.34' in terms)
         self.assertFalse('ZXDECIMAL_NUMBER22.34' in terms)
+
+    def test_non_ascii_chars(self):
+        terms = get_terms(self.backend, '-a')
+        self.assertIn('corrup\xe7\xe3o', terms)
 
 
 class XapianSearchBackendTestCase(HaystackBackendTestCase, TestCase):
