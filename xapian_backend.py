@@ -53,6 +53,14 @@ DEFAULT_XAPIAN_FLAGS = (
 # this must be improved to be relative to the total number of docs.
 DEFAULT_CHECK_AT_LEAST = 1000
 
+# field types accepted to be serialized as values in Xapian
+FIELD_TYPES = {'text', 'integer', 'date', 'datetime', 'float', 'boolean'}
+
+# defines the format used to store types in Xapian
+# this format ensures datetimes are sorted correctly
+DATETIME_FORMAT = '%Y%m%d%H%M%S'
+INTEGER_FORMAT = '%012d'
+
 
 class InvalidIndexError(HaystackError):
     """Raised when an index can not be opened."""
@@ -102,12 +110,12 @@ class XHValueRangeProcessor(xapian.ValueRangeProcessor):
                     elif field_type == 'date' or field_type == 'datetime':
                         end = '99990101000000'
 
-                if field_dict['type'] == 'float':
-                    begin = _marshal_value(float(begin))
-                    end = _marshal_value(float(end))
-                elif field_dict['type'] == 'integer':
-                    begin = _marshal_value(int(begin))
-                    end = _marshal_value(int(end))
+                if field_type == 'float':
+                    begin = _term_to_xapian_value(float(begin), field_type)
+                    end = _term_to_xapian_value(float(end), field_type)
+                elif field_type == 'integer':
+                    begin = _term_to_xapian_value(int(begin), field_type)
+                    end = _term_to_xapian_value(int(end), field_type)
                 return field_dict['column'], str(begin), str(end)
 
 
@@ -262,28 +270,27 @@ class XapianSearchBackend(BaseSearchBackend):
                     else:
                         weight = 1
 
+                    value = data[field['field_name']]
+                    # Private fields are indexed in a different way:
+                    # `django_id` is an int and `django_ct` is text;
+                    # besides, they are indexed by their (unstemmed) value.
                     if field['field_name'] in ('id', 'django_id', 'django_ct'):
-                        term = data[field['field_name']]
-
-                        # django_id is always an integer, thus we send
-                        # it to _marshal_value as int to guarantee it
-                        # is stored as a sortable number.
                         if field['field_name'] == 'django_id':
-                            term = int(term)
-                        term = _marshal_value(term)
+                            value = int(value)
+                        value = _term_to_xapian_value(value, field['type'])
 
-                        document.add_term(TERM_PREFIXES[field['field_name']] + term, weight)
-                        document.add_value(field['column'], term)
+                        document.add_term(TERM_PREFIXES[field['field_name']] + value, weight)
+                        document.add_value(field['column'], value)
                     else:
-                        value = data[field['field_name']]
                         prefix = TERM_PREFIXES['field'] + field['field_name'].upper()
 
+                        # if not multi_valued, we add a value and construct a one-element list
                         if field['multi_valued'] == 'false':
-                            document.add_value(field['column'], _marshal_value(value))
+                            document.add_value(field['column'], _term_to_xapian_value(value, field['type']))
                             value = [value]
 
                         for term in value:
-                            term = _marshal_term(term)
+                            term = _to_xapian_term(term)
                             if field['type'] == 'text':
                                 term_generator.index_text(term, weight)
                                 term_generator.index_text(term, weight, prefix)
@@ -769,10 +776,12 @@ class XapianSearchBackend(BaseSearchBackend):
         facet_dict = {}
         for spy in spies:
             field = self.schema[spy.slot]
-            field_name = field['field_name']
+            field_name, field_type = field['field_name'], field['type']
+
             facet_dict[field_name] = []
             for facet in spy.values():
-                facet_dict[field_name].append((_xapian_to_python(facet.term), facet.termfreq))
+                facet_dict[field_name].append((_from_xapian_value(facet.term, field_type),
+                                               facet.termfreq))
         return facet_dict
 
     def _do_multivalued_field_facets(self, results, field_facets):
@@ -1087,11 +1096,6 @@ class XapianSearchQuery(BaseSearchQuery):
                 if hasattr(term, 'values_list'):
                     term = list(term)
 
-                if isinstance(term, (list, tuple)):
-                    term = [_marshal_term(t) for t in term]
-                else:
-                    term = _marshal_term(term)
-
                 if field_name == 'content':
                     # content is the generic search:
                     # force no field_name search
@@ -1106,8 +1110,13 @@ class XapianSearchQuery(BaseSearchQuery):
                     if filter_type == 'contains':
                         filter_type = None
                 else:
-                    # pick the field_type from the backend
+                    # get the field_type from the backend
                     field_type = self.backend.schema[self.backend.column(field_name)]['type']
+
+                # private fields don't accept 'contains' or 'startswith'
+                # since they have no meaning.
+                if filter_type in ('contains', 'startswith') and field_name in ('id', 'django_id', 'django_ct'):
+                    filter_type = 'exact'
 
                 if filter_type == 'contains':
                     query_list.append(self._filter_contains(term, field_name, field_type, is_not))
@@ -1118,13 +1127,13 @@ class XapianSearchQuery(BaseSearchQuery):
                 elif filter_type == 'startswith':
                     query_list.append(self._filter_startswith(term, field_name, field_type, is_not))
                 elif filter_type == 'gt':
-                    query_list.append(self._filter_gt(term, field_name, is_not))
+                    query_list.append(self._filter_gt(term, field_name, field_type, is_not))
                 elif filter_type == 'gte':
-                    query_list.append(self._filter_gte(term, field_name, is_not))
+                    query_list.append(self._filter_gte(term, field_name, field_type, is_not))
                 elif filter_type == 'lt':
-                    query_list.append(self._filter_lt(term, field_name, is_not))
+                    query_list.append(self._filter_lt(term, field_name, field_type, is_not))
                 elif filter_type == 'lte':
-                    query_list.append(self._filter_lte(term, field_name, is_not))
+                    query_list.append(self._filter_lte(term, field_name, field_type, is_not))
 
         if search_node.connector == 'OR':
             return xapian.Query(xapian.Query.OP_OR, query_list)
@@ -1133,20 +1142,21 @@ class XapianSearchQuery(BaseSearchQuery):
 
     def _all_query(self):
         """
-        Private method that returns a xapian.Query that returns all documents,
-
-        Returns:
-            A xapian.Query
+        Returns a match all query.
         """
         return xapian.Query('')
 
-    def _filter_contains(self, sentence, field_name, field_type, is_not):
+    def _filter_contains(self, term, field_name, field_type, is_not):
         """
         Splits the sentence in terms and join them with OR,
         using stemmed and un-stemmed.
         """
-        query = self._or_query(sentence.split(), field_name, field_type)
+        if field_type == 'text':
+            term_list = term.split()
+        else:
+            term_list = [term]
 
+        query = self._or_query(term_list, field_name, field_type)
         if is_not:
             return xapian.Query(xapian.Query.OP_AND_NOT, self._all_query(), query)
         else:
@@ -1175,10 +1185,15 @@ class XapianSearchQuery(BaseSearchQuery):
         Returns a query that matches exactly the un-stemmed term
         with positional order.
         """
-        if ' ' in term:
+
+        # this is an hack:
+        # the ideal would be to use the same idea as in _filter_contains.
+        # However, it causes tests to fail.
+        if field_type == 'text' and ' ' in term:
             query = self._phrase_query(term.split(), field_name, field_type)
         else:
             query = self._term_query(term, field_name, field_type, exact=True, stemmed=False)
+
         if is_not:
             return xapian.Query(xapian.Query.OP_AND_NOT, self._all_query(), query)
         else:
@@ -1236,7 +1251,7 @@ class XapianSearchQuery(BaseSearchQuery):
             # to ensure the value is serialized correctly.
             if field_name == 'django_id':
                 term = int(term)
-            term = _marshal_value(term)
+            term = _term_to_xapian_value(term, field_type)
             return xapian.Query('%s%s' % (TERM_PREFIXES[field_name], term))
 
         constructor = '{prefix}{term}'
@@ -1248,7 +1263,7 @@ class XapianSearchQuery(BaseSearchQuery):
         prefix = ''
         if field_name:
             prefix = TERM_PREFIXES['field'] + field_name.upper()
-            term = _marshal_value(term)
+            term = _to_xapian_term(term)
 
         unstemmed_term = constructor.format(prefix=prefix, term=term)
         if stemmed:
@@ -1262,19 +1277,19 @@ class XapianSearchQuery(BaseSearchQuery):
         else:
             return unstemmed_term
 
-    def _filter_gt(self, term, field, is_not):
-        return self._filter_lte(term, field, is_not=not is_not)
+    def _filter_gt(self, term, field_name, field_type, is_not):
+        return self._filter_lte(term, field_name, field_type, is_not=not is_not)
 
-    def _filter_lt(self, term, field, is_not):
-        return self._filter_gte(term, field, is_not=not is_not)
+    def _filter_lt(self, term, field_name, field_type, is_not):
+        return self._filter_gte(term, field_name, field_type, is_not=not is_not)
 
-    def _filter_gte(self, term, field, is_not):
+    def _filter_gte(self, term, field_name, field_type, is_not):
         """
         Private method that returns a xapian.Query that searches for any term
         that is greater than `term` in a specified `field`.
         """
         vrp = XHValueRangeProcessor(self.backend)
-        pos, begin, end = vrp('%s:%s' % (field, _marshal_value(term)), '*')
+        pos, begin, end = vrp('%s:%s' % (field_name, _term_to_xapian_value(term, field_type)), '*')
         if is_not:
             return xapian.Query(xapian.Query.OP_AND_NOT,
                                 self._all_query(),
@@ -1282,13 +1297,13 @@ class XapianSearchQuery(BaseSearchQuery):
                                 )
         return xapian.Query(xapian.Query.OP_VALUE_RANGE, pos, begin, end)
 
-    def _filter_lte(self, term, field, is_not):
+    def _filter_lte(self, term, field_name, field_type, is_not):
         """
         Private method that returns a xapian.Query that searches for any term
         that is less than `term` in a specified `field`.
         """
         vrp = XHValueRangeProcessor(self.backend)
-        pos, begin, end = vrp('%s:' % field, '%s' % _marshal_value(term))
+        pos, begin, end = vrp('%s:' % field_name, '%s' % _term_to_xapian_value(term, field_type))
         if is_not:
             return xapian.Query(xapian.Query.OP_AND_NOT,
                                 self._all_query(),
@@ -1297,39 +1312,47 @@ class XapianSearchQuery(BaseSearchQuery):
         return xapian.Query(xapian.Query.OP_VALUE_RANGE, pos, begin, end)
 
 
-def _marshal_value(value):
+def _term_to_xapian_value(term, field_type):
     """
-    Private utility method that converts Python values to a string for Xapian values.
+    Converts a term to a serialized
+    Xapian value based on the field_type.
     """
-    if isinstance(value, datetime.datetime):
-        value = _marshal_datetime(value)
-    elif isinstance(value, datetime.date):
-        value = _marshal_date(value)
-    elif isinstance(value, bool):
-        if value:
+    assert field_type in FIELD_TYPES
+
+    def strf(dt):
+        """
+        Equivalent to datetime.datetime.strptime(dt, DATETIME_FORMAT)
+        but accepts years below 1900 (see http://stackoverflow.com/q/10263956/931303)
+        """
+        return '%04d%02d%02d%02d%02d%02d' % (
+            dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second)
+
+    if field_type == 'boolean':
+        assert isinstance(term, bool)
+        if term:
             value = 't'
         else:
             value = 'f'
-    elif isinstance(value, float):
-        value = xapian.sortable_serialise(value)
-    elif isinstance(value, int):
-        value = '%012d' % value
-    else:
-        value = force_text(value).lower()
+
+    elif field_type == 'integer':
+        value = INTEGER_FORMAT % term
+    elif field_type == 'float':
+        value = xapian.sortable_serialise(term)
+    elif field_type == 'date' or field_type == 'datetime':
+        if field_type == 'date':
+            # http://stackoverflow.com/a/1937636/931303 and comments
+            term = datetime.datetime.combine(term, datetime.time())
+        value = strf(term)
+    else:  # field_type == 'text'
+        value = _to_xapian_term(term)
+
     return value
 
 
-def _xapian_to_python(value):
-    if value == 't':
-        return True
-    elif value == 'f':
-        return False
-    return value
-
-
-def _marshal_term(term):
+def _to_xapian_term(term):
     """
-    Private utility method that converts Python terms to a string for Xapian terms.
+    Converts a Python type to a
+    Xapian term that can be indexed.
     """
     if isinstance(term, datetime.datetime):
         term = _marshal_datetime(term)
@@ -1338,6 +1361,35 @@ def _marshal_term(term):
     else:
         term = force_text(term).lower()
     return term
+
+
+def _from_xapian_value(value, field_type):
+    """
+    Converts a serialized Xapian value
+    to Python equivalent based on the field_type.
+
+    Doesn't accept multivalued fields.
+    """
+    assert field_type in FIELD_TYPES
+    if field_type == 'boolean':
+        if value == 't':
+            return True
+        elif value == 'f':
+            return False
+        else:
+            InvalidIndexError('Field type "%d" does not accept value "%s"' % (field_type, value))
+    elif field_type == 'integer':
+        return int(value)
+    elif field_type == 'float':
+        return xapian.sortable_unserialise(value)
+    elif field_type == 'date' or field_type == 'datetime':
+        datetime_value = datetime.datetime.strptime(value, DATETIME_FORMAT)
+        if field_type == 'datetime':
+            return datetime_value
+        else:
+            return datetime_value.date()
+    else:  # field_type == 'text'
+        return value
 
 
 def _marshal_date(d):
