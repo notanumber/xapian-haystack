@@ -23,8 +23,8 @@ from core.tests.mocks import MockSearchResult
 
 def get_terms(backend, *args):
     result = subprocess.check_output(['delve'] + list(args) + [backend.path], env=os.environ.copy())
-    result = result.split(": ")[1].strip()
-    return result.split(" ")
+    result = result.split(b": ")[1].strip()
+    return result.split(b" ")
 
 
 def pks(results):
@@ -78,7 +78,7 @@ class XapianMockSearchIndex(indexes.SearchIndex):
         return XapianMockModel
 
     def prepare_sites(self, obj):
-        return ['%d' % (i * obj.id) for i in xrange(1, 4)]
+        return ['%d' % (i * obj.id) for i in range(1, 4)]
 
     def prepare_tags(self, obj):
         if obj.id == 1:
@@ -89,7 +89,7 @@ class XapianMockSearchIndex(indexes.SearchIndex):
             return ['an', 'to', 'or']
 
     def prepare_keys(self, obj):
-        return [i * obj.id for i in xrange(1, 4)]
+        return [i * obj.id for i in range(1, 4)]
 
     def prepare_titles(self, obj):
         if obj.id == 1:
@@ -210,7 +210,7 @@ class XapianSearchBackendTestCase(HaystackBackendTestCase, TestCase):
 
         self.sample_objs = []
 
-        for i in xrange(1, 4):
+        for i in range(1, 4):
             mock = XapianMockModel()
             mock.id = i
             mock.author = 'david%s' % i
@@ -329,7 +329,7 @@ class XapianSearchBackendTestCase(HaystackBackendTestCase, TestCase):
             ('2008-10-26T00:00:00', 0),
         ])
 
-        facets = {'pub_date': {'start_date': datetime.datetime(2009, 02, 01),
+        facets = {'pub_date': {'start_date': datetime.datetime(2009, 2, 1),
                                'end_date': datetime.datetime(2009, 3, 15),
                                'gap_by': 'day',
                                'gap_amount': 15}}
@@ -502,9 +502,9 @@ class XapianSearchBackendTestCase(HaystackBackendTestCase, TestCase):
         self.assertEqual(str(self.backend.parse_query('value:0..10')),
                          'Xapian::Query(VALUE_RANGE 16 000000000000 000000000010)')
         self.assertEqual(str(self.backend.parse_query('value:..10')),
-                         'Xapian::Query(VALUE_RANGE 16 %012d 000000000010)' % (-sys.maxint - 1))
+                         'Xapian::Query(VALUE_RANGE 16 %012d 000000000010)' % (-sys.maxsize - 1))
         self.assertEqual(str(self.backend.parse_query('value:10..*')),
-                         'Xapian::Query(VALUE_RANGE 16 000000000010 %012d)' % sys.maxint)
+                         'Xapian::Query(VALUE_RANGE 16 000000000010 %012d)' % sys.maxsize)
         self.assertEqual(str(self.backend.parse_query('popularity:25.5..100.0')),
                          b'Xapian::Query(VALUE_RANGE 9 \xb2` \xba@)')
 
@@ -514,7 +514,7 @@ class XapianSearchBackendTestCase(HaystackBackendTestCase, TestCase):
         10 entries was not correct at some point.
         """
         self.sample_objs = []
-        number_list = range(1, 101)
+        number_list = list(range(1, 101))
         for i in number_list:
             mock = XapianMockModel()
             mock.id = i
@@ -713,7 +713,7 @@ class XapianBoostBackendTestCase(HaystackBackendTestCase, TestCase):
         super(XapianBoostBackendTestCase, self).setUp()
 
         self.sample_objs = []
-        for i in xrange(1, 5):
+        for i in range(1, 5):
             mock = AFourthMockModel()
             mock.id = i
             if i % 2:

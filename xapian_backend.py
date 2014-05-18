@@ -95,7 +95,7 @@ class XHValueRangeProcessor(xapian.ValueRangeProcessor):
                     if field_type == 'text':
                         begin = 'a'  # TODO: A better way of getting a min text value?
                     elif field_type == 'integer':
-                        begin = -sys.maxint - 1
+                        begin = -sys.maxsize - 1
                     elif field_type == 'float':
                         begin = float('-inf')
                     elif field_type == 'date' or field_type == 'datetime':
@@ -104,7 +104,7 @@ class XHValueRangeProcessor(xapian.ValueRangeProcessor):
                     if field_type == 'text':
                         end = 'z' * 100  # TODO: A better way of getting a max text value?
                     elif field_type == 'integer':
-                        end = sys.maxint
+                        end = sys.maxsize
                     elif field_type == 'float':
                         end = float('inf')
                     elif field_type == 'date' or field_type == 'datetime':
@@ -263,7 +263,7 @@ class XapianSearchBackend(BaseSearchBackend):
                 weights = index.get_field_weights()
                 for field in self.schema:
                     # not supported fields are ignored.
-                    if field['field_name'] not in data.keys():
+                    if field['field_name'] not in list(data.keys()):
                         continue
 
                     if field['field_name'] in weights:
@@ -702,7 +702,7 @@ class XapianSearchBackend(BaseSearchBackend):
 
         column = len(schema_fields)
 
-        for field_name, field_class in sorted(fields.items(), key=lambda n: n[0]):
+        for field_name, field_class in sorted(list(fields.items()), key=lambda n: n[0]):
             if field_class.document is True:
                 content_field_name = field_class.index_fieldname
 
@@ -780,7 +780,7 @@ class XapianSearchBackend(BaseSearchBackend):
             field_name, field_type = field['field_name'], field['type']
 
             facet_dict[field_name] = []
-            for facet in spy.values():
+            for facet in list(spy.values()):
                 facet_dict[field_name].append((_from_xapian_value(facet.term, field_type),
                                                facet.termfreq))
         return facet_dict
@@ -805,7 +805,7 @@ class XapianSearchBackend(BaseSearchBackend):
                 for item in field_value:  # Facet each item in a MultiValueField
                     facet_list[item] = facet_list.get(item, 0) + 1
 
-            facet_dict[field] = facet_list.items()
+            facet_dict[field] = list(facet_list.items())
         return facet_dict
 
     @staticmethod
@@ -839,7 +839,7 @@ class XapianSearchBackend(BaseSearchBackend):
         """
         facet_dict = {}
 
-        for date_facet, facet_params in date_facets.iteritems():
+        for date_facet, facet_params in list(date_facets.items()):
             gap_type = facet_params.get('gap_by')
             gap_value = facet_params.get('gap_amount', 1)
             date_range = facet_params['start_date']
@@ -905,7 +905,7 @@ class XapianSearchBackend(BaseSearchBackend):
         eg. {'name': ('a*', 5)}
         """
         facet_dict = {}
-        for field, query in dict(query_facets).items():
+        for field, query in list(dict(query_facets).items()):
             facet_dict[field] = (query, self.search(self.parse_query(query))['hits'])
 
         return facet_dict
@@ -1064,7 +1064,7 @@ class XapianSearchQuery(BaseSearchQuery):
                 xapian.Query(
                     xapian.Query.OP_SCALE_WEIGHT,
                     self._term_query(term, None, None), value
-                ) for term, value in self.boost.iteritems()
+                ) for term, value in list(self.boost.items())
             ]
             query = xapian.Query(
                 xapian.Query.OP_AND_MAYBE, query,

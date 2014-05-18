@@ -1,6 +1,6 @@
 from haystack import indexes
 
-import models
+from . import models
 
 
 class DocumentIndex(indexes.SearchIndex):
