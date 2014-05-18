@@ -1062,7 +1062,8 @@ class XapianSearchQuery(BaseSearchQuery):
         if self.boost:
             subqueries = [
                 xapian.Query(
-                    xapian.Query.OP_SCALE_WEIGHT, self._content_field(term, False), value
+                    xapian.Query.OP_SCALE_WEIGHT,
+                    self._term_query(term, None, None), value
                 ) for term, value in self.boost.iteritems()
             ]
             query = xapian.Query(
