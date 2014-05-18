@@ -81,24 +81,27 @@ class XHValueRangeProcessor(xapian.ValueRangeProcessor):
         begin = begin[colon + 1:len(begin)]
         for field_dict in self.backend.schema:
             if field_dict['field_name'] == field_name:
+                field_type = field_dict['type']
+
                 if not begin:
-                    if field_dict['type'] == 'text':
+                    if field_type == 'text':
                         begin = 'a'  # TODO: A better way of getting a min text value?
-                    elif field_dict['type'] == 'integer':
+                    elif field_type == 'integer':
                         begin = -sys.maxint - 1
-                    elif field_dict['type'] == 'float':
+                    elif field_type == 'float':
                         begin = float('-inf')
-                    elif field_dict['type'] == 'date' or field_dict['type'] == 'datetime':
+                    elif field_type == 'date' or field_type == 'datetime':
                         begin = '00010101000000'
                 elif end == '*':
-                    if field_dict['type'] == 'text':
+                    if field_type == 'text':
                         end = 'z' * 100  # TODO: A better way of getting a max text value?
-                    elif field_dict['type'] == 'integer':
+                    elif field_type == 'integer':
                         end = sys.maxint
-                    elif field_dict['type'] == 'float':
+                    elif field_type == 'float':
                         end = float('inf')
-                    elif field_dict['type'] == 'date' or field_dict['type'] == 'datetime':
+                    elif field_type == 'date' or field_type == 'datetime':
                         end = '99990101000000'
+
                 if field_dict['type'] == 'float':
                     begin = _marshal_value(float(begin))
                     end = _marshal_value(float(end))
