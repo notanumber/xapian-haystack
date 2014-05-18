@@ -1,28 +1,34 @@
 from __future__ import unicode_literals
 
 import datetime
-import os
-import shutil
 
-from django.conf import settings
 from django.test import TestCase
 
+from haystack import indexes
 from haystack import connections
 from haystack.query import SQ
 
 from core.models import MockModel, AnotherMockModel
+from xapian_tests.tests.test_xapian_backend import HaystackBackendTestCase
 
 
-class XapianSearchQueryTestCase(TestCase):
+class XapianMockQueryIndex(indexes.SearchIndex):
+    text = indexes.CharField(document=True)
+    pub_date = indexes.DateTimeField()
+    title = indexes.CharField()
+    foo = indexes.CharField()
+
+    def get_model(self):
+        return MockModel
+
+
+class XapianSearchQueryTestCase(HaystackBackendTestCase, TestCase):
+    def get_index(self):
+        return XapianMockQueryIndex()
+
     def setUp(self):
         super(XapianSearchQueryTestCase, self).setUp()
         self.sq = connections['default'].get_query()
-
-    def tearDown(self):
-        if os.path.exists(settings.HAYSTACK_CONNECTIONS['default']['PATH']):
-            shutil.rmtree(settings.HAYSTACK_CONNECTIONS['default']['PATH'])
-
-        super(XapianSearchQueryTestCase, self).tearDown()
 
     def test_build_query_all(self):
         self.assertEqual(str(self.sq.build_query()),
@@ -114,30 +120,30 @@ class XapianSearchQueryTestCase(TestCase):
 
     def test_build_query_multiple_word_field_exact(self):
         self.sq.add_filter(SQ(foo='hello'))
-        self.sq.add_filter(SQ(bar='world'))
+        self.sq.add_filter(SQ(title='world'))
         self.assertEqual(str(self.sq.build_query()),
                          'Xapian::Query(('
                          '(ZXFOOhello OR XFOOhello) AND '
-                         '(ZXBARworld OR XBARworld)))')
+                         '(ZXTITLEworld OR XTITLEworld)))')
 
     def test_build_query_multiple_word_field_exact_not(self):
         self.sq.add_filter(~SQ(foo='hello'))
-        self.sq.add_filter(~SQ(bar='world'))
+        self.sq.add_filter(~SQ(title='world'))
         self.assertEqual(str(self.sq.build_query()),
                          'Xapian::Query(('
                          '(<alldocuments> AND_NOT (ZXFOOhello OR XFOOhello)) AND '
-                         '(<alldocuments> AND_NOT (ZXBARworld OR XBARworld))))')
+                         '(<alldocuments> AND_NOT (ZXTITLEworld OR XTITLEworld))))')
 
-    def test_build_query_phrase(self):
+    def test_build_query_or(self):
         self.sq.add_filter(SQ(content='hello world'))
         self.assertEqual(str(self.sq.build_query()),
-                         'Xapian::Query((hello PHRASE 2 world))')
+                         'Xapian::Query((Zhello OR hello OR Zworld OR world))')
 
-    def test_build_query_phrase_not(self):
+    def test_build_query_not_or(self):
         self.sq.add_filter(~SQ(content='hello world'))
         self.assertEqual(str(self.sq.build_query()),
                          'Xapian::Query('
-                         '(<alldocuments> AND_NOT (hello PHRASE 2 world)))')
+                         '(<alldocuments> AND_NOT (Zhello OR hello OR Zworld OR world)))')
 
     def test_build_query_boost(self):
         self.sq.add_filter(SQ(content='hello'))
@@ -147,20 +153,13 @@ class XapianSearchQueryTestCase(TestCase):
                          '(Zhello OR hello) AND_MAYBE '
                          '5 * (Zworld OR world)))')
 
-    def test_build_query_in_filter_single_words(self):
-        self.sq.add_filter(SQ(content='why'))
-        self.sq.add_filter(SQ(title__in=["Dune", "Jaws"]))
-        self.assertEqual(str(self.sq.build_query()),
-                         'Xapian::Query(((Zwhi OR why) AND '
-                         '(ZXTITLEdune OR XTITLEdune OR ZXTITLEjaw OR XTITLEjaws)))')
-
     def test_build_query_not_in_filter_single_words(self):
         self.sq.add_filter(SQ(content='why'))
         self.sq.add_filter(~SQ(title__in=["Dune", "Jaws"]))
         self.assertEqual(str(self.sq.build_query()),
                          'Xapian::Query(((Zwhi OR why) AND '
-                         '(<alldocuments> AND_NOT (ZXTITLEdune OR XTITLEdune OR '
-                         'ZXTITLEjaw OR XTITLEjaws))))')
+                         '(<alldocuments> AND_NOT ("XTITLEdune" OR '
+                         '"XTITLEjaws"))))')
 
     def test_build_query_in_filter_multiple_words(self):
         self.sq.add_filter(SQ(content='why'))
@@ -193,7 +192,7 @@ class XapianSearchQueryTestCase(TestCase):
         self.sq.add_filter(SQ(pub_date__in=[datetime.datetime(2009, 7, 6, 1, 56, 21)]))
         self.assertEqual(str(self.sq.build_query()),
                          'Xapian::Query(((Zwhi OR why) AND '
-                         '(ZXPUB_DATE20090706015621 OR XPUB_DATE20090706015621)))')
+                         'XPUB_DATE20090706015621))')
 
     def test_clean(self):
         self.assertEqual(self.sq.clean('hello world'), 'hello world')
@@ -230,5 +229,4 @@ class XapianSearchQueryTestCase(TestCase):
         self.sq.add_filter(SQ(title__in=MockModel.objects.values_list('id', flat=True)))
         self.assertEqual(str(self.sq.build_query()),
                          'Xapian::Query(((Zwhi OR why) AND '
-                         '(ZXTITLE1 OR XTITLE1 OR ZXTITLE2 OR '
-                         'XTITLE2 OR ZXTITLE3 OR XTITLE3)))')
+                         '("XTITLE1" OR "XTITLE2" OR "XTITLE3")))')
