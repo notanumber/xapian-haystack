@@ -292,10 +292,18 @@ class XapianSearchBackend(BaseSearchBackend):
 
                         for term in value:
                             term = _to_xapian_term(term)
+                            # from here on term is a string;
+                            # now decide how it is stored:
+
+                            # these are
                             if field['type'] == 'text':
                                 term_generator.index_text(term, weight)
                                 term_generator.index_text(term, weight, prefix)
-                            if len(term.split()) == 1:
+                            elif ' ' in term:
+                                for t in term.split():
+                                    document.add_term(t, weight)
+                                    document.add_term(prefix + t, weight)
+                            if term != "":
                                 document.add_term(term, weight)
                                 document.add_term(prefix + term, weight)
 
@@ -1276,6 +1284,18 @@ class XapianSearchQuery(BaseSearchQuery):
         if stemmed:
             assert not exact
 
+        constructor = '{prefix}{term}'
+        # "" is to do a boolean match, but only works on indexed terms
+        # (constraint on Xapian side)
+        if exact and field_type == 'text':
+            constructor = '"{prefix}{term}"'
+
+        # construct the prefix to be used.
+        prefix = ''
+        if field_name:
+            prefix = TERM_PREFIXES['field'] + field_name.upper()
+            term = _to_xapian_term(term)
+
         if field_name in ('id', 'django_id', 'django_ct'):
             # to ensure the value is serialized correctly.
             if field_name == 'django_id':
@@ -1283,16 +1303,17 @@ class XapianSearchQuery(BaseSearchQuery):
             term = _term_to_xapian_value(term, field_type)
             return xapian.Query('%s%s' % (TERM_PREFIXES[field_name], term))
 
-        constructor = '{prefix}{term}'
-        # "" is to do a boolean match, but only works on indexed terms
-        # (constraint on Xapian side)
-        if exact and field_type == 'text':
-            constructor = '"{prefix}{term}"'
+        # we construct the query dates in a slightly different way
+        if field_type == 'datetime':
+            date, time = term.split()
+            return xapian.Query(xapian.Query.OP_AND_MAYBE,
+                                constructor.format(prefix=prefix, term=date),
+                                constructor.format(prefix=prefix, term=time)
+                                )
 
-        prefix = ''
-        if field_name:
-            prefix = TERM_PREFIXES['field'] + field_name.upper()
-            term = _to_xapian_term(term)
+        # only use stem if field is text or "None"
+        if field_type not in ('text', None):
+            stemmed = False
 
         unstemmed_term = constructor.format(prefix=prefix, term=term)
         if stemmed:
@@ -1304,7 +1325,7 @@ class XapianSearchQuery(BaseSearchQuery):
                                 xapian.Query(unstemmed_term)
                                 )
         else:
-            return unstemmed_term
+            return xapian.Query(unstemmed_term)
 
     def _filter_gt(self, term, field_name, field_type, is_not):
         return self._filter_lte(term, field_name, field_type, is_not=not is_not)
@@ -1383,13 +1404,7 @@ def _to_xapian_term(term):
     Converts a Python type to a
     Xapian term that can be indexed.
     """
-    if isinstance(term, datetime.datetime):
-        value = term.strftime(DATETIME_FORMAT)
-    elif isinstance(term, datetime.date):
-        value = term.strftime(DATETIME_FORMAT)
-    else:
-        value = force_text(term).lower()
-    return value
+    return force_text(term).lower()
 
 
 def _from_xapian_value(value, field_type):

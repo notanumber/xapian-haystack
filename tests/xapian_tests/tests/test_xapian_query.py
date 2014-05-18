@@ -62,22 +62,23 @@ class XapianSearchQueryTestCase(HaystackBackendTestCase, TestCase):
     def test_build_query_date(self):
         self.sq.add_filter(SQ(content=datetime.date(2009, 5, 8)))
         self.assertEqual(str(self.sq.build_query()),
-                         'Xapian::Query((Z20090508000000 OR 20090508000000))')
+                         'Xapian::Query((Z2009-05-08 OR 2009-05-08))')
 
     def test_build_query_date_not(self):
         self.sq.add_filter(~SQ(content=datetime.date(2009, 5, 8)))
         self.assertEqual(str(self.sq.build_query()),
-                         'Xapian::Query((<alldocuments> AND_NOT (Z20090508000000 OR 20090508000000)))')
+                         'Xapian::Query((<alldocuments> AND_NOT (Z2009-05-08 OR 2009-05-08)))')
 
     def test_build_query_datetime(self):
         self.sq.add_filter(SQ(content=datetime.datetime(2009, 5, 8, 11, 28)))
         self.assertEqual(str(self.sq.build_query()),
-                         'Xapian::Query((Z20090508112800 OR 20090508112800))')
+                         'Xapian::Query((Z2009-05-08 OR 2009-05-08 OR Z11:28:00 OR 11:28:00))')
 
     def test_build_query_datetime_not(self):
         self.sq.add_filter(~SQ(content=datetime.datetime(2009, 5, 8, 11, 28)))
         self.assertEqual(str(self.sq.build_query()),
-                         'Xapian::Query((<alldocuments> AND_NOT (Z20090508112800 OR 20090508112800)))')
+                         'Xapian::Query((<alldocuments> AND_NOT '
+                         '(Z2009-05-08 OR 2009-05-08 OR Z11:28:00 OR 11:28:00)))')
 
     def test_build_query_float(self):
         self.sq.add_filter(SQ(content=25.52))
@@ -192,7 +193,7 @@ class XapianSearchQueryTestCase(HaystackBackendTestCase, TestCase):
         self.sq.add_filter(SQ(pub_date__in=[datetime.datetime(2009, 7, 6, 1, 56, 21)]))
         self.assertEqual(str(self.sq.build_query()),
                          'Xapian::Query(((Zwhi OR why) AND '
-                         'XPUB_DATE20090706015621))')
+                         '(XPUB_DATE2009-07-06 AND_MAYBE XPUB_DATE01:56:21)))')
 
     def test_clean(self):
         self.assertEqual(self.sq.clean('hello world'), 'hello world')
