@@ -1084,6 +1084,9 @@ class XapianSearchQuery(BaseSearchQuery):
                 expression, term = child
                 field_name, filter_type = search_node.split_expression(expression)
 
+                if field_name != 'content' and field_name not in self.backend.column:
+                    raise InvalidIndexError('field "%s" not indexed' % field_name)
+
                 # Identify and parse AutoQuery
                 if isinstance(term, AutoQuery):
                     if field_name != 'content':
@@ -1104,6 +1107,11 @@ class XapianSearchQuery(BaseSearchQuery):
                     field_name = None
                     field_type = 'text'
 
+                    # we don't know what is the type(term), so we parse it.
+                    # Ideally this would not be required, but
+                    # some filters currently depend on the term to make decisions.
+                    term = _to_xapian_term(term)
+
                     query_list.append(self._filter_contains(term, field_name, field_type, is_not))
                     # when filter has no filter_type, haystack uses
                     # filter_type = 'contains'. Here we remove it
@@ -1119,6 +1127,17 @@ class XapianSearchQuery(BaseSearchQuery):
                 if filter_type in ('contains', 'startswith') and field_name in ('id', 'django_id', 'django_ct'):
                     filter_type = 'exact'
 
+                if field_type == 'text':
+                    # we don't know what type "term" is, but we know we are searching as text
+                    # so we parse it like that.
+                    # Ideally this would not be required since _term_query does it, but
+                    # some filters currently depend on the term to make decisions.
+                    if isinstance(term, list):
+                        term = [_to_xapian_term(term) for term in term]
+                    else:
+                        term = _to_xapian_term(term)
+
+                # todo: we should check that the filter is valid for this field_type or raise InvalidIndexError
                 if filter_type == 'contains':
                     query_list.append(self._filter_contains(term, field_name, field_type, is_not))
                 elif filter_type == 'exact':
@@ -1151,6 +1170,8 @@ class XapianSearchQuery(BaseSearchQuery):
         """
         Splits the sentence in terms and join them with OR,
         using stemmed and un-stemmed.
+
+        Assumes term is not a list.
         """
         if field_type == 'text':
             term_list = term.split()
@@ -1171,6 +1192,8 @@ class XapianSearchQuery(BaseSearchQuery):
          A in {B,C} <=> (A = B or A = C)
          ~(A in {B,C}) <=> ~(A = B or A = C)
         Because OP_AND_NOT(C, D) <=> (C and ~D), then D=(A in {B,C}) requires `is_not=False`.
+
+        Assumes term is a list.
         """
         query_list = [self._filter_exact(term, field_name, field_type, is_not=False)
                       for term in term_list]
@@ -1185,6 +1208,8 @@ class XapianSearchQuery(BaseSearchQuery):
         """
         Returns a query that matches exactly the un-stemmed term
         with positional order.
+
+        Assumes term is not a list.
         """
 
         # this is an hack:
@@ -1203,6 +1228,8 @@ class XapianSearchQuery(BaseSearchQuery):
     def _filter_startswith(self, term, field_name, field_type, is_not):
         """
         Returns a startswith query on the un-stemmed term.
+
+        Assumes term is not a list.
         """
         # TODO: if field_type is of type integer, we need to marsh the value.
         if field_name:
