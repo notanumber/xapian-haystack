@@ -200,12 +200,13 @@ class XapianSearchBackend(BaseSearchBackend):
         self._update_cache()
         return self._content_field_name
 
-    def column(self, field_name):
+    @property
+    def column(self):
         """
         Returns the column in the database of a given field name.
         """
         self._update_cache()
-        return self._columns[field_name]
+        return self._columns
 
     def update(self, index, iterable):
         """
@@ -384,7 +385,7 @@ class XapianSearchBackend(BaseSearchBackend):
         if field_names:
             for field_name in field_names:
                 try:
-                    self.column(field_name)
+                    self.column[field_name]
                 except KeyError:
                     raise InvalidIndexError('Trying to use non indexed field "%s"' % field_name)
 
@@ -474,7 +475,7 @@ class XapianSearchBackend(BaseSearchBackend):
                     sort_field = sort_field[1:]  # Strip the '-'
                 else:
                     reverse = False  # Reverse is inverted in Xapian -- http://trac.xapian.org/ticket/311
-                sorter.add(self.column(sort_field), reverse)
+                sorter.add(self.column[sort_field], reverse)
 
             enquire.set_sort_by_key_then_relevance(sorter, True)
 
@@ -760,7 +761,7 @@ class XapianSearchBackend(BaseSearchBackend):
         """
         spies = []
         for facet in facets:
-            slot = self.column(facet)
+            slot = self.column[facet]
             spy = xapian.ValueCountMatchSpy(slot)
             # add attribute "slot" to know which column this spy is targeting.
             spy.slot = slot
@@ -1111,7 +1112,7 @@ class XapianSearchQuery(BaseSearchQuery):
                         filter_type = None
                 else:
                     # get the field_type from the backend
-                    field_type = self.backend.schema[self.backend.column(field_name)]['type']
+                    field_type = self.backend.schema[self.backend.column[field_name]]['type']
 
                 # private fields don't accept 'contains' or 'startswith'
                 # since they have no meaning.
