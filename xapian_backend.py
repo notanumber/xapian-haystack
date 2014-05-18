@@ -1384,12 +1384,12 @@ def _to_xapian_term(term):
     Xapian term that can be indexed.
     """
     if isinstance(term, datetime.datetime):
-        term = _marshal_datetime(term)
+        value = term.strftime(DATETIME_FORMAT)
     elif isinstance(term, datetime.date):
-        term = _marshal_date(term)
+        value = term.strftime(DATETIME_FORMAT)
     else:
-        term = force_text(term).lower()
-    return term
+        value = force_text(term).lower()
+    return value
 
 
 def _from_xapian_value(value, field_type):
@@ -1419,17 +1419,6 @@ def _from_xapian_value(value, field_type):
             return datetime_value.date()
     else:  # field_type == 'text'
         return value
-
-
-def _marshal_date(d):
-    return '%04d%02d%02d000000' % (d.year, d.month, d.day)
-
-
-def _marshal_datetime(dt):
-    return '%04d%02d%02d%02d%02d%02d' % (
-        dt.year, dt.month, dt.day, dt.hour,
-        dt.minute, dt.second
-    )
 
 
 class XapianEngine(BaseEngine):
