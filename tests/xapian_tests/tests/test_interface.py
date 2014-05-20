@@ -115,7 +115,8 @@ class InterfaceTestCase(TestCase):
         self.assertEqual(pks(self.queryset.filter(name='8 4')), [2, 4])
 
     def test_field_in(self):
-        self.assertEqual(pks(self.queryset.filter(name__in=['magazine 2', 'article 4'])), [1, 2])
+        self.assertEqual(set(pks(self.queryset.filter(name__in=['magazine 2', 'article 4']))),
+                         set(pks(Document.objects.filter(name__in=['magazine 2', 'article 4']))))
 
         self.assertEqual(pks(self.queryset.filter(number__in=[4])),
                          pks(Document.objects.filter(number__in=[4])))
