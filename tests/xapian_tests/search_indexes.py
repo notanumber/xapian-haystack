@@ -11,12 +11,8 @@ class DocumentIndex(indexes.SearchIndex):
 
     number = indexes.IntegerField(model_attr='number')
 
-    name = indexes.CharField()
+    name = indexes.CharField(model_attr='name')
     date = indexes.DateField(model_attr='date')
 
     def get_model(self):
         return models.Document()
-
-    def prepare_name(self, obj):
-        return "%s %s" % (obj.type_name, str(obj.number))
-

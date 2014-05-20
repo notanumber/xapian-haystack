@@ -1,6 +1,7 @@
 from __future__ import unicode_literals
 
 import datetime
+from django.db.models import Q
 from django.test import TestCase
 
 from haystack import connections
@@ -38,10 +39,12 @@ class InterfaceTestCase(TestCase):
         for i in range(1, 13):
             doc = Document()
             doc.type_name = types_names[i % 3]
-            doc.text = texts[i % 3]
-            doc.date = dates[i % 3]
-            doc.summary = summaries[i % 3]
             doc.number = i * 2
+            doc.name = "%s %d" % (doc.type_name, doc.number)
+            doc.date = dates[i % 3]
+
+            doc.summary = summaries[i % 3]
+            doc.text = texts[i % 3]
             doc.save()
 
         self.index = DocumentIndex()
@@ -131,12 +134,22 @@ class InterfaceTestCase(TestCase):
 
     def test_field_startswith(self):
         self.assertEqual(len(self.queryset.filter(name__startswith='magaz')), 4)
-        self.assertEqual(len(self.queryset.filter(text__startswith='This is')), 12)
+        self.assertEqual(set(pks(self.queryset.filter(text__startswith='This is'))),
+                         set(pks(Document.objects.filter(text__startswith='This is'))))
 
     def test_auto_query(self):
-        self.assertEqual(len(self.queryset.auto_query("huge OR medium")), 8)
-        self.assertEqual(len(self.queryset.auto_query("huge AND medium")), 0)
-        self.assertEqual(len(self.queryset.auto_query("huge -this")), 0)
+        self.assertEqual(set(pks(self.queryset.auto_query("huge OR medium"))),
+                         set(pks(Document.objects.filter(Q(text__contains="huge") |
+                                                         Q(text__contains="medium")))))
+
+        self.assertEqual(set(pks(self.queryset.auto_query("huge AND medium"))),
+                         set(pks(Document.objects.filter(Q(text__contains="huge") &
+                                                         Q(text__contains="medium")))))
+
+        self.assertEqual(set(pks(self.queryset.auto_query("text:huge text:-this"))),
+                         set(pks(Document.objects.filter(Q(text__contains="huge") &
+                                                         ~Q(text__contains="this")))))
+
         self.assertEqual(len(self.queryset.filter(name=AutoQuery("8 OR 4"))), 2)
         self.assertEqual(len(self.queryset.filter(name=AutoQuery("8 AND 4"))), 0)
 
