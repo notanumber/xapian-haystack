@@ -179,12 +179,18 @@ class XapianSearchBackend(BaseSearchBackend):
 
         # these 4 attributes are caches populated in `build_schema`
         # they are checked in `_update_cache`
-        self._fields = None
-        self._schema = None
+        # use property to retrieve them
+        self._fields = {}
+        self._schema = []
         self._content_field_name = None
         self._columns = {}
 
     def _update_cache(self):
+        """
+        To avoid build_schema every time, we cache
+        some values: they only change when a SearchIndex
+        changes, which typically restarts the Python.
+        """
         fields = connections[self.connection_alias].get_unified_index().all_searchfields()
         if self._fields != fields:
             self._fields = fields
@@ -1093,81 +1099,90 @@ class XapianSearchQuery(BaseSearchQuery):
                 expression, term = child
                 field_name, filter_type = search_node.split_expression(expression)
 
-                if field_name != 'content' and field_name not in self.backend.column:
-                    raise InvalidIndexError('field "%s" not indexed' % field_name)
-
-                # Identify and parse AutoQuery
-                if isinstance(term, AutoQuery):
-                    if field_name != 'content':
-                        query = '%s:%s' % (field_name, term.prepare(self))
-                    else:
-                        query = term.prepare(self)
-                    query_list.append(self.backend.parse_query(query))
-                    continue
-
-                # Handle `ValuesListQuerySet`.
-                if hasattr(term, 'values_list'):
-                    term = list(term)
-
-                if field_name == 'content':
-                    # content is the generic search:
-                    # force no field_name search
-                    # and the field_type to be 'text'.
-                    field_name = None
-                    field_type = 'text'
-
-                    # we don't know what is the type(term), so we parse it.
-                    # Ideally this would not be required, but
-                    # some filters currently depend on the term to make decisions.
-                    term = _to_xapian_term(term)
-
-                    query_list.append(self._filter_contains(term, field_name, field_type, is_not))
-                    # when filter has no filter_type, haystack uses
-                    # filter_type = 'contains'. Here we remove it
-                    # since the above query is already doing this
-                    if filter_type == 'contains':
-                        filter_type = None
-                else:
-                    # get the field_type from the backend
-                    field_type = self.backend.schema[self.backend.column[field_name]]['type']
-
-                # private fields don't accept 'contains' or 'startswith'
-                # since they have no meaning.
-                if filter_type in ('contains', 'startswith') and field_name in ('id', 'django_id', 'django_ct'):
-                    filter_type = 'exact'
-
-                if field_type == 'text':
-                    # we don't know what type "term" is, but we know we are searching as text
-                    # so we parse it like that.
-                    # Ideally this would not be required since _term_query does it, but
-                    # some filters currently depend on the term to make decisions.
-                    if isinstance(term, list):
-                        term = [_to_xapian_term(term) for term in term]
-                    else:
-                        term = _to_xapian_term(term)
-
-                # todo: we should check that the filter is valid for this field_type or raise InvalidIndexError
-                if filter_type == 'contains':
-                    query_list.append(self._filter_contains(term, field_name, field_type, is_not))
-                elif filter_type == 'exact':
-                    query_list.append(self._filter_exact(term, field_name, field_type, is_not))
-                elif filter_type == 'in':
-                    query_list.append(self._filter_in(term, field_name, field_type, is_not))
-                elif filter_type == 'startswith':
-                    query_list.append(self._filter_startswith(term, field_name, field_type, is_not))
-                elif filter_type == 'gt':
-                    query_list.append(self._filter_gt(term, field_name, field_type, is_not))
-                elif filter_type == 'gte':
-                    query_list.append(self._filter_gte(term, field_name, field_type, is_not))
-                elif filter_type == 'lt':
-                    query_list.append(self._filter_lt(term, field_name, field_type, is_not))
-                elif filter_type == 'lte':
-                    query_list.append(self._filter_lte(term, field_name, field_type, is_not))
+                constructed_query_list = self._query_from_term(term, field_name, filter_type, is_not)
+                query_list.extend(constructed_query_list)
 
         if search_node.connector == 'OR':
             return xapian.Query(xapian.Query.OP_OR, query_list)
         else:
             return xapian.Query(xapian.Query.OP_AND, query_list)
+
+    def _query_from_term(self, term, field_name, filter_type, is_not):
+        """
+        Uses arguments to construct a list of xapian.Query's.
+        """
+        if field_name != 'content' and field_name not in self.backend.column:
+            raise InvalidIndexError('field "%s" not indexed' % field_name)
+
+        # It it is an AutoQuery, it has no filters
+        # or others, thus we short-circuit the procedure.
+        if isinstance(term, AutoQuery):
+            if field_name != 'content':
+                query = '%s:%s' % (field_name, term.prepare(self))
+            else:
+                query = term.prepare(self)
+            return [self.backend.parse_query(query)]
+        query_list = []
+
+        # Handle `ValuesListQuerySet`.
+        if hasattr(term, 'values_list'):
+            term = list(term)
+
+        if field_name == 'content':
+            # content is the generic search:
+            # force no field_name search
+            # and the field_type to be 'text'.
+            field_name = None
+            field_type = 'text'
+
+            # we don't know what is the type(term), so we parse it.
+            # Ideally this would not be required, but
+            # some filters currently depend on the term to make decisions.
+            term = _to_xapian_term(term)
+
+            query_list.append(self._filter_contains(term, field_name, field_type, is_not))
+            # when filter has no filter_type, haystack uses
+            # filter_type = 'contains'. Here we remove it
+            # since the above query is already doing this
+            if filter_type == 'contains':
+                filter_type = None
+        else:
+            # get the field_type from the backend
+            field_type = self.backend.schema[self.backend.column[field_name]]['type']
+
+        # private fields don't accept 'contains' or 'startswith'
+        # since they have no meaning.
+        if filter_type in ('contains', 'startswith') and field_name in ('id', 'django_id', 'django_ct'):
+            filter_type = 'exact'
+
+        if field_type == 'text':
+            # we don't know what type "term" is, but we know we are searching as text
+            # so we parse it like that.
+            # Ideally this would not be required since _term_query does it, but
+            # some filters currently depend on the term to make decisions.
+            if isinstance(term, list):
+                term = [_to_xapian_term(term) for term in term]
+            else:
+                term = _to_xapian_term(term)
+
+        # todo: we should check that the filter is valid for this field_type or raise InvalidIndexError
+        if filter_type == 'contains':
+            query_list.append(self._filter_contains(term, field_name, field_type, is_not))
+        elif filter_type == 'exact':
+            query_list.append(self._filter_exact(term, field_name, field_type, is_not))
+        elif filter_type == 'in':
+            query_list.append(self._filter_in(term, field_name, field_type, is_not))
+        elif filter_type == 'startswith':
+            query_list.append(self._filter_startswith(term, field_name, field_type, is_not))
+        elif filter_type == 'gt':
+            query_list.append(self._filter_gt(term, field_name, field_type, is_not))
+        elif filter_type == 'gte':
+            query_list.append(self._filter_gte(term, field_name, field_type, is_not))
+        elif filter_type == 'lt':
+            query_list.append(self._filter_lt(term, field_name, field_type, is_not))
+        elif filter_type == 'lte':
+            query_list.append(self._filter_lte(term, field_name, field_type, is_not))
+        return query_list
 
     def _all_query(self):
         """
