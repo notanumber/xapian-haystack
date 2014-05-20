@@ -261,13 +261,40 @@ class XapianSearchBackend(BaseSearchBackend):
             if self.include_spelling is True:
                 term_generator.set_flags(xapian.TermGenerator.FLAG_SPELLING)
 
+            def add_text(termpos, prefix, term, weight):
+                term_generator.set_termpos(termpos + 1)
+                term_generator.index_text(term, weight)
+                term_generator.index_text(term, weight, prefix)
+                term_generator.increase_termpos()
+                return term_generator.get_termpos()
+
             for obj in iterable:
                 document = xapian.Document()
                 term_generator.set_document(document)
 
+                def add_to_document(prefix, term, weight):
+                    document.add_term('%s' % term, weight)
+                    document.add_term(prefix + term, weight)
+                    document.add_term(prefix + '^%s$' % term, weight)
+
+                def add_datetime_to_document(termpos, prefix, term, weight):
+                    date, time = term.split()
+                    document.add_posting(date, termpos, weight)
+                    termpos += 1
+                    document.add_posting(time, termpos, weight)
+                    termpos += 1
+                    document.add_posting(prefix + date, termpos, weight)
+                    termpos += 1
+                    document.add_posting(prefix + time, termpos, weight)
+                    termpos += 1
+                    return termpos
+
                 data = index.full_prepare(obj)
                 weights = index.get_field_weights()
+
+                termpos = 0
                 for field in self.schema:
+                    termpos += 1
                     # not supported fields are ignored.
                     if field['field_name'] not in list(data.keys()):
                         continue
@@ -288,30 +315,36 @@ class XapianSearchBackend(BaseSearchBackend):
 
                         document.add_term(TERM_PREFIXES[field['field_name']] + value, weight)
                         document.add_value(field['column'], value)
+                        continue
                     else:
                         prefix = TERM_PREFIXES['field'] + field['field_name'].upper()
 
-                        # if not multi_valued, we add a value and construct a one-element list
+                        # if not multi_valued, we add as a document value
+                        # for sorting and facets
                         if field['multi_valued'] == 'false':
                             document.add_value(field['column'], _term_to_xapian_value(value, field['type']))
-                            value = [value]
+                        else:
+                            for t in value:
+                                # add the exact match of each value
+                                term = _to_xapian_term(t)
+                                add_to_document(prefix, term, weight)
+                                # index each value with positional information
+                                if ' ' in term:
+                                    termpos = add_text(termpos, prefix, term, weight)
+                            continue
 
-                        for term in value:
-                            term = _to_xapian_term(term)
-                            # from here on term is a string;
-                            # now decide how it is stored:
+                        term = _to_xapian_term(value)
+                        # from here on the term is a string;
+                        # we now decide how it is indexed
 
-                            # these are
-                            if field['type'] == 'text':
-                                term_generator.index_text(term, weight)
-                                term_generator.index_text(term, weight, prefix)
-                            elif ' ' in term:
-                                for t in term.split():
-                                    document.add_term(t, weight)
-                                    document.add_term(prefix + t, weight)
-                            if term != "":
-                                document.add_term(term, weight)
-                                document.add_term(prefix + term, weight)
+                        if field['type'] == 'text':
+                            # text is indexed with positional information
+                            termpos = add_text(termpos, prefix, term, weight)
+                        elif field['type'] == 'datetime':
+                            termpos = add_datetime_to_document(termpos, prefix, term, weight)
+                        if term != "":
+                            # all other terms are added without positional information
+                            add_to_document(prefix, term, weight)
 
                 # store data without indexing it
                 document.set_data(pickle.dumps(
@@ -1300,10 +1333,9 @@ class XapianSearchQuery(BaseSearchQuery):
             assert not exact
 
         constructor = '{prefix}{term}'
-        # "" is to do a boolean match, but only works on indexed terms
-        # (constraint on Xapian side)
-        if exact and field_type == 'text':
-            constructor = '"{prefix}{term}"'
+        # ^{term}$ is for boolean match of the term
+        if exact:
+            constructor = '{prefix}^{term}$'
 
         # construct the prefix to be used.
         prefix = ''
@@ -1321,6 +1353,7 @@ class XapianSearchQuery(BaseSearchQuery):
         # we construct the query dates in a slightly different way
         if field_type == 'datetime':
             date, time = term.split()
+            constructor = '{prefix}{term}'
             return xapian.Query(xapian.Query.OP_AND_MAYBE,
                                 constructor.format(prefix=prefix, term=date),
                                 constructor.format(prefix=prefix, term=time)
