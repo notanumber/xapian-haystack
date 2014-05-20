@@ -120,6 +120,8 @@ class XapianSimpleMockIndex(indexes.SearchIndex):
     float_number = indexes.FloatField()
     decimal_number = indexes.DecimalField()
 
+    multi_value = indexes.MultiValueField()
+
     def get_model(self):
         return MockModel
 
@@ -149,6 +151,9 @@ class XapianSimpleMockIndex(indexes.SearchIndex):
 
     def prepare_decimal_number(self, obj):
         return '22.34'
+
+    def prepare_multi_value(self, obj):
+        return ['multi1', 'multi2']
 
 
 class HaystackBackendTestCase(object):
@@ -278,6 +283,15 @@ class XapianBackendTestCase(HaystackBackendTestCase, TestCase):
         self.assertTrue('22.34' in terms)
         self.assertTrue('XDECIMAL_NUMBER22.34' in terms)
         self.assertFalse('ZXDECIMAL_NUMBER22.34' in terms)
+
+    def test_multivalue_field(self):
+        terms = get_terms(self.backend, '-a')
+        self.assertTrue('multi1' in terms)
+        self.assertTrue('multi2' in terms)
+        self.assertTrue('XMULTI_VALUEmulti1' in terms)
+        self.assertTrue('XMULTI_VALUEmulti2' in terms)
+        self.assertTrue('ZXMULTI_VALUEmulti2' in terms)
+        self.assertTrue('Zmulti2' in terms)
 
     def test_non_ascii_chars(self):
         terms = get_terms(self.backend, '-a')
