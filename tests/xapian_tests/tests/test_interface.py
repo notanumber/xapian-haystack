@@ -193,3 +193,11 @@ class InterfaceTestCase(TestCase):
         """
         self.assertEqual(pks(self.queryset.filter(content='corrup\xe7\xe3o')),
                          pks(Document.objects.filter(summary__contains='corrup\xe7\xe3o')))
+
+    def test_multi_values_exact_search(self):
+        """
+        Regression test for #103
+        """
+        self.assertEqual(len(self.queryset.filter(tags__exact='tag')), 12)
+        self.assertEqual(len(self.queryset.filter(tags__exact='tag-test')), 8)
+        self.assertEqual(len(self.queryset.filter(tags__exact='tag-test-test')), 4)

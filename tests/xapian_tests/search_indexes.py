@@ -14,5 +14,13 @@ class DocumentIndex(indexes.SearchIndex):
     name = indexes.CharField(model_attr='name')
     date = indexes.DateField(model_attr='date')
 
+    tags = indexes.MultiValueField()
+
     def get_model(self):
         return models.Document()
+
+    def prepare_tags(self, obj):
+        l = [['tag', 'tag-test', 'tag-test-test'],
+             ['tag', 'tag-test'],
+             ['tag']]
+        return l[obj.id % 3]

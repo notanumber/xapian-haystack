@@ -150,7 +150,7 @@ class XapianSimpleMockIndex(indexes.SearchIndex):
         return '22.34'
 
     def prepare_multi_value(self, obj):
-        return ['multi1', 'multi2']
+        return ['tag', 'tag-test', 'tag-test-test']
 
 
 class HaystackBackendTestCase(object):
@@ -288,13 +288,23 @@ class BackendIndexationTestCase(HaystackBackendTestCase, TestCase):
         self.assertFalse('ZXDECIMAL_NUMBER22.34' in terms)
 
     def test_multivalue_field(self):
+        """
+        Regression test for #103
+        """
         terms = get_terms(self.backend, '-a')
-        self.assertTrue('multi1' in terms)
-        self.assertTrue('multi2' in terms)
-        self.assertTrue('XMULTI_VALUEmulti1' in terms)
-        self.assertTrue('XMULTI_VALUEmulti2' in terms)
-        self.assertTrue('ZXMULTI_VALUEmulti2' in terms)
-        self.assertTrue('Zmulti2' in terms)
+        self.assertTrue('tag' in terms)
+        self.assertTrue('tag-test' in terms)
+        self.assertTrue('tag-test-test' in terms)
+
+        self.assertTrue('XMULTI_VALUEtag' in terms)
+        self.assertTrue('XMULTI_VALUEtag-test' in terms)
+        self.assertTrue('XMULTI_VALUEtag-test-test' in terms)
+
+        # these and only these terms
+        # 3 for the exact term (^{term}$)
+        self.assertEqual(len([term for term in terms if term.startswith('XMULTI_VALUE')]), 6)
+        # no stem for exact multivalues.
+        self.assertEqual(len([term for term in terms if term.startswith('ZXMULTI_VALUE')]), 0)
 
     def test_non_ascii_chars(self):
         terms = get_terms(self.backend, '-a')
