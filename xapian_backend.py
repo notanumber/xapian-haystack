@@ -16,6 +16,7 @@ from haystack import connections
 from haystack.backends import BaseEngine, BaseSearchBackend, BaseSearchQuery, SearchNode, log_query
 from haystack.constants import ID, DJANGO_ID, DJANGO_CT
 from haystack.exceptions import HaystackError, MissingDependency
+from haystack.inputs import AutoQuery
 from haystack.models import SearchResult
 from haystack.utils import get_identifier, get_model_ct
 
@@ -48,6 +49,18 @@ DEFAULT_XAPIAN_FLAGS = (
     xapian.QueryParser.FLAG_PURE_NOT
 )
 
+# number of documents checked by default when building facets
+# this must be improved to be relative to the total number of docs.
+DEFAULT_CHECK_AT_LEAST = 1000
+
+# field types accepted to be serialized as values in Xapian
+FIELD_TYPES = {'text', 'integer', 'date', 'datetime', 'float', 'boolean'}
+
+# defines the format used to store types in Xapian
+# this format ensures datetimes are sorted correctly
+DATETIME_FORMAT = '%Y%m%d%H%M%S'
+INTEGER_FORMAT = '%012d'
+
 
 class InvalidIndexError(HaystackError):
     """Raised when an index can not be opened."""
@@ -76,30 +89,33 @@ class XHValueRangeProcessor(xapian.ValueRangeProcessor):
         begin = begin[colon + 1:len(begin)]
         for field_dict in self.backend.schema:
             if field_dict['field_name'] == field_name:
+                field_type = field_dict['type']
+
                 if not begin:
-                    if field_dict['type'] == 'text':
+                    if field_type == 'text':
                         begin = 'a'  # TODO: A better way of getting a min text value?
-                    elif field_dict['type'] == 'long':
+                    elif field_type == 'integer':
                         begin = -sys.maxint - 1
-                    elif field_dict['type'] == 'float':
+                    elif field_type == 'float':
                         begin = float('-inf')
-                    elif field_dict['type'] == 'date' or field_dict['type'] == 'datetime':
+                    elif field_type == 'date' or field_type == 'datetime':
                         begin = '00010101000000'
                 elif end == '*':
-                    if field_dict['type'] == 'text':
+                    if field_type == 'text':
                         end = 'z' * 100  # TODO: A better way of getting a max text value?
-                    elif field_dict['type'] == 'long':
+                    elif field_type == 'integer':
                         end = sys.maxint
-                    elif field_dict['type'] == 'float':
+                    elif field_type == 'float':
                         end = float('inf')
-                    elif field_dict['type'] == 'date' or field_dict['type'] == 'datetime':
+                    elif field_type == 'date' or field_type == 'datetime':
                         end = '99990101000000'
-                if field_dict['type'] == 'float':
-                    begin = _marshal_value(float(begin))
-                    end = _marshal_value(float(end))
-                elif field_dict['type'] == 'long':
-                    begin = _marshal_value(long(begin))
-                    end = _marshal_value(long(end))
+
+                if field_type == 'float':
+                    begin = _term_to_xapian_value(float(begin), field_type)
+                    end = _term_to_xapian_value(float(end), field_type)
+                elif field_type == 'integer':
+                    begin = _term_to_xapian_value(int(begin), field_type)
+                    end = _term_to_xapian_value(int(end), field_type)
                 return field_dict['column'], str(begin), str(end)
 
 
@@ -184,12 +200,13 @@ class XapianSearchBackend(BaseSearchBackend):
         self._update_cache()
         return self._content_field_name
 
-    def column(self, field_name):
+    @property
+    def column(self):
         """
         Returns the column in the database of a given field name.
         """
         self._update_cache()
-        return self._columns[field_name]
+        return self._columns
 
     def update(self, index, iterable):
         """
@@ -254,28 +271,27 @@ class XapianSearchBackend(BaseSearchBackend):
                     else:
                         weight = 1
 
+                    value = data[field['field_name']]
+                    # Private fields are indexed in a different way:
+                    # `django_id` is an int and `django_ct` is text;
+                    # besides, they are indexed by their (unstemmed) value.
                     if field['field_name'] in ('id', 'django_id', 'django_ct'):
-                        term = data[field['field_name']]
-
-                        # django_id is always an integer, thus we send
-                        # it to _marshal_value as int to guarantee it
-                        # is stored as a sortable number.
                         if field['field_name'] == 'django_id':
-                            term = int(term)
-                        term = _marshal_value(term)
+                            value = int(value)
+                        value = _term_to_xapian_value(value, field['type'])
 
-                        document.add_term(TERM_PREFIXES[field['field_name']] + term, weight)
-                        document.add_value(field['column'], term)
+                        document.add_term(TERM_PREFIXES[field['field_name']] + value, weight)
+                        document.add_value(field['column'], value)
                     else:
-                        value = data[field['field_name']]
                         prefix = TERM_PREFIXES['field'] + field['field_name'].upper()
 
+                        # if not multi_valued, we add a value and construct a one-element list
                         if field['multi_valued'] == 'false':
-                            document.add_value(field['column'], _marshal_value(value))
+                            document.add_value(field['column'], _term_to_xapian_value(value, field['type']))
                             value = [value]
 
                         for term in value:
-                            term = _marshal_term(term)
+                            term = _to_xapian_term(term)
                             if field['type'] == 'text':
                                 term_generator.index_text(term, weight)
                                 term_generator.index_text(term, weight, prefix)
@@ -361,6 +377,18 @@ class XapianSearchBackend(BaseSearchBackend):
 
         return query
 
+    def _check_field_names(self, field_names):
+        """
+        Raises InvalidIndexError if any of a field_name in field_names is
+        not indexed.
+        """
+        if field_names:
+            for field_name in field_names:
+                try:
+                    self.column[field_name]
+                except KeyError:
+                    raise InvalidIndexError('Trying to use non indexed field "%s"' % field_name)
+
     @log_query
     def search(self, query, sort_by=None, start_offset=0, end_offset=None,
                fields='', highlight=False, facets=None, date_facets=None,
@@ -409,6 +437,10 @@ class XapianSearchBackend(BaseSearchBackend):
                 'hits': 0,
             }
 
+        self._check_field_names(facets)
+        self._check_field_names(date_facets)
+        self._check_field_names(query_facets)
+
         database = self._database()
 
         if result_class is None:
@@ -443,7 +475,7 @@ class XapianSearchBackend(BaseSearchBackend):
                     sort_field = sort_field[1:]  # Strip the '-'
                 else:
                     reverse = False  # Reverse is inverted in Xapian -- http://trac.xapian.org/ticket/311
-                sorter.add(self.column(sort_field), reverse)
+                sorter.add(self.column[sort_field], reverse)
 
             enquire.set_sort_by_key_then_relevance(sorter, True)
 
@@ -456,6 +488,12 @@ class XapianSearchBackend(BaseSearchBackend):
 
         if not end_offset:
             end_offset = database.get_doccount() - start_offset
+
+        ## prepare spies in case of facets
+        if facets:
+            facets_spies = self._prepare_facet_field_spies(facets)
+            for spy in facets_spies:
+                enquire.add_matchspy(spy)
 
         matches = self._get_enquire_mset(database, enquire, start_offset, end_offset)
 
@@ -472,9 +510,18 @@ class XapianSearchBackend(BaseSearchBackend):
             )
 
         if facets:
-            facets_dict['fields'] = self._do_field_facets(results, facets)
+            # pick single valued facets from spies
+            single_facets_dict = self._process_facet_field_spies(facets_spies)
+
+            # pick multivalued valued facets from results
+            multi_facets_dict = self._do_multivalued_field_facets(results, facets)
+
+            # merge both results (http://stackoverflow.com/a/38990/931303)
+            facets_dict['fields'] = dict(list(single_facets_dict.items()) + list(multi_facets_dict.items()))
+
         if date_facets:
             facets_dict['dates'] = self._do_date_facets(results, date_facets)
+
         if query_facets:
             facets_dict['queries'] = self._do_query_facets(results, query_facets)
 
@@ -641,7 +688,7 @@ class XapianSearchBackend(BaseSearchBackend):
              'multi_valued': 'false',
              'column': 0},
             {'field_name': DJANGO_ID,
-             'type': 'long',
+             'type': 'integer',
              'multi_valued': 'false',
              'column': 1},
             {'field_name': DJANGO_CT,
@@ -667,10 +714,12 @@ class XapianSearchBackend(BaseSearchBackend):
                     'column': column,
                 }
 
-                if field_class.field_type in ['date', 'datetime']:
+                if field_class.field_type == 'date':
                     field_data['type'] = 'date'
+                elif field_class.field_type == 'datetime':
+                    field_data['type'] = 'datetime'
                 elif field_class.field_type == 'integer':
-                    field_data['type'] = 'long'
+                    field_data['type'] = 'integer'
                 elif field_class.field_type == 'float':
                     field_data['type'] = 'float'
                 elif field_class.field_type == 'boolean':
@@ -705,33 +754,58 @@ class XapianSearchBackend(BaseSearchBackend):
 
         return content
 
-    def _do_field_facets(self, results, field_facets):
+    def _prepare_facet_field_spies(self, facets):
         """
-        Private method that facets a document by field name.
+        Returns a list of spies based on the facets
+        used to count frequencies.
+        """
+        spies = []
+        for facet in facets:
+            slot = self.column[facet]
+            spy = xapian.ValueCountMatchSpy(slot)
+            # add attribute "slot" to know which column this spy is targeting.
+            spy.slot = slot
+            spies.append(spy)
+        return spies
 
-        Fields of type MultiValueField will be faceted on each item in the
-        (containing) list.
+    def _process_facet_field_spies(self, spies):
+        """
+        Returns a dict of facet names with lists of
+        tuples of the form (term, term_frequency)
+        from a list of spies that observed the enquire.
+        """
+        facet_dict = {}
+        for spy in spies:
+            field = self.schema[spy.slot]
+            field_name, field_type = field['field_name'], field['type']
 
-        Required arguments:
-            `results` -- A list SearchResults to facet
-            `field_facets` -- A list of fields to facet on
+            facet_dict[field_name] = []
+            for facet in spy.values():
+                facet_dict[field_name].append((_from_xapian_value(facet.term, field_type),
+                                               facet.termfreq))
+        return facet_dict
+
+    def _do_multivalued_field_facets(self, results, field_facets):
+        """
+        Implements a multivalued field facet on the results.
+
+        This is implemented using brute force - O(N^2) -
+        because Xapian does not have it implemented yet
+        (see http://trac.xapian.org/ticket/199)
         """
         facet_dict = {}
 
-        # DS_TODO: Improve this algorithm.  Currently, runs in O(N^2), ouch.
         for field in field_facets:
             facet_list = {}
+            if not self._multi_value_field(field):
+                continue
 
             for result in results:
                 field_value = getattr(result, field)
-                if self._multi_value_field(field):
-                    for item in field_value:  # Facet each item in a MultiValueField
-                        facet_list[item] = facet_list.get(item, 0) + 1
-                else:
-                    facet_list[field_value] = facet_list.get(field_value, 0) + 1
+                for item in field_value:  # Facet each item in a MultiValueField
+                    facet_list[item] = facet_list.get(item, 0) + 1
 
             facet_dict[field] = facet_list.items()
-
         return facet_dict
 
     @staticmethod
@@ -831,7 +905,6 @@ class XapianSearchBackend(BaseSearchBackend):
         eg. {'name': ('a*', 5)}
         """
         facet_dict = {}
-
         for field, query in dict(query_facets).items():
             facet_dict[field] = (query, self.search(self.parse_query(query))['hits'])
 
@@ -887,7 +960,7 @@ class XapianSearchBackend(BaseSearchBackend):
         return database
 
     @staticmethod
-    def _get_enquire_mset(database, enquire, start_offset, end_offset):
+    def _get_enquire_mset(database, enquire, start_offset, end_offset, checkatleast=DEFAULT_CHECK_AT_LEAST):
         """
         A safer version of Xapian.enquire.get_mset
 
@@ -901,10 +974,10 @@ class XapianSearchBackend(BaseSearchBackend):
             `end_offset` -- The end offset to pass to `enquire.get_mset`
         """
         try:
-            return enquire.get_mset(start_offset, end_offset)
+            return enquire.get_mset(start_offset, end_offset, checkatleast)
         except xapian.DatabaseModifiedError:
             database.reopen()
-            return enquire.get_mset(start_offset, end_offset)
+            return enquire.get_mset(start_offset, end_offset, checkatleast)
 
     @staticmethod
     def _get_document_data(database, document):
@@ -989,7 +1062,8 @@ class XapianSearchQuery(BaseSearchQuery):
         if self.boost:
             subqueries = [
                 xapian.Query(
-                    xapian.Query.OP_SCALE_WEIGHT, self._content_field(term, False), value
+                    xapian.Query.OP_SCALE_WEIGHT,
+                    self._term_query(term, None, None), value
                 ) for term, value in self.boost.iteritems()
             ]
             query = xapian.Query(
@@ -1009,169 +1083,242 @@ class XapianSearchQuery(BaseSearchQuery):
                 )
             else:
                 expression, term = child
-                field, filter_type = search_node.split_expression(expression)
+                field_name, filter_type = search_node.split_expression(expression)
 
-                # Handle when we've got a ``ValuesListQuerySet``...
+                if field_name != 'content' and field_name not in self.backend.column:
+                    raise InvalidIndexError('field "%s" not indexed' % field_name)
+
+                # Identify and parse AutoQuery
+                if isinstance(term, AutoQuery):
+                    if field_name != 'content':
+                        query = '%s:%s' % (field_name, term.prepare(self))
+                    else:
+                        query = term.prepare(self)
+                    query_list.append(self.backend.parse_query(query))
+                    continue
+
+                # Handle `ValuesListQuerySet`.
                 if hasattr(term, 'values_list'):
                     term = list(term)
 
-                if isinstance(term, (list, tuple)):
-                    term = [_marshal_term(t) for t in term]
-                else:
-                    term = _marshal_term(term)
+                if field_name == 'content':
+                    # content is the generic search:
+                    # force no field_name search
+                    # and the field_type to be 'text'.
+                    field_name = None
+                    field_type = 'text'
 
-                if field == 'content':
-                    query_list.append(self._content_field(term, is_not))
-                else:
+                    # we don't know what is the type(term), so we parse it.
+                    # Ideally this would not be required, but
+                    # some filters currently depend on the term to make decisions.
+                    term = _to_xapian_term(term)
+
+                    query_list.append(self._filter_contains(term, field_name, field_type, is_not))
+                    # when filter has no filter_type, haystack uses
+                    # filter_type = 'contains'. Here we remove it
+                    # since the above query is already doing this
                     if filter_type == 'contains':
-                        query_list.append(self._filter_contains(term, field, is_not))
-                    elif filter_type == 'exact':
-                        query_list.append(self._filter_exact(term, field, is_not))
-                    elif filter_type == 'gt':
-                        query_list.append(self._filter_gt(term, field, is_not))
-                    elif filter_type == 'gte':
-                        query_list.append(self._filter_gte(term, field, is_not))
-                    elif filter_type == 'lt':
-                        query_list.append(self._filter_lt(term, field, is_not))
-                    elif filter_type == 'lte':
-                        query_list.append(self._filter_lte(term, field, is_not))
-                    elif filter_type == 'startswith':
-                        query_list.append(self._filter_startswith(term, field, is_not))
-                    elif filter_type == 'in':
-                        query_list.append(self._filter_in(term, field, is_not))
+                        filter_type = None
+                else:
+                    # get the field_type from the backend
+                    field_type = self.backend.schema[self.backend.column[field_name]]['type']
+
+                # private fields don't accept 'contains' or 'startswith'
+                # since they have no meaning.
+                if filter_type in ('contains', 'startswith') and field_name in ('id', 'django_id', 'django_ct'):
+                    filter_type = 'exact'
+
+                if field_type == 'text':
+                    # we don't know what type "term" is, but we know we are searching as text
+                    # so we parse it like that.
+                    # Ideally this would not be required since _term_query does it, but
+                    # some filters currently depend on the term to make decisions.
+                    if isinstance(term, list):
+                        term = [_to_xapian_term(term) for term in term]
+                    else:
+                        term = _to_xapian_term(term)
+
+                # todo: we should check that the filter is valid for this field_type or raise InvalidIndexError
+                if filter_type == 'contains':
+                    query_list.append(self._filter_contains(term, field_name, field_type, is_not))
+                elif filter_type == 'exact':
+                    query_list.append(self._filter_exact(term, field_name, field_type, is_not))
+                elif filter_type == 'in':
+                    query_list.append(self._filter_in(term, field_name, field_type, is_not))
+                elif filter_type == 'startswith':
+                    query_list.append(self._filter_startswith(term, field_name, field_type, is_not))
+                elif filter_type == 'gt':
+                    query_list.append(self._filter_gt(term, field_name, field_type, is_not))
+                elif filter_type == 'gte':
+                    query_list.append(self._filter_gte(term, field_name, field_type, is_not))
+                elif filter_type == 'lt':
+                    query_list.append(self._filter_lt(term, field_name, field_type, is_not))
+                elif filter_type == 'lte':
+                    query_list.append(self._filter_lte(term, field_name, field_type, is_not))
 
         if search_node.connector == 'OR':
             return xapian.Query(xapian.Query.OP_OR, query_list)
         else:
             return xapian.Query(xapian.Query.OP_AND, query_list)
 
-    def _content_field(self, term, is_not):
+    def _all_query(self):
         """
-        Private method that returns a xapian.Query that searches for `value`
-        in all fields.
-
-        Required arguments:
-            ``term`` -- The term to search for
-            ``is_not`` -- Invert the search results
-
-        Returns:
-            A xapian.Query
+        Returns a match all query.
         """
-        # it is more than one term, we build a PHRASE
-        if ' ' in term:
-            query = self._phrase_query(term.split(), self.backend.content_field_name, is_content=True)
+        return xapian.Query('')
+
+    def _filter_contains(self, term, field_name, field_type, is_not):
+        """
+        Splits the sentence in terms and join them with OR,
+        using stemmed and un-stemmed.
+
+        Assumes term is not a list.
+        """
+        if field_type == 'text':
+            term_list = term.split()
         else:
-            query = self._term_query(term)
+            term_list = [term]
 
+        query = self._or_query(term_list, field_name, field_type)
         if is_not:
             return xapian.Query(xapian.Query.OP_AND_NOT, self._all_query(), query)
         else:
             return query
 
-    def _filter_contains(self, term, field, is_not):
+    def _filter_in(self, term_list, field_name, field_type, is_not):
         """
-        Private method that returns a xapian.Query that searches for `term`
-        in a specified `field`.
+        Returns a query that matches exactly ANY term in term_list.
 
-        Required arguments:
-            ``term`` -- The term to search for
-            ``field`` -- The field to search
-            ``is_not`` -- Invert the search results
+        Notice that:
+         A in {B,C} <=> (A = B or A = C)
+         ~(A in {B,C}) <=> ~(A = B or A = C)
+        Because OP_AND_NOT(C, D) <=> (C and ~D), then D=(A in {B,C}) requires `is_not=False`.
 
-        Returns:
-            A xapian.Query
+        Assumes term is a list.
         """
-        if ' ' in term:
-            return self._filter_exact(term, field, is_not)
-        else:
-            query = self._term_query(term, field)
-            if is_not:
-                return xapian.Query(xapian.Query.OP_AND_NOT, self._all_query(), query)
-            else:
-                return query
+        query_list = [self._filter_exact(term, field_name, field_type, is_not=False)
+                      for term in term_list]
 
-    def _filter_exact(self, term, field, is_not):
-        """
-        Private method that returns a xapian.Query that searches for an exact
-        match for `term` in a specified `field`.
-
-        Required arguments:
-            ``term`` -- The term to search for
-            ``field`` -- The field to search
-            ``is_not`` -- Invert the search results
-
-        Returns:
-            A xapian.Query
-        """
-        query = self._phrase_query(term.split(), field)
-        if is_not:
-            return xapian.Query(xapian.Query.OP_AND_NOT, self._all_query(), query)
-        else:
-            return query
-
-    def _filter_in(self, term_list, field, is_not):
-        """
-        Private method that returns a xapian.Query that searches for any term
-        of `value_list` in a specified `field`.
-
-        Required arguments:
-            ``term_list`` -- The terms to search for
-            ``field`` -- The field to search
-            ``is_not`` -- Invert the search results
-
-        Returns:
-            A xapian.Query
-        """
-        query_list = []
-        for term in term_list:
-            if ' ' in term:
-                query_list.append(
-                    self._phrase_query(term.split(), field)
-                )
-            else:
-                query_list.append(
-                    self._term_query(term, field)
-                )
         if is_not:
             return xapian.Query(xapian.Query.OP_AND_NOT, self._all_query(),
                                 xapian.Query(xapian.Query.OP_OR, query_list))
         else:
             return xapian.Query(xapian.Query.OP_OR, query_list)
 
-    def _filter_startswith(self, term, field, is_not):
+    def _filter_exact(self, term, field_name, field_type, is_not):
         """
-        Private method that returns a xapian.Query that searches for any term
-        that begins with `term` in a specified `field`.
+        Returns a query that matches exactly the un-stemmed term
+        with positional order.
 
-        Required arguments:
-            ``term`` -- The terms to search for
-            ``field`` -- The field to search
-            ``is_not`` -- Invert the search results
-
-        Returns:
-            A xapian.Query
+        Assumes term is not a list.
         """
+
+        # this is an hack:
+        # the ideal would be to use the same idea as in _filter_contains.
+        # However, it causes tests to fail.
+        if field_type == 'text' and ' ' in term:
+            query = self._phrase_query(term.split(), field_name, field_type)
+        else:
+            query = self._term_query(term, field_name, field_type, exact=True, stemmed=False)
+
         if is_not:
-            return xapian.Query(
-                xapian.Query.OP_AND_NOT,
-                self._all_query(),
-                self.backend.parse_query('%s:%s*' % (field, term)),
-            )
-        return self.backend.parse_query('%s:%s*' % (field, term))
+            return xapian.Query(xapian.Query.OP_AND_NOT, self._all_query(), query)
+        else:
+            return query
 
-    def _filter_gt(self, term, field, is_not):
-        return self._filter_lte(term, field, is_not=not is_not)
+    def _filter_startswith(self, term, field_name, field_type, is_not):
+        """
+        Returns a startswith query on the un-stemmed term.
 
-    def _filter_lt(self, term, field, is_not):
-        return self._filter_gte(term, field, is_not=not is_not)
+        Assumes term is not a list.
+        """
+        # TODO: if field_type is of type integer, we need to marsh the value.
+        if field_name:
+            query_string = '%s:%s*' % (field_name, term)
+        else:
+            query_string = '%s*' % term
 
-    def _filter_gte(self, term, field, is_not):
+        query = self.backend.parse_query(query_string)
+
+        if is_not:
+            return xapian.Query(xapian.Query.OP_AND_NOT, self._all_query(), query)
+        return query
+
+    def _or_query(self, term_list, field, field_type, exact=False):
+        """
+        Joins each item of term_list decorated by _term_query with an OR.
+        """
+        term_list = [self._term_query(term, field, field_type, exact) for term in term_list]
+        return xapian.Query(xapian.Query.OP_OR, term_list)
+
+    def _phrase_query(self, term_list, field_name, field_type):
+        """
+        Returns a query that matches exact terms with
+        positional order (i.e. ["this", "thing"] != ["thing", "this"])
+        and no stem.
+
+        If `field_name` is not `None`, restrict to the field.
+        """
+        term_list = [self._term_query(term, field_name, field_type,
+                                      stemmed=False) for term in term_list]
+
+        query = xapian.Query(xapian.Query.OP_PHRASE, term_list)
+        return query
+
+    def _term_query(self, term, field_name, field_type, exact=False, stemmed=True):
+        """
+        Constructs a query of a single term.
+
+        If `field_name` is not `None`, the term is search on that field only.
+        If exact is `True`, the search is restricted to boolean matches.
+        """
+        # using stemmed terms in exact query is not acceptable.
+        if stemmed:
+            assert not exact
+
+        if field_name in ('id', 'django_id', 'django_ct'):
+            # to ensure the value is serialized correctly.
+            if field_name == 'django_id':
+                term = int(term)
+            term = _term_to_xapian_value(term, field_type)
+            return xapian.Query('%s%s' % (TERM_PREFIXES[field_name], term))
+
+        constructor = '{prefix}{term}'
+        # "" is to do a boolean match, but only works on indexed terms
+        # (constraint on Xapian side)
+        if exact and field_type == 'text':
+            constructor = '"{prefix}{term}"'
+
+        prefix = ''
+        if field_name:
+            prefix = TERM_PREFIXES['field'] + field_name.upper()
+            term = _to_xapian_term(term)
+
+        unstemmed_term = constructor.format(prefix=prefix, term=term)
+        if stemmed:
+            stem = xapian.Stem(self.backend.language)
+            stemmed_term = 'Z' + constructor.format(prefix=prefix, term=stem(term))
+
+            return xapian.Query(xapian.Query.OP_OR,
+                                xapian.Query(stemmed_term),
+                                xapian.Query(unstemmed_term)
+                                )
+        else:
+            return unstemmed_term
+
+    def _filter_gt(self, term, field_name, field_type, is_not):
+        return self._filter_lte(term, field_name, field_type, is_not=not is_not)
+
+    def _filter_lt(self, term, field_name, field_type, is_not):
+        return self._filter_gte(term, field_name, field_type, is_not=not is_not)
+
+    def _filter_gte(self, term, field_name, field_type, is_not):
         """
         Private method that returns a xapian.Query that searches for any term
         that is greater than `term` in a specified `field`.
         """
         vrp = XHValueRangeProcessor(self.backend)
-        pos, begin, end = vrp('%s:%s' % (field, _marshal_value(term)), '*')
+        pos, begin, end = vrp('%s:%s' % (field_name, _term_to_xapian_value(term, field_type)), '*')
         if is_not:
             return xapian.Query(xapian.Query.OP_AND_NOT,
                                 self._all_query(),
@@ -1179,13 +1326,13 @@ class XapianSearchQuery(BaseSearchQuery):
                                 )
         return xapian.Query(xapian.Query.OP_VALUE_RANGE, pos, begin, end)
 
-    def _filter_lte(self, term, field, is_not):
+    def _filter_lte(self, term, field_name, field_type, is_not):
         """
         Private method that returns a xapian.Query that searches for any term
         that is less than `term` in a specified `field`.
         """
         vrp = XHValueRangeProcessor(self.backend)
-        pos, begin, end = vrp('%s:' % field, '%s' % _marshal_value(term))
+        pos, begin, end = vrp('%s:' % field_name, '%s' % _term_to_xapian_value(term, field_type))
         if is_not:
             return xapian.Query(xapian.Query.OP_AND_NOT,
                                 self._all_query(),
@@ -1193,117 +1340,85 @@ class XapianSearchQuery(BaseSearchQuery):
                                 )
         return xapian.Query(xapian.Query.OP_VALUE_RANGE, pos, begin, end)
 
-    @staticmethod
-    def _all_query():
-        """
-        Private method that returns a xapian.Query that returns all documents,
 
-        Returns:
-            A xapian.Query
-        """
-        return xapian.Query('')
-
-    def _term_query(self, term, field=None):
-        """
-        Private method that returns a term based xapian.Query that searches
-        for `term`.
-
-        Required arguments:
-            ``term`` -- The term to search for
-            ``field`` -- The field to search (If `None`, all fields)
-
-        Returns:
-            A xapian.Query
-        """
-        stem = xapian.Stem(self.backend.language)
-
-        if field in ('id', 'django_id', 'django_ct'):
-            return xapian.Query('%s%s' % (TERM_PREFIXES[field], term))
-        elif field:
-            stemmed = 'Z%s%s%s' % (
-                TERM_PREFIXES['field'], field.upper(), stem(term)
-            )
-            unstemmed = '%s%s%s' % (
-                TERM_PREFIXES['field'], field.upper(), term
-            )
-        else:
-            stemmed = 'Z%s' % stem(term)
-            unstemmed = term
-
-        return xapian.Query(
-            xapian.Query.OP_OR,
-            xapian.Query(stemmed),
-            xapian.Query(unstemmed)
-        )
-
-    @staticmethod
-    def _phrase_query(term_list, field=None, is_content=False):
-        """
-        Private method that returns a phrase based xapian.Query that searches
-        for terms in `term_list.
-
-        Required arguments:
-            ``term_list`` -- The terms to search for
-            ``field`` -- The field to search (If `None`, all fields)
-
-        Returns:
-            A xapian.Query
-        """
-        if field and not is_content:
-            term_list = ['%s%s%s' % (TERM_PREFIXES['field'], field.upper(), term) for term in term_list]
-        return xapian.Query(xapian.Query.OP_PHRASE, term_list)
-
-
-def _marshal_value(value):
+def _term_to_xapian_value(term, field_type):
     """
-    Private utility method that converts Python values to a string for Xapian values.
+    Converts a term to a serialized
+    Xapian value based on the field_type.
     """
-    if isinstance(value, datetime.datetime):
-        value = _marshal_datetime(value)
-    elif isinstance(value, datetime.date):
-        value = _marshal_date(value)
-    elif isinstance(value, bool):
-        if value:
+    assert field_type in FIELD_TYPES
+
+    def strf(dt):
+        """
+        Equivalent to datetime.datetime.strptime(dt, DATETIME_FORMAT)
+        but accepts years below 1900 (see http://stackoverflow.com/q/10263956/931303)
+        """
+        return '%04d%02d%02d%02d%02d%02d' % (
+            dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second)
+
+    if field_type == 'boolean':
+        assert isinstance(term, bool)
+        if term:
             value = 't'
         else:
             value = 'f'
-    elif isinstance(value, float):
-        value = xapian.sortable_serialise(value)
-    elif isinstance(value, (int, long)):
-        value = '%012d' % value
-    else:
-        value = force_text(value).lower()
+
+    elif field_type == 'integer':
+        value = INTEGER_FORMAT % term
+    elif field_type == 'float':
+        value = xapian.sortable_serialise(term)
+    elif field_type == 'date' or field_type == 'datetime':
+        if field_type == 'date':
+            # http://stackoverflow.com/a/1937636/931303 and comments
+            term = datetime.datetime.combine(term, datetime.time())
+        value = strf(term)
+    else:  # field_type == 'text'
+        value = _to_xapian_term(term)
+
     return value
 
 
-def _marshal_term(term):
+def _to_xapian_term(term):
     """
-    Private utility method that converts Python terms to a string for Xapian terms.
+    Converts a Python type to a
+    Xapian term that can be indexed.
     """
     if isinstance(term, datetime.datetime):
-        term = _marshal_datetime(term)
+        value = term.strftime(DATETIME_FORMAT)
     elif isinstance(term, datetime.date):
-        term = _marshal_date(term)
+        value = term.strftime(DATETIME_FORMAT)
     else:
-        term = force_text(term).lower()
-    return term
+        value = force_text(term).lower()
+    return value
 
 
-def _marshal_date(d):
-    return '%04d%02d%02d000000' % (d.year, d.month, d.day)
+def _from_xapian_value(value, field_type):
+    """
+    Converts a serialized Xapian value
+    to Python equivalent based on the field_type.
 
-
-def _marshal_datetime(dt):
-    if dt.microsecond:
-        return '%04d%02d%02d%02d%02d%02d%06d' % (
-            dt.year, dt.month, dt.day, dt.hour,
-            dt.minute, dt.second, dt.microsecond
-        )
-    else:
-        return '%04d%02d%02d%02d%02d%02d' % (
-            dt.year, dt.month, dt.day, dt.hour,
-            dt.minute, dt.second
-        )
+    Doesn't accept multivalued fields.
+    """
+    assert field_type in FIELD_TYPES
+    if field_type == 'boolean':
+        if value == 't':
+            return True
+        elif value == 'f':
+            return False
+        else:
+            InvalidIndexError('Field type "%d" does not accept value "%s"' % (field_type, value))
+    elif field_type == 'integer':
+        return int(value)
+    elif field_type == 'float':
+        return xapian.sortable_unserialise(value)
+    elif field_type == 'date' or field_type == 'datetime':
+        datetime_value = datetime.datetime.strptime(value, DATETIME_FORMAT)
+        if field_type == 'datetime':
+            return datetime_value
+        else:
+            return datetime_value.date()
+    else:  # field_type == 'text'
+        return value
 
 
 class XapianEngine(BaseEngine):
