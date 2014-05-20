@@ -9,16 +9,19 @@ from haystack.query import SearchQuerySet
 
 from xapian_tests.models import Document
 from xapian_tests.search_indexes import DocumentIndex
-from xapian_tests.tests.test_xapian_backend import get_terms
+from xapian_tests.tests.test_backend import pks
 
 
-def pks(results):
-    return [result.pk for result in results]
+class InterfaceTestCase(TestCase):
+    """
+    Tests the interface of Xapian-Haystack.
 
-
-class LiveXapianTestCase(TestCase):
+    Tests related to usability and expected behavior
+    go here.
+    """
 
     def setUp(self):
+        super(InterfaceTestCase, self).setUp()
 
         types_names = ['book', 'magazine', 'article']
         texts = ['This is a huge text',
@@ -53,6 +56,7 @@ class LiveXapianTestCase(TestCase):
     def tearDown(self):
         Document.objects.all().delete()
         self.backend.clear()
+        super(InterfaceTestCase, self).tearDown()
 
     def test_count(self):
         self.assertEqual(self.queryset.count(), Document.objects.count())
