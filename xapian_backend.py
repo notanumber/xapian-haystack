@@ -261,23 +261,64 @@ class XapianSearchBackend(BaseSearchBackend):
             if self.include_spelling is True:
                 term_generator.set_flags(xapian.TermGenerator.FLAG_SPELLING)
 
-            def add_text(termpos, prefix, term, weight):
-                term_generator.set_termpos(termpos + 1)
-                term_generator.index_text(term, weight)
-                term_generator.index_text(term, weight, prefix)
+            def _add_text(termpos, text, weight, prefix=''):
+                """
+                indexes text appending 2 extra terms
+                to identify beginning and ending of the text.
+                """
+                start_term = '%s^' % prefix
+                end_term = '%s$' % prefix
+                # add begin
+                document.add_posting(start_term, termpos, weight)
+                # add text
+                term_generator.index_text(text, weight, prefix)
+                termpos = term_generator.get_termpos()
+                # add ending
+                termpos += 1
+                document.add_posting(end_term, termpos, weight)
+
+                # increase termpos
+                term_generator.set_termpos(termpos)
                 term_generator.increase_termpos()
+
                 return term_generator.get_termpos()
+
+            def add_text(termpos, prefix, text, weight):
+                """
+                Adds text to the document with positional information
+                and processing (e.g. stemming).
+                """
+                termpos = _add_text(termpos, text, weight, prefix=prefix)
+                termpos = _add_text(termpos, text, weight, prefix='')
+                return termpos
 
             for obj in iterable:
                 document = xapian.Document()
                 term_generator.set_document(document)
 
-                def add_to_document(prefix, term, weight):
-                    document.add_term('%s' % term, weight)
-                    document.add_term(prefix + term, weight)
-                    document.add_term(prefix + '^%s$' % term, weight)
+                def add_to_document(prefix, sentence, weight):
+                    """
+                    Adds sentence to the document without positional information
+                    and without processing.
+
+                    If the term is alone, also adds it as "^<term>$"
+                    to allow exact matches on single terms.
+                    """
+                    if len(sentence.split()) > 1:
+                        for term in sentence.split():
+                            document.add_term(term, weight)
+                            document.add_term(prefix + term, weight)
+                    else:
+                        document.add_term(sentence, weight)
+                        document.add_term(prefix + sentence, weight)
+                        document.add_term("^%s$" % sentence, weight)
+                        document.add_term(prefix + "^%s$" % sentence, weight)
 
                 def add_datetime_to_document(termpos, prefix, term, weight):
+                    """
+                    Adds a datetime to document with positional order
+                    to allow exact matches on it.
+                    """
                     date, time = term.split()
                     document.add_posting(date, termpos, weight)
                     termpos += 1
@@ -292,11 +333,10 @@ class XapianSearchBackend(BaseSearchBackend):
                 data = index.full_prepare(obj)
                 weights = index.get_field_weights()
 
-                termpos = 0
+                termpos = term_generator.get_termpos()  # identifies the current position in the document.
                 for field in self.schema:
-                    termpos += 1
-                    # not supported fields are ignored.
                     if field['field_name'] not in list(data.keys()):
+                        # not supported fields are ignored.
                         continue
 
                     if field['field_name'] in weights:
@@ -305,10 +345,11 @@ class XapianSearchBackend(BaseSearchBackend):
                         weight = 1
 
                     value = data[field['field_name']]
-                    # Private fields are indexed in a different way:
-                    # `django_id` is an int and `django_ct` is text;
-                    # besides, they are indexed by their (unstemmed) value.
+
                     if field['field_name'] in ('id', 'django_id', 'django_ct'):
+                        # Private fields are indexed in a different way:
+                        # `django_id` is an int and `django_ct` is text;
+                        # besides, they are indexed by their (unstemmed) value.
                         if field['field_name'] == 'django_id':
                             value = int(value)
                         value = _term_to_xapian_value(value, field['type'])
@@ -327,10 +368,8 @@ class XapianSearchBackend(BaseSearchBackend):
                             for t in value:
                                 # add the exact match of each value
                                 term = _to_xapian_term(t)
+                                termpos = add_text(termpos, prefix, term, weight)
                                 add_to_document(prefix, term, weight)
-                                # index each value with positional information
-                                if ' ' in term:
-                                    termpos = add_text(termpos, prefix, term, weight)
                             continue
 
                         term = _to_xapian_term(value)
@@ -342,8 +381,8 @@ class XapianSearchBackend(BaseSearchBackend):
                             termpos = add_text(termpos, prefix, term, weight)
                         elif field['type'] == 'datetime':
                             termpos = add_datetime_to_document(termpos, prefix, term, weight)
-                        elif term != "":
-                            # all other terms are added without positional information
+                        if term != "":
+                            # other non-sentence terms are added without positional information
                             add_to_document(prefix, term, weight)
 
                 # store data without indexing it
@@ -1273,6 +1312,7 @@ class XapianSearchQuery(BaseSearchQuery):
         # the ideal would be to use the same idea as in _filter_contains.
         # However, it causes tests to fail.
         if field_type == 'text' and ' ' in term:
+            term = '^ %s $' % term
             query = self._phrase_query(term.split(), field_name, field_type)
         else:
             query = self._term_query(term, field_name, field_type, exact=True, stemmed=False)
@@ -1333,8 +1373,9 @@ class XapianSearchQuery(BaseSearchQuery):
             assert not exact
 
         constructor = '{prefix}{term}'
-        # ^{term}$ is for boolean match of the term
-        if exact:
+        # "" is to do a boolean match, but only works on indexed terms
+        # (constraint on Xapian side)
+        if exact and field_type == 'text':
             constructor = '{prefix}^{term}$'
 
         # construct the prefix to be used.
@@ -1353,7 +1394,6 @@ class XapianSearchQuery(BaseSearchQuery):
         # we construct the query dates in a slightly different way
         if field_type == 'datetime':
             date, time = term.split()
-            constructor = '{prefix}{term}'
             return xapian.Query(xapian.Query.OP_AND_MAYBE,
                                 constructor.format(prefix=prefix, term=date),
                                 constructor.format(prefix=prefix, term=time)
