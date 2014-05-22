@@ -342,7 +342,7 @@ class XapianSearchBackend(BaseSearchBackend):
                             termpos = add_text(termpos, prefix, term, weight)
                         elif field['type'] == 'datetime':
                             termpos = add_datetime_to_document(termpos, prefix, term, weight)
-                        if term != "":
+                        elif term != "":
                             # all other terms are added without positional information
                             add_to_document(prefix, term, weight)
 

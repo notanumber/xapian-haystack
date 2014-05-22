@@ -10,7 +10,7 @@ from haystack.query import SearchQuerySet
 
 from xapian_tests.models import Document
 from xapian_tests.search_indexes import DocumentIndex
-from xapian_tests.tests.test_backend import pks
+from xapian_tests.tests.test_backend import pks, get_terms
 
 
 class InterfaceTestCase(TestCase):
@@ -58,7 +58,7 @@ class InterfaceTestCase(TestCase):
 
     def tearDown(self):
         Document.objects.all().delete()
-        self.backend.clear()
+        #self.backend.clear()
         super(InterfaceTestCase, self).tearDown()
 
     def test_count(self):
@@ -139,6 +139,7 @@ class InterfaceTestCase(TestCase):
                          set(pks(Document.objects.filter(text__startswith='This is'))))
 
     def test_auto_query(self):
+        # todo: improve to query text only.
         self.assertEqual(set(pks(self.queryset.auto_query("huge OR medium"))),
                          set(pks(Document.objects.filter(Q(text__contains="huge") |
                                                          Q(text__contains="medium")))))

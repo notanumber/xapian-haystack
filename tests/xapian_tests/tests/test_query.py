@@ -169,27 +169,33 @@ class XapianSearchQueryTestCase(HaystackBackendTestCase, TestCase):
         self.sq.add_filter(SQ(content='why'))
         self.sq.add_filter(SQ(title__in=["A Famous Paper", "An Infamous Article"]))
         self.assertEqual(str(self.sq.build_query()),
-                         'Xapian::Query(((Zwhi OR why) AND '
-                         '((XTITLEa PHRASE 3 XTITLEfamous PHRASE 3 XTITLEpaper) OR '
-                         '(XTITLEan PHRASE 3 XTITLEinfamous PHRASE 3 XTITLEarticle))))')
+                         'Xapian::Query(('
+                         '(Zwhi OR why) AND ((XTITLE^ PHRASE 5 XTITLEa PHRASE 5 '
+                         'XTITLEfamous PHRASE 5 XTITLEpaper PHRASE 5 XTITLE$) OR '
+                         '(XTITLE^ PHRASE 5 XTITLEan PHRASE 5 XTITLEinfamous PHRASE 5 '
+                         'XTITLEarticle PHRASE 5 XTITLE$))))')
 
     def test_build_query_in_filter_multiple_words_with_punctuation(self):
         self.sq.add_filter(SQ(title__in=["A Famous Paper", "An Infamous Article", "My Store Inc."]))
         self.assertEqual(str(self.sq.build_query()),
                          'Xapian::Query(('
-                         '(XTITLEa PHRASE 3 XTITLEfamous PHRASE 3 XTITLEpaper) OR '
-                         '(XTITLEan PHRASE 3 XTITLEinfamous PHRASE 3 XTITLEarticle) OR '
-                         '(XTITLEmy PHRASE 3 XTITLEstore PHRASE 3 XTITLEinc.)))')
+                         '(XTITLE^ PHRASE 5 XTITLEa PHRASE 5 XTITLEfamous PHRASE 5'
+                         ' XTITLEpaper PHRASE 5 XTITLE$) OR '
+                         '(XTITLE^ PHRASE 5 XTITLEan PHRASE 5 XTITLEinfamous PHRASE 5'
+                         ' XTITLEarticle PHRASE 5 XTITLE$) OR '
+                         '(XTITLE^ PHRASE 5 XTITLEmy PHRASE 5 XTITLEstore PHRASE 5'
+                         ' XTITLEinc. PHRASE 5 XTITLE$)))')
 
     def test_build_query_not_in_filter_multiple_words(self):
         self.sq.add_filter(SQ(content='why'))
         self.sq.add_filter(~SQ(title__in=["A Famous Paper", "An Infamous Article"]))
         self.assertEqual(str(self.sq.build_query()),
-                         'Xapian::Query(((Zwhi OR why) AND '
-                         '(<alldocuments> AND_NOT ((XTITLEa PHRASE 3 '
-                         'XTITLEfamous PHRASE 3 '
-                         'XTITLEpaper) OR (XTITLEan PHRASE 3 '
-                         'XTITLEinfamous PHRASE 3 XTITLEarticle)))))')
+                         'Xapian::Query(('
+                         '(Zwhi OR why) AND (<alldocuments> AND_NOT '
+                         '((XTITLE^ PHRASE 5 XTITLEa PHRASE 5 XTITLEfamous PHRASE 5 '
+                         'XTITLEpaper PHRASE 5 XTITLE$) OR (XTITLE^ PHRASE 5 '
+                         'XTITLEan PHRASE 5 XTITLEinfamous PHRASE 5 '
+                         'XTITLEarticle PHRASE 5 XTITLE$)))))')
 
     def test_build_query_in_filter_datetime(self):
         self.sq.add_filter(SQ(content='why'))

@@ -123,10 +123,10 @@ class XapianSimpleMockIndex(indexes.SearchIndex):
         return MockModel
 
     def prepare_text(self, obj):
-        return 'this_is_a_word'
+        return 'this_is_a_word inside a big text'
 
     def prepare_author(self, obj):
-        return 'david'
+        return 'david holland'
 
     def prepare_url(self, obj):
         return 'http://example.com/1/'
@@ -150,7 +150,7 @@ class XapianSimpleMockIndex(indexes.SearchIndex):
         return '22.34'
 
     def prepare_multi_value(self, obj):
-        return ['tag', 'tag-test', 'tag-test-test']
+        return ['tag', 'tag-tag', 'tag-tag-tag']
 
 
 class HaystackBackendTestCase(object):
@@ -237,6 +237,8 @@ class BackendIndexationTestCase(HaystackBackendTestCase, TestCase):
         self.assertTrue('ZXTEXTthis_is_a_word' in terms)
         self.assertTrue('XTEXTthis_is_a_word' in terms)
 
+        self.assertFalse('^this_is_a_word inside a big text$' in terms)
+
     def test_author_field(self):
         terms = get_terms(self.backend, '-a')
 
@@ -293,18 +295,12 @@ class BackendIndexationTestCase(HaystackBackendTestCase, TestCase):
         """
         terms = get_terms(self.backend, '-a')
         self.assertTrue('tag' in terms)
-        self.assertTrue('tag-test' in terms)
-        self.assertTrue('tag-test-test' in terms)
+        self.assertTrue('tag-tag' in terms)
+        self.assertTrue('tag-tag-tag' in terms)
 
         self.assertTrue('XMULTI_VALUEtag' in terms)
-        self.assertTrue('XMULTI_VALUEtag-test' in terms)
-        self.assertTrue('XMULTI_VALUEtag-test-test' in terms)
-
-        # these and only these terms
-        # 3 for the exact term (^{term}$)
-        self.assertEqual(len([term for term in terms if term.startswith('XMULTI_VALUE')]), 6)
-        # no stem for exact multivalues.
-        self.assertEqual(len([term for term in terms if term.startswith('ZXMULTI_VALUE')]), 0)
+        self.assertTrue('XMULTI_VALUEtag-tag' in terms)
+        self.assertTrue('XMULTI_VALUEtag-tag-tag' in terms)
 
     def test_non_ascii_chars(self):
         terms = get_terms(self.backend, '-a')
