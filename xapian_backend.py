@@ -266,6 +266,8 @@ class XapianSearchBackend(BaseSearchBackend):
                 indexes text appending 2 extra terms
                 to identify beginning and ending of the text.
                 """
+                term_generator.set_termpos(termpos)
+
                 start_term = '%s^' % prefix
                 end_term = '%s$' % prefix
                 # add begin
@@ -304,13 +306,16 @@ class XapianSearchBackend(BaseSearchBackend):
                     If the term is alone, also adds it as "^<term>$"
                     to allow exact matches on single terms.
                     """
-                    if len(sentence.split()) > 1:
+                    if ' ' in sentence:
+                        # search will use PHRASE, no need to add ^$
                         for term in sentence.split():
                             document.add_term(term, weight)
                             document.add_term(prefix + term, weight)
                     else:
                         document.add_term(sentence, weight)
                         document.add_term(prefix + sentence, weight)
+                        # single terms are constructed by XapianSearchQuery._term_query
+                        # and require ^$.
                         document.add_term("^%s$" % sentence, weight)
                         document.add_term(prefix + "^%s$" % sentence, weight)
 
@@ -327,7 +332,7 @@ class XapianSearchBackend(BaseSearchBackend):
                     document.add_posting(prefix + date, termpos, weight)
                     termpos += 1
                     document.add_posting(prefix + time, termpos, weight)
-                    termpos += 1
+                    termpos += 101
                     return termpos
 
                 data = index.full_prepare(obj)
@@ -373,6 +378,8 @@ class XapianSearchBackend(BaseSearchBackend):
                             continue
 
                         term = _to_xapian_term(value)
+                        if term == '':
+                            continue
                         # from here on the term is a string;
                         # we now decide how it is indexed
 
@@ -381,9 +388,8 @@ class XapianSearchBackend(BaseSearchBackend):
                             termpos = add_text(termpos, prefix, term, weight)
                         elif field['type'] == 'datetime':
                             termpos = add_datetime_to_document(termpos, prefix, term, weight)
-                        if term != "":
-                            # other non-sentence terms are added without positional information
-                            add_to_document(prefix, term, weight)
+                        # all terms are added without positional information
+                        add_to_document(prefix, term, weight)
 
                 # store data without indexing it
                 document.set_data(pickle.dumps(
