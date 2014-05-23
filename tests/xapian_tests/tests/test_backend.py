@@ -239,6 +239,35 @@ class BackendIndexationTestCase(HaystackBackendTestCase, TestCase):
 
         self.assertFalse('^this_is_a_word inside a big text$' in terms)
 
+    def test_text_posting(self):
+        """
+        Tests that text is correctly positioned in the document
+        """
+        expected_order = ['this_is_a_word', 'inside', 'a', 'big', 'text']
+
+        def get_positions(term):
+            """
+            Uses delve to get
+            the positions of the term in the first document.
+            """
+            return [int(pos) for pos in get_terms(self.backend, '-r1', '-t%s' % term)]
+
+        # (position of the first term) - 1 must be a position of "^"
+        self.assertTrue(get_positions(expected_order[0])[0] - 1 in
+                        get_positions('^'))
+
+        # (position of the last term) + 1 must be a position of "$"
+        self.assertTrue(get_positions(expected_order[-1])[0] + 1 in
+                        get_positions('$'))
+
+        previous_position = get_positions(expected_order[0])[0]
+        for term in expected_order[1:]:
+            pos = get_positions(term)
+            # only one term for the word
+            self.assertEqual(len(pos), 1)
+            self.assertEqual(pos[0] - 1, previous_position)
+            previous_position += 1
+
     def test_author_field(self):
         terms = get_terms(self.backend, '-a')
 
