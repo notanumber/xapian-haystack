@@ -61,6 +61,9 @@ FIELD_TYPES = {'text', 'integer', 'date', 'datetime', 'float', 'boolean'}
 DATETIME_FORMAT = '%Y%m%d%H%M%S'
 INTEGER_FORMAT = '%012d'
 
+# defines the distance given between
+# texts with positional information
+TERMPOS_DISTANCE = 100
 
 class InvalidIndexError(HaystackError):
     """Raised when an index can not be opened."""
@@ -281,7 +284,7 @@ class XapianSearchBackend(BaseSearchBackend):
 
                 # increase termpos
                 term_generator.set_termpos(termpos)
-                term_generator.increase_termpos()
+                term_generator.increase_termpos(TERMPOS_DISTANCE)
 
                 return term_generator.get_termpos()
 
@@ -332,7 +335,7 @@ class XapianSearchBackend(BaseSearchBackend):
                     document.add_posting(prefix + date, termpos, weight)
                     termpos += 1
                     document.add_posting(prefix + time, termpos, weight)
-                    termpos += 101
+                    termpos += TERMPOS_DISTANCE + 1
                     return termpos
 
                 data = index.full_prepare(obj)
