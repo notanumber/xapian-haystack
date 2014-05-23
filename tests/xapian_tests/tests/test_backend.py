@@ -109,6 +109,7 @@ class XapianSimpleMockIndex(indexes.SearchIndex):
     author = indexes.CharField(model_attr='author')
     url = indexes.CharField()
     non_anscii = indexes.CharField()
+    funny_text = indexes.CharField()
 
     datetime = indexes.DateTimeField(model_attr='pub_date')
     date = indexes.DateField()
@@ -133,6 +134,9 @@ class XapianSimpleMockIndex(indexes.SearchIndex):
 
     def prepare_non_anscii(self, obj):
         return 'thsi sdas das corrup\xe7\xe3o das'
+
+    def prepare_funny_text(self, obj):
+        return 'this-text has funny.words!!'
 
     def prepare_datetime(self, obj):
         return datetime.datetime(2009, 2, 25, 1, 1, 1)
@@ -243,30 +247,27 @@ class BackendIndexationTestCase(HaystackBackendTestCase, TestCase):
         """
         Tests that text is correctly positioned in the document
         """
-        expected_order = ['this_is_a_word', 'inside', 'a', 'big', 'text']
+        expected_order = ['^', 'this_is_a_word', 'inside', 'a', 'big', 'text', '$']
 
         def get_positions(term):
             """
             Uses delve to get
             the positions of the term in the first document.
             """
-            return [int(pos) for pos in get_terms(self.backend, '-r1', '-t%s' % term)]
+            return sorted([int(pos) for pos in get_terms(self.backend, '-r1', '-tXTEXT%s' % term)])
 
-        # (position of the first term) - 1 must be a position of "^"
-        self.assertTrue(get_positions(expected_order[0])[0] - 1 in
-                        get_positions('^'))
-
-        # (position of the last term) + 1 must be a position of "$"
-        self.assertTrue(get_positions(expected_order[-1])[0] + 1 in
-                        get_positions('$'))
-
-        previous_position = get_positions(expected_order[0])[0]
+        # confirms expected_order
+        previous_position = get_positions(expected_order[0])
         for term in expected_order[1:]:
             pos = get_positions(term)
-            # only one term for the word
-            self.assertEqual(len(pos), 1)
-            self.assertEqual(pos[0] - 1, previous_position)
-            previous_position += 1
+            # only two positions per term
+            # (one from term_generator, one from literal text)
+            self.assertEqual(len(pos), 2)
+
+            self.assertEqual(pos[0] - 1, previous_position[0])
+            self.assertEqual(pos[1] - 1, previous_position[1])
+            previous_position[0] += 1
+            previous_position[1] += 1
 
     def test_author_field(self):
         terms = get_terms(self.backend, '-a')
@@ -275,6 +276,10 @@ class BackendIndexationTestCase(HaystackBackendTestCase, TestCase):
         self.assertTrue('ZXAUTHORdavid' in terms)
         self.assertTrue('Zdavid' in terms)
         self.assertTrue('david' in terms)
+
+    def test_funny_text_field(self):
+        terms = get_terms(self.backend, '-r1')
+        self.assertTrue('this-text' in terms)
 
     def test_datetime_field(self):
         terms = get_terms(self.backend, '-a')

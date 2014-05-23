@@ -161,9 +161,11 @@ class XapianSearchQueryTestCase(HaystackBackendTestCase, TestCase):
         self.sq.add_filter(SQ(content='why'))
         self.sq.add_filter(~SQ(title__in=["Dune", "Jaws"]))
         self.assertEqual(str(self.sq.build_query()),
-                         'Xapian::Query(((Zwhi OR why) AND '
-                         '(<alldocuments> AND_NOT (XTITLE^dune$ OR '
-                         'XTITLE^jaws$))))')
+                         'Xapian::Query('
+                         '((Zwhi OR why) AND '
+                         '(<alldocuments> AND_NOT ('
+                         '(XTITLE^ PHRASE 3 XTITLEdune PHRASE 3 XTITLE$) OR '
+                         '(XTITLE^ PHRASE 3 XTITLEjaws PHRASE 3 XTITLE$)))))')
 
     def test_build_query_in_filter_multiple_words(self):
         self.sq.add_filter(SQ(content='why'))
@@ -238,8 +240,11 @@ class XapianSearchQueryTestCase(HaystackBackendTestCase, TestCase):
         self.sq.add_filter(SQ(content='why'))
         self.sq.add_filter(SQ(title__in=MockModel.objects.values_list('id', flat=True)))
         self.assertEqual(str(self.sq.build_query()),
-                         'Xapian::Query(((Zwhi OR why) AND '
-                         '(XTITLE^1$ OR XTITLE^2$ OR XTITLE^3$)))')
+                         'Xapian::Query('
+                         '((Zwhi OR why) AND ('
+                         '(XTITLE^ PHRASE 3 XTITLE1 PHRASE 3 XTITLE$) OR '
+                         '(XTITLE^ PHRASE 3 XTITLE2 PHRASE 3 XTITLE$) OR '
+                         '(XTITLE^ PHRASE 3 XTITLE3 PHRASE 3 XTITLE$))))')
 
 
 class MockSearchIndex(indexes.SearchIndex):

@@ -288,6 +288,21 @@ class XapianSearchBackend(BaseSearchBackend):
 
                 return term_generator.get_termpos()
 
+            def _add_literal_text(termpos, text, weight, prefix=''):
+                """
+                Adds sentence to the document with positional information
+                but without processing.
+
+                The sentence is bounded by "^" "$" to allow exact matches.
+                """
+                text = '^ %s $' % text
+                for word in text.split():
+                    term = '%s%s' % (prefix, word)
+                    document.add_posting(term, termpos, weight)
+                    termpos += 1
+                termpos += TERMPOS_DISTANCE
+                return termpos
+
             def add_text(termpos, prefix, text, weight):
                 """
                 Adds text to the document with positional information
@@ -295,32 +310,24 @@ class XapianSearchBackend(BaseSearchBackend):
                 """
                 termpos = _add_text(termpos, text, weight, prefix=prefix)
                 termpos = _add_text(termpos, text, weight, prefix='')
+                termpos = _add_literal_text(termpos, text, weight, prefix=prefix)
+                termpos = _add_literal_text(termpos, text, weight, prefix='')
                 return termpos
 
             for obj in iterable:
                 document = xapian.Document()
                 term_generator.set_document(document)
 
-                def add_to_document(prefix, sentence, weight):
+                def add_non_text_to_document(prefix, term, weight):
                     """
-                    Adds sentence to the document without positional information
+                    Adds term to the document without positional information
                     and without processing.
 
                     If the term is alone, also adds it as "^<term>$"
                     to allow exact matches on single terms.
                     """
-                    if ' ' in sentence:
-                        # search will use PHRASE, no need to add ^$
-                        for term in sentence.split():
-                            document.add_term(term, weight)
-                            document.add_term(prefix + term, weight)
-                    else:
-                        document.add_term(sentence, weight)
-                        document.add_term(prefix + sentence, weight)
-                        # single terms are constructed by XapianSearchQuery._term_query
-                        # and require ^$.
-                        document.add_term("^%s$" % sentence, weight)
-                        document.add_term(prefix + "^%s$" % sentence, weight)
+                    document.add_term(term, weight)
+                    document.add_term(prefix + term, weight)
 
                 def add_datetime_to_document(termpos, prefix, term, weight):
                     """
@@ -377,7 +384,6 @@ class XapianSearchBackend(BaseSearchBackend):
                                 # add the exact match of each value
                                 term = _to_xapian_term(t)
                                 termpos = add_text(termpos, prefix, term, weight)
-                                add_to_document(prefix, term, weight)
                             continue
 
                         term = _to_xapian_term(value)
@@ -391,8 +397,9 @@ class XapianSearchBackend(BaseSearchBackend):
                             termpos = add_text(termpos, prefix, term, weight)
                         elif field['type'] == 'datetime':
                             termpos = add_datetime_to_document(termpos, prefix, term, weight)
-                        # all terms are added without positional information
-                        add_to_document(prefix, term, weight)
+                        else:
+                            # all other terms are added without positional information
+                            add_non_text_to_document(prefix, term, weight)
 
                 # store data without indexing it
                 document.set_data(pickle.dumps(
@@ -1316,15 +1323,11 @@ class XapianSearchQuery(BaseSearchQuery):
 
         Assumes term is not a list.
         """
-
-        # this is an hack:
-        # the ideal would be to use the same idea as in _filter_contains.
-        # However, it causes tests to fail.
-        if field_type == 'text' and ' ' in term:
+        if field_type == 'text':
             term = '^ %s $' % term
             query = self._phrase_query(term.split(), field_name, field_type)
         else:
-            query = self._term_query(term, field_name, field_type, exact=True, stemmed=False)
+            query = self._term_query(term, field_name, field_type, stemmed=False)
 
         if is_not:
             return xapian.Query(xapian.Query.OP_AND_NOT, self._all_query(), query)
@@ -1349,11 +1352,11 @@ class XapianSearchQuery(BaseSearchQuery):
             return xapian.Query(xapian.Query.OP_AND_NOT, self._all_query(), query)
         return query
 
-    def _or_query(self, term_list, field, field_type, exact=False):
+    def _or_query(self, term_list, field, field_type):
         """
         Joins each item of term_list decorated by _term_query with an OR.
         """
-        term_list = [self._term_query(term, field, field_type, exact) for term in term_list]
+        term_list = [self._term_query(term, field, field_type) for term in term_list]
         return xapian.Query(xapian.Query.OP_OR, term_list)
 
     def _phrase_query(self, term_list, field_name, field_type):
@@ -1370,22 +1373,14 @@ class XapianSearchQuery(BaseSearchQuery):
         query = xapian.Query(xapian.Query.OP_PHRASE, term_list)
         return query
 
-    def _term_query(self, term, field_name, field_type, exact=False, stemmed=True):
+    def _term_query(self, term, field_name, field_type, stemmed=True):
         """
         Constructs a query of a single term.
 
         If `field_name` is not `None`, the term is search on that field only.
         If exact is `True`, the search is restricted to boolean matches.
         """
-        # using stemmed terms in exact query is not acceptable.
-        if stemmed:
-            assert not exact
-
         constructor = '{prefix}{term}'
-        # "" is to do a boolean match, but only works on indexed terms
-        # (constraint on Xapian side)
-        if exact and field_type == 'text':
-            constructor = '{prefix}^{term}$'
 
         # construct the prefix to be used.
         prefix = ''
