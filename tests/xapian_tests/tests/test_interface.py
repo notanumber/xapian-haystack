@@ -135,8 +135,8 @@ class InterfaceTestCase(TestCase):
 
     def test_field_startswith(self):
         self.assertEqual(len(self.queryset.filter(name__startswith='magaz')), 4)
-        self.assertEqual(set(pks(self.queryset.filter(text__startswith='This is'))),
-                         set(pks(Document.objects.filter(text__startswith='This is'))))
+        self.assertEqual(set(pks(self.queryset.filter(summary__startswith='This is a huge'))),
+                         set(pks(Document.objects.filter(summary__startswith='This is a huge'))))
 
     def test_auto_query(self):
         # todo: improve to query text only.

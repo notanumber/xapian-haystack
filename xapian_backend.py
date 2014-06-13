@@ -14,7 +14,7 @@ from django.utils.encoding import force_text
 
 from haystack import connections
 from haystack.backends import BaseEngine, BaseSearchBackend, BaseSearchQuery, SearchNode, log_query
-from haystack.constants import ID, DJANGO_ID, DJANGO_CT
+from haystack.constants import ID, DJANGO_ID, DJANGO_CT, DEFAULT_OPERATOR
 from haystack.exceptions import HaystackError, MissingDependency
 from haystack.inputs import AutoQuery
 from haystack.models import SearchResult
@@ -48,6 +48,13 @@ DEFAULT_XAPIAN_FLAGS = (
     xapian.QueryParser.FLAG_WILDCARD |
     xapian.QueryParser.FLAG_PURE_NOT
 )
+
+# Mapping from `HAYSTACK_DEFAULT_OPERATOR` to Xapian operators
+XAPIAN_OPTS = {'AND': xapian.Query.OP_AND,
+               'OR': xapian.Query.OP_OR,
+               'PHRASE': xapian.Query.OP_PHRASE,
+               'NEAR': xapian.Query.OP_NEAR
+               }
 
 # number of documents checked by default when building facets
 # this must be improved to be relative to the total number of docs.
@@ -750,6 +757,7 @@ class XapianSearchBackend(BaseSearchBackend):
         qp.set_database(self._database())
         qp.set_stemmer(xapian.Stem(self.language))
         qp.set_stemming_strategy(xapian.QueryParser.STEM_SOME)
+        qp.set_default_op(XAPIAN_OPTS[DEFAULT_OPERATOR])
         qp.add_boolean_prefix('django_ct', TERM_PREFIXES['django_ct'])
 
         for field_dict in self.schema:
@@ -1340,13 +1348,16 @@ class XapianSearchQuery(BaseSearchQuery):
 
         Assumes term is not a list.
         """
-        # TODO: if field_type is of type integer, we need to marsh the value.
-        if field_name:
-            query_string = '%s:%s*' % (field_name, term)
+        if field_type == 'text':
+            if len(term.split()) == 1:
+                term = '^ %s*' % term
+                query = self.backend.parse_query(term)
+            else:
+                term = '^ %s' % term
+                query = self._phrase_query(term.split(), field_name, field_type)
         else:
-            query_string = '%s*' % term
-
-        query = self.backend.parse_query(query_string)
+            term = '^%s*' % term
+            query = self.backend.parse_query(term)
 
         if is_not:
             return xapian.Query(xapian.Query.OP_AND_NOT, self._all_query(), query)
