@@ -14,8 +14,8 @@ from haystack import indexes
 from haystack.backends.xapian_backend import InvalidIndexError, _term_to_xapian_value
 from haystack.utils.loading import UnifiedIndex
 
-from core.models import MockTag, MockModel, AnotherMockModel
-from core.tests.mocks import MockSearchResult
+from test_haystack.core.models import MockTag, MockModel, AnotherMockModel
+from test_haystack.mocks import MockSearchResult
 
 
 def get_terms(backend, *args):
