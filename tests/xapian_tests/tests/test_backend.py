@@ -413,7 +413,19 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
 
         self.backend.clear([AnotherMockModel, XapianMockModel])
         self.assertEqual(self.backend.document_count(), 0)
+    
+    def test_ngram_search(self):
+        """Tests ngram search with different parts of words"""
+        # Minimun length of query string must be equal to NGRAM_MIN_LENGTH.
+        self.assertEqual(pks(self.backend.search(xapian.Query('da'))['results']),
+                         [1, 2, 3])
 
+        self.assertEqual(pks(self.backend.search(xapian.Query('avi'))['results']),
+                         [1, 2, 3])
+
+        self.assertEqual(pks(self.backend.search(xapian.Query('vid1'))['results']),
+                         [1])
+        
     def test_search(self):
         # no match query
         self.assertEqual(self.backend.search(xapian.Query()), {'hits': 0, 'results': []})
