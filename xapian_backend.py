@@ -22,7 +22,6 @@ from haystack.utils import get_identifier, get_model_ct
 
 
 PY2 = sys.version_info[0] == 2
-PY3 = sys.version_info[0] == 3
 NGRAM_MIN_LENGTH = 2
 NGRAM_MAX_LENGTH = 15
 
@@ -334,8 +333,9 @@ class XapianSearchBackend(BaseSearchBackend):
 
                 def add_edge_ngram_to_document(prefix, value, weight):
                     """
-                    Adds several terms to the document without positional information.
-                    The terms has entries, which match with value.
+                    Adds several terms to the Xapian document without
+                    positional information. The terms has entries, which
+                    match with value.
                     """
                     if PY2: range = xrange
 
