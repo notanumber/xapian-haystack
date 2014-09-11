@@ -18,5 +18,4 @@ before_script:
 # command to run tests
 script:
   - cd django-haystack/test_haystack/
-  - export PYTHONPATH=`pwd`/..:`pwd`
-  - django-admin.py test xapian_tests --settings=xapian_settings
+  - PYTHONPATH=`pwd`/..:`pwd` django-admin.py test xapian_tests --settings=xapian_settings
