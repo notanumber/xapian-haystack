@@ -61,7 +61,7 @@ XAPIAN_OPTS = {'AND': xapian.Query.OP_AND,
 DEFAULT_CHECK_AT_LEAST = 1000
 
 # field types accepted to be serialized as values in Xapian
-FIELD_TYPES = {'text', 'integer', 'date', 'datetime', 'float', 'boolean'}
+FIELD_TYPES = ('text', 'integer', 'date', 'datetime', 'float', 'boolean')
 
 # defines the format used to store types in Xapian
 # this format ensures datetimes are sorted correctly
