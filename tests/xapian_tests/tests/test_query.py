@@ -11,7 +11,7 @@ from haystack.models import SearchResult
 from haystack.query import SearchQuerySet, SQ
 
 from core.models import MockModel, AnotherMockModel, AFourthMockModel
-from core.tests.mocks import MockSearchResult
+from mocks import MockSearchResult
 from xapian_tests.tests.test_backend import HaystackBackendTestCase
 
 
