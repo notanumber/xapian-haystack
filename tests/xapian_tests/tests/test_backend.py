@@ -121,7 +121,7 @@ class XapianSimpleMockIndex(indexes.SearchIndex):
     multi_value = indexes.MultiValueField()
 
     def get_model(self):
-        return MockModel
+        return XapianMockModel
 
     def prepare_text(self, obj):
         return 'this_is_a_word inside a big text'
@@ -155,6 +155,22 @@ class XapianSimpleMockIndex(indexes.SearchIndex):
 
     def prepare_multi_value(self, obj):
         return ['tag', 'tag-tag', 'tag-tag-tag']
+
+
+class XapianNGramIndex(indexes.SearchIndex):
+    text = indexes.CharField(model_attr='author', document=True)
+    ngram = indexes.NgramField(model_attr='author')
+
+    def get_model(self):
+        return XapianMockModel
+
+
+class XapianEdgeNGramIndex(indexes.SearchIndex):
+    text = indexes.CharField(model_attr='author', document=True)
+    edge_ngram = indexes.EdgeNgramField(model_attr='author')
+
+    def get_model(self):
+        return XapianMockModel
 
 
 class HaystackBackendTestCase(object):
@@ -199,6 +215,7 @@ class BackendIndexationTestCase(HaystackBackendTestCase, TestCase):
         super(BackendIndexationTestCase, self).setUp()
         mock = XapianMockModel()
         mock.id = 1
+        mock.author = u'david'
         self.backend.update(self.index, [mock])
 
     def test_app_is_not_split(self):
@@ -419,8 +436,7 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
 
         # Other `result_class`
         self.assertTrue(isinstance(self.backend.search(xapian.Query('indexed'),
-                                                       result_class=MockSearchResult)['results'][0],
-                                   MockSearchResult))
+                                                       result_class=MockSearchResult)['results'][0], MockSearchResult))
 
     def test_search_field_with_punctuation(self):
         self.assertEqual(pks(self.backend.search(xapian.Query('http://example.com/1/'))['results']),
@@ -703,3 +719,95 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
 
         self.backend.silently_fail = False
         self.assertRaises(InvalidIndexError, self.backend.more_like_this, mock)
+
+
+class IndexationNGramTestCase(HaystackBackendTestCase, TestCase):
+    def get_index(self):
+        return XapianNGramIndex()
+
+    def setUp(self):
+        super(IndexationNGramTestCase, self).setUp()
+        mock = XapianMockModel()
+        mock.id = 1
+        mock.author = u'david'
+
+        mock1 = XapianMockModel()
+        mock1.id = 2
+        mock1.author = u'da1id'
+
+        self.backend.update(self.index, [mock, mock1])
+
+    def test_field(self):
+        terms = get_terms(self.backend, '-a')
+
+        self.assertTrue('da' in terms)
+        self.assertTrue('XNGRAMda' in terms)
+        self.assertTrue('dav' in terms)
+        self.assertTrue('XNGRAMdav' in terms)
+        self.assertTrue('davi' in terms)
+        self.assertTrue('XNGRAMdavi' in terms)
+        self.assertTrue('david' in terms)
+        self.assertTrue('XNGRAMdavid' in terms)
+
+        self.assertTrue('vid' in terms)
+        self.assertTrue('XNGRAMvid' in terms)
+        self.assertTrue('id' in terms)
+        self.assertTrue('XNGRAMid' in terms)
+        self.assertTrue('av' in terms)
+        self.assertTrue('XNGRAMav' in terms)
+
+    def test_search(self):
+        """Tests edge ngram search with different parts of words"""
+        # Minimun length of query string must be equal to EDGE_NGRAM_MIN_LENGTH.
+        self.assertEqual(pks(self.backend.search(xapian.Query('da'))['results']),
+                [1, 2])
+        self.assertEqual(pks(self.backend.search(xapian.Query('dav'))['results']),
+                [1])
+        self.assertEqual(pks(self.backend.search(xapian.Query('da1'))['results']),
+                [2])
+
+
+class IndexationEdgeNGramTestCase(HaystackBackendTestCase, TestCase):
+    def get_index(self):
+        return XapianEdgeNGramIndex()
+
+    def setUp(self):
+        super(IndexationEdgeNGramTestCase, self).setUp()
+        mock = XapianMockModel()
+        mock.id = 1
+        mock.author = u'david'
+
+        mock1 = XapianMockModel()
+        mock1.id = 2
+        mock1.author = u'da1id'
+
+        self.backend.update(self.index, [mock, mock1])
+
+    def test_field(self):
+        terms = get_terms(self.backend, '-a')
+
+        self.assertTrue('da' in terms)
+        self.assertTrue('XEDGE_NGRAMda' in terms)
+        self.assertTrue('dav' in terms)
+        self.assertTrue('XEDGE_NGRAMdav' in terms)
+        self.assertTrue('davi' in terms)
+        self.assertTrue('XEDGE_NGRAMdavi' in terms)
+        self.assertTrue('david' in terms)
+        self.assertTrue('XEDGE_NGRAMdavid' in terms)
+
+        self.assertTrue('vid' not in terms)
+        self.assertTrue('XEDGE_NGRAMvid' not in terms)
+        self.assertTrue('id' not in terms)
+        self.assertTrue('XEDGE_NGRAMid' not in terms)
+        self.assertTrue('av' not in terms)
+        self.assertTrue('XEDGE_NGRAMav' not in terms)
+
+    def test_search(self):
+        """Tests edge ngram search with different parts of words"""
+        # Minimun length of query string must be equal to NGRAM_MIN_LENGTH.
+        self.assertEqual(pks(self.backend.search(xapian.Query('da'))['results']),
+                [1, 2])
+        self.assertEqual(pks(self.backend.search(xapian.Query('dav'))['results']),
+                [1])
+        self.assertEqual(pks(self.backend.search(xapian.Query('da1'))['results']),
+                [2])

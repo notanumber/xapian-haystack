@@ -22,7 +22,7 @@ Xapian-Haystack provides all the standard features of Haystack:
 - Faceted search (date, query, etc.)
 - Sorting
 - Spelling suggestions
-
+- EdgeNGram and Ngram (for autocomplete)
 
 Requirements
 ------------
@@ -113,6 +113,7 @@ Credits
 Xapian-Haystack is maintained by Jorge C. Leitão;
 `David Sauve <mailto:david.sauve@bag-of-holding.com>`_ was the main contributor of Xapian-Haystack and
 Xapian-Haystack was originally funded by `Trapeze <http://www.trapeze.com>`_.
+`ANtlord <https://github.com/ANtlord>`_ implemented support for EdgeNgram and Ngram.
 
 
 License
