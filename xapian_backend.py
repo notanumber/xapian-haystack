@@ -8,6 +8,7 @@ import re
 import shutil
 import sys
 
+from django.utils import six
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.utils.encoding import force_text
@@ -19,6 +20,9 @@ from haystack.exceptions import HaystackError, MissingDependency
 from haystack.inputs import AutoQuery
 from haystack.models import SearchResult
 from haystack.utils import get_identifier, get_model_ct
+
+NGRAM_MIN_LENGTH = 2
+NGRAM_MAX_LENGTH = 15
 
 try:
     import xapian
@@ -61,7 +65,8 @@ XAPIAN_OPTS = {'AND': xapian.Query.OP_AND,
 DEFAULT_CHECK_AT_LEAST = 1000
 
 # field types accepted to be serialized as values in Xapian
-FIELD_TYPES = {'text', 'integer', 'date', 'datetime', 'float', 'boolean'}
+FIELD_TYPES = {'text', 'integer', 'date', 'datetime', 'float', 'boolean',
+    'edge_ngram', 'ngram'}
 
 # defines the format used to store types in Xapian
 # this format ensures datetimes are sorted correctly
@@ -321,9 +326,49 @@ class XapianSearchBackend(BaseSearchBackend):
                 termpos = _add_literal_text(termpos, text, weight, prefix='')
                 return termpos
 
+            def _get_ngram_lengths(value):
+                values = value.split()
+                for item in values:
+                    for ngram_length in six.moves.range(NGRAM_MIN_LENGTH, NGRAM_MAX_LENGTH + 1):
+                        yield item, ngram_length
+
             for obj in iterable:
                 document = xapian.Document()
                 term_generator.set_document(document)
+
+                def ngram_terms(value):
+                    for item, length in _get_ngram_lengths(value):
+                        item_length = len(item)
+                        for start in six.moves.range(0, item_length - length + 1):
+                            for size in six.moves.range(length, length + 1):
+                                end = start + size
+                                if end > item_length:
+                                    continue
+                                yield _to_xapian_term(item[start:end])
+
+                def edge_ngram_terms(value):
+                    for item, length in _get_ngram_lengths(value):
+                        yield _to_xapian_term(item[0:length])
+
+                def add_edge_ngram_to_document(prefix, value, weight):
+                    """
+                    Splits the term in ngrams and adds each ngram to the index.
+                    The minimum and maximum size of the ngram is respectively
+                    NGRAM_MIN_LENGTH and NGRAM_MAX_LENGTH.
+                    """
+                    for term in edge_ngram_terms(value):
+                        document.add_term(term, weight)
+                        document.add_term(prefix + term, weight)
+
+                def add_ngram_to_document(prefix, value, weight):
+                    """
+                    Splits the term in ngrams and adds each ngram to the index.
+                    The minimum and maximum size of the ngram is respectively
+                    NGRAM_MIN_LENGTH and NGRAM_MAX_LENGTH.
+                    """
+                    for term in ngram_terms(value):
+                        document.add_term(term, weight)
+                        document.add_term(prefix + term, weight)
 
                 def add_non_text_to_document(prefix, term, weight):
                     """
@@ -404,6 +449,10 @@ class XapianSearchBackend(BaseSearchBackend):
                             termpos = add_text(termpos, prefix, term, weight)
                         elif field['type'] == 'datetime':
                             termpos = add_datetime_to_document(termpos, prefix, term, weight)
+                        elif field['type'] == 'ngram':
+                            add_ngram_to_document(prefix, value, weight)
+                        elif field['type'] == 'edge_ngram':
+                            add_edge_ngram_to_document(prefix, value, weight)
                         else:
                             # all other terms are added without positional information
                             add_non_text_to_document(prefix, term, weight)
@@ -834,6 +883,10 @@ class XapianSearchBackend(BaseSearchBackend):
                     field_data['type'] = 'float'
                 elif field_class.field_type == 'boolean':
                     field_data['type'] = 'boolean'
+                elif field_class.field_type == 'ngram':
+                    field_data['type'] = 'ngram'
+                elif field_class.field_type == 'edge_ngram':
+                    field_data['type'] = 'edge_ngram'
 
                 if field_class.is_multivalued:
                     field_data['multi_valued'] = 'true'
