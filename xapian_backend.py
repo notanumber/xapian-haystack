@@ -20,6 +20,12 @@ from haystack.inputs import AutoQuery
 from haystack.models import SearchResult
 from haystack.utils import get_identifier, get_model_ct
 
+
+PY2 = sys.version_info[0] == 2
+PY3 = sys.version_info[0] == 3
+NGRAM_MIN_LENGTH = 2
+NGRAM_MAX_LENGTH = 15
+
 try:
     import xapian
 except ImportError:
@@ -61,7 +67,8 @@ XAPIAN_OPTS = {'AND': xapian.Query.OP_AND,
 DEFAULT_CHECK_AT_LEAST = 1000
 
 # field types accepted to be serialized as values in Xapian
-FIELD_TYPES = {'text', 'integer', 'date', 'datetime', 'float', 'boolean'}
+FIELD_TYPES = {'text', 'integer', 'date', 'datetime', 'float', 'boolean',
+    'edge_ngram', 'ngram'}
 
 # defines the format used to store types in Xapian
 # this format ensures datetimes are sorted correctly
@@ -325,6 +332,27 @@ class XapianSearchBackend(BaseSearchBackend):
                 document = xapian.Document()
                 term_generator.set_document(document)
 
+                def add_edge_ngram_to_document(prefix, value, weight):
+                    """
+                    Adds several terms to the document without positional information.
+                    The terms has entries, which match with value.
+                    """
+                    if PY2: range = xrange
+
+                    values = value.split()
+                    for item in values:
+                        item_length = len(item)
+                        for ngram_length in range(NGRAM_MIN_LENGTH, NGRAM_MAX_LENGTH + 1):
+                            for start in range(0, item_length - ngram_length + 1):
+                                for size in range(ngram_length, ngram_length + 1):
+                                    end = start + size
+                                    if end > item_length:
+                                        continue
+                                    term = _to_xapian_term(item[start:end])
+                                    document.add_term(term, weight)
+                                    document.add_term(prefix + term, weight)
+
+
                 def add_non_text_to_document(prefix, term, weight):
                     """
                     Adds term to the document without positional information
@@ -385,7 +413,8 @@ class XapianSearchBackend(BaseSearchBackend):
                         # if not multi_valued, we add as a document value
                         # for sorting and facets
                         if field['multi_valued'] == 'false':
-                            document.add_value(field['column'], _term_to_xapian_value(value, field['type']))
+                            document.add_value(field['column'],
+                                    _term_to_xapian_value(value, field['type']))
                         else:
                             for t in value:
                                 # add the exact match of each value
@@ -404,6 +433,10 @@ class XapianSearchBackend(BaseSearchBackend):
                             termpos = add_text(termpos, prefix, term, weight)
                         elif field['type'] == 'datetime':
                             termpos = add_datetime_to_document(termpos, prefix, term, weight)
+                        elif field['type'] == 'ngram':
+                            pass
+                        elif field['type'] == 'edge_ngram':
+                            add_edge_ngram_to_document(prefix, value, weight)
                         else:
                             # all other terms are added without positional information
                             add_non_text_to_document(prefix, term, weight)
@@ -834,6 +867,10 @@ class XapianSearchBackend(BaseSearchBackend):
                     field_data['type'] = 'float'
                 elif field_class.field_type == 'boolean':
                     field_data['type'] = 'boolean'
+                elif field_class.field_type == 'ngram':
+                    field_data['type'] = 'ngram'
+                elif field_class.field_type == 'edge_ngram':
+                    field_data['type'] = 'edge_ngram'
 
                 if field_class.is_multivalued:
                     field_data['multi_valued'] = 'true'
