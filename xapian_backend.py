@@ -7,6 +7,7 @@ import os
 import re
 import shutil
 import sys
+import six
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
@@ -20,8 +21,6 @@ from haystack.inputs import AutoQuery
 from haystack.models import SearchResult
 from haystack.utils import get_identifier, get_model_ct
 
-
-PY2 = sys.version_info[0] == 2
 EDGE_NGRAM_MIN_LENGTH = 2
 EDGE_NGRAM_MAX_LENGTH = 15
 
@@ -67,7 +66,7 @@ DEFAULT_CHECK_AT_LEAST = 1000
 
 # field types accepted to be serialized as values in Xapian
 FIELD_TYPES = {'text', 'integer', 'date', 'datetime', 'float', 'boolean',
-    'edge_ngram', 'ngram'}
+    'edge_ngram'}
 
 # defines the format used to store types in Xapian
 # this format ensures datetimes are sorted correctly
@@ -333,18 +332,17 @@ class XapianSearchBackend(BaseSearchBackend):
 
                 def add_edge_ngram_to_document(prefix, value, weight):
                     """
-                    Adds several terms to the Xapian document without
-                    positional information. The terms has entries, which
-                    match with value.
+                    Splits the term in ngrams and adds each ngram to the index.
+                    The minimum and maximum size of the ngram is respectively
+                    NGRAM_MIN_LENGTH and NGRAM_MAX_LENGTH.
                     """
-                    if PY2: range = xrange
 
                     values = value.split()
                     for item in values:
                         item_length = len(item)
-                        for edge_ngram_length in range(EDGE_NGRAM_MIN_LENGTH, EDGE_NGRAM_MAX_LENGTH + 1):
-                            for start in range(0, item_length - edge_ngram_length + 1):
-                                for size in range(edge_ngram_length, edge_ngram_length + 1):
+                        for edge_ngram_length in six.moves.range(EDGE_NGRAM_MIN_LENGTH, EDGE_NGRAM_MAX_LENGTH + 1):
+                            for start in six.moves.range(0, item_length - edge_ngram_length + 1):
+                                for size in six.moves.range(edge_ngram_length, edge_ngram_length + 1):
                                     end = start + size
                                     if end > item_length:
                                         continue
@@ -413,8 +411,7 @@ class XapianSearchBackend(BaseSearchBackend):
                         # if not multi_valued, we add as a document value
                         # for sorting and facets
                         if field['multi_valued'] == 'false':
-                            document.add_value(field['column'],
-                                    _term_to_xapian_value(value, field['type']))
+                            document.add_value(field['column'], _term_to_xapian_value(value, field['type']))
                         else:
                             for t in value:
                                 # add the exact match of each value
@@ -433,8 +430,7 @@ class XapianSearchBackend(BaseSearchBackend):
                             termpos = add_text(termpos, prefix, term, weight)
                         elif field['type'] == 'datetime':
                             termpos = add_datetime_to_document(termpos, prefix, term, weight)
-                        elif field['type'] == 'ngram':
-                            pass
+                        #elif field['type'] == 'ngram': pass
                         elif field['type'] == 'edge_ngram':
                             add_edge_ngram_to_document(prefix, value, weight)
                         else:

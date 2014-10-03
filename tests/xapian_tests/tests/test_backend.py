@@ -66,15 +66,15 @@ class XapianMockSearchIndex(indexes.SearchIndex):
     url = indexes.CharField(model_attr='url')
     empty = indexes.CharField()
 
-    # For edge ngram field. End target of the field is autocompletion.
-    # It is working like operator "LIKE" in SQL.
-    content_auto = indexes.EdgeNgramField(model_attr='author')
-
     # Various MultiValueFields
     sites = indexes.MultiValueField()
     tags = indexes.MultiValueField()
     keys = indexes.MultiValueField()
     titles = indexes.MultiValueField()
+
+    # For edge ngram field. End target of the field is autocompletion.
+    # It is working like operator "LIKE" in SQL.
+    content_auto = indexes.EdgeNgramField(model_attr='author')
 
     def get_model(self):
         return XapianMockModel
@@ -344,6 +344,9 @@ class BackendIndexationTestCase(HaystackBackendTestCase, TestCase):
         terms = get_terms(self.backend, '-a')
         self.assertIn('corrup\xe7\xe3o', terms)
 
+    def test_edge_ngram_field(self):
+        terms = get_terms(self.backend, '-a')
+        import pdb; pdb.set_trace()
 
 class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
     """
@@ -434,9 +437,8 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
                          [1, 2, 3])
 
         # Other `result_class`
-        res = self.backend.search(xapian.Query('indexed'),
-                result_class=MockSearchResult)['results'][0], MockSearchResult
-        self.assertTrue(isinstance(res))
+        self.assertTrue(isinstance(self.backend.search(xapian.Query('indexed'),
+            result_class=MockSearchResult)['results'][0], MockSearchResult))
 
     def test_search_field_with_punctuation(self):
         self.assertEqual(pks(self.backend.search(xapian.Query('http://example.com/1/'))['results']),
