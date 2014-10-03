@@ -22,8 +22,8 @@ from haystack.utils import get_identifier, get_model_ct
 
 
 PY2 = sys.version_info[0] == 2
-NGRAM_MIN_LENGTH = 2
-NGRAM_MAX_LENGTH = 15
+EDGE_NGRAM_MIN_LENGTH = 2
+EDGE_NGRAM_MAX_LENGTH = 15
 
 try:
     import xapian
@@ -342,9 +342,9 @@ class XapianSearchBackend(BaseSearchBackend):
                     values = value.split()
                     for item in values:
                         item_length = len(item)
-                        for ngram_length in range(NGRAM_MIN_LENGTH, NGRAM_MAX_LENGTH + 1):
-                            for start in range(0, item_length - ngram_length + 1):
-                                for size in range(ngram_length, ngram_length + 1):
+                        for edge_ngram_length in range(EDGE_NGRAM_MIN_LENGTH, EDGE_NGRAM_MAX_LENGTH + 1):
+                            for start in range(0, item_length - edge_ngram_length + 1):
+                                for size in range(edge_ngram_length, edge_ngram_length + 1):
                                     end = start + size
                                     if end > item_length:
                                         continue

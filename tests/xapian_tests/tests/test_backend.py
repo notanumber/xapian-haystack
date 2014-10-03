@@ -14,8 +14,8 @@ from haystack import indexes
 from haystack.backends.xapian_backend import InvalidIndexError, _term_to_xapian_value
 from haystack.utils.loading import UnifiedIndex
 
-from test_haystack.core.models import MockTag, MockModel, AnotherMockModel
-from test_haystack.mocks import MockSearchResult
+from core.models import MockTag, MockModel, AnotherMockModel
+from mocks import MockSearchResult
 
 
 def get_terms(backend, *args):
@@ -66,7 +66,7 @@ class XapianMockSearchIndex(indexes.SearchIndex):
     url = indexes.CharField(model_attr='url')
     empty = indexes.CharField()
 
-    # For ngram field. End target of the field is autocompletion.
+    # For edge ngram field. End target of the field is autocompletion.
     # It is working like operator "LIKE" in SQL.
     content_auto = indexes.EdgeNgramField(model_attr='author')
 
@@ -414,9 +414,9 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
         self.backend.clear([AnotherMockModel, XapianMockModel])
         self.assertEqual(self.backend.document_count(), 0)
     
-    def test_ngram_search(self):
-        """Tests ngram search with different parts of words"""
-        # Minimun length of query string must be equal to NGRAM_MIN_LENGTH.
+    def test_edge_ngram_search(self):
+        """Tests edge ngram search with different parts of words"""
+        # Minimun length of query string must be equal to EDGE_NGRAM_MIN_LENGTH.
         self.assertEqual(pks(self.backend.search(xapian.Query('da'))['results']),
                          [1, 2, 3])
 
