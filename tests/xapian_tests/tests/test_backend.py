@@ -124,8 +124,12 @@ class XapianSimpleMockIndex(indexes.SearchIndex):
 
     multi_value = indexes.MultiValueField()
 
+    # For edge ngram field. End target of the field is autocompletion.
+    # It is working like operator "LIKE" in SQL.
+    content_auto = indexes.EdgeNgramField(model_attr='author')
+
     def get_model(self):
-        return MockModel
+        return XapianMockModel
 
     def prepare_text(self, obj):
         return 'this_is_a_word inside a big text'
@@ -203,6 +207,7 @@ class BackendIndexationTestCase(HaystackBackendTestCase, TestCase):
         super(BackendIndexationTestCase, self).setUp()
         mock = XapianMockModel()
         mock.id = 1
+        mock.author = u'david'
         self.backend.update(self.index, [mock])
 
     def test_app_is_not_split(self):
@@ -346,7 +351,10 @@ class BackendIndexationTestCase(HaystackBackendTestCase, TestCase):
 
     def test_edge_ngram_field(self):
         terms = get_terms(self.backend, '-a')
-        import pdb; pdb.set_trace()
+        self.assertTrue('da' in terms)
+        self.assertTrue('dav' in terms)
+        self.assertTrue('davi' in terms)
+        self.assertTrue('david' in terms)
 
 class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
     """
