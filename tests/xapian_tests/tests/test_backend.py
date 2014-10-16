@@ -635,25 +635,26 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
         (content_field_name, fields) = self.backend.build_schema(search_fields)
 
         self.assertEqual(content_field_name, 'text')
-        self.assertEqual(len(fields), 14 + 3)
+        self.assertEqual(len(fields), 14 + 3 + 1)
         self.assertEqual(fields, [
             {'column': 0, 'type': 'text', 'field_name': 'id', 'multi_valued': 'false'},
             {'column': 1, 'type': 'integer', 'field_name': 'django_id', 'multi_valued': 'false'},
             {'column': 2, 'type': 'text', 'field_name': 'django_ct', 'multi_valued': 'false'},
-            {'column': 3, 'type': 'text', 'field_name': 'empty', 'multi_valued': 'false'},
-            {'column': 4, 'type': 'date', 'field_name': 'exp_date', 'multi_valued': 'false'},
-            {'column': 5, 'type': 'boolean', 'field_name': 'flag', 'multi_valued': 'false'},
-            {'column': 6, 'type': 'text', 'field_name': 'keys', 'multi_valued': 'true'},
-            {'column': 7, 'type': 'text', 'field_name': 'name', 'multi_valued': 'false'},
-            {'column': 8, 'type': 'text', 'field_name': 'name_exact', 'multi_valued': 'false'},
-            {'column': 9, 'type': 'float', 'field_name': 'popularity', 'multi_valued': 'false'},
-            {'column': 10, 'type': 'date', 'field_name': 'pub_date', 'multi_valued': 'false'},
-            {'column': 11, 'type': 'text', 'field_name': 'sites', 'multi_valued': 'true'},
-            {'column': 12, 'type': 'text', 'field_name': 'tags', 'multi_valued': 'true'},
-            {'column': 13, 'type': 'text', 'field_name': 'text', 'multi_valued': 'false'},
-            {'column': 14, 'type': 'text', 'field_name': 'titles', 'multi_valued': 'true'},
-            {'column': 15, 'type': 'text', 'field_name': 'url', 'multi_valued': 'false'},
-            {'column': 16, 'type': 'integer', 'field_name': 'value', 'multi_valued': 'false'}
+            {'column': 3, 'type': 'edge_ngram', 'field_name': 'content_auto', 'multi_valued': 'false'},
+            {'column': 4, 'type': 'text', 'field_name': 'empty', 'multi_valued': 'false'},
+            {'column': 5, 'type': 'date', 'field_name': 'exp_date', 'multi_valued': 'false'},
+            {'column': 6, 'type': 'boolean', 'field_name': 'flag', 'multi_valued': 'false'},
+            {'column': 7, 'type': 'text', 'field_name': 'keys', 'multi_valued': 'true'},
+            {'column': 8, 'type': 'text', 'field_name': 'name', 'multi_valued': 'false'},
+            {'column': 9, 'type': 'text', 'field_name': 'name_exact', 'multi_valued': 'false'},
+            {'column': 10, 'type': 'float', 'field_name': 'popularity', 'multi_valued': 'false'},
+            {'column': 11, 'type': 'date', 'field_name': 'pub_date', 'multi_valued': 'false'},
+            {'column': 12, 'type': 'text', 'field_name': 'sites', 'multi_valued': 'true'},
+            {'column': 13, 'type': 'text', 'field_name': 'tags', 'multi_valued': 'true'},
+            {'column': 14, 'type': 'text', 'field_name': 'text', 'multi_valued': 'false'},
+            {'column': 15, 'type': 'text', 'field_name': 'titles', 'multi_valued': 'true'},
+            {'column': 16, 'type': 'text', 'field_name': 'url', 'multi_valued': 'false'},
+            {'column': 17, 'type': 'integer', 'field_name': 'value', 'multi_valued': 'false'},
         ])
 
     def test_parse_query(self):
@@ -676,15 +677,15 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
                              'XNAMEdavid3:(pos=1)))')
 
         self.assertEqual(str(self.backend.parse_query('name:david1..david2')),
-                         'Xapian::Query(VALUE_RANGE 7 david1 david2)')
+                         'Xapian::Query(VALUE_RANGE 8 david1 david2)')
         self.assertEqual(str(self.backend.parse_query('value:0..10')),
-                         'Xapian::Query(VALUE_RANGE 16 000000000000 000000000010)')
+                         'Xapian::Query(VALUE_RANGE 17 000000000000 000000000010)')
         self.assertEqual(str(self.backend.parse_query('value:..10')),
-                         'Xapian::Query(VALUE_RANGE 16 %012d 000000000010)' % (-sys.maxsize - 1))
+                         'Xapian::Query(VALUE_RANGE 17 %012d 000000000010)' % (-sys.maxsize - 1))
         self.assertEqual(str(self.backend.parse_query('value:10..*')),
-                         'Xapian::Query(VALUE_RANGE 16 000000000010 %012d)' % sys.maxsize)
+                         'Xapian::Query(VALUE_RANGE 17 000000000010 %012d)' % sys.maxsize)
         self.assertEqual(str(self.backend.parse_query('popularity:25.5..100.0')),
-                         b'Xapian::Query(VALUE_RANGE 9 \xb2` \xba@)')
+                         b'Xapian::Query(VALUE_RANGE 10 \xb2` \xba@)')
 
     def test_order_by_django_id(self):
         """
