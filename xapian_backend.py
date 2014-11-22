@@ -330,7 +330,7 @@ class XapianSearchBackend(BaseSearchBackend):
                 document = xapian.Document()
                 term_generator.set_document(document)
 
-                def value_splitter(value):
+                def edge_ngram_terms(value):
                     values = value.split()
                     n = len(values)
                     for item in values:
@@ -341,13 +341,7 @@ class XapianSearchBackend(BaseSearchBackend):
                                     end = start + size
                                     if end > item_length:
                                         continue
-                                    term = _to_xapian_term(item[start:end])
-                                    document.add_term(term, weight)
-                                    document.add_term(prefix + term, weight)
-
-                        yield n
-
-
+                                    yield _to_xapian_term(item[start:end])
 
                 def add_edge_ngram_to_document(prefix, value, weight):
                     """
@@ -355,8 +349,9 @@ class XapianSearchBackend(BaseSearchBackend):
                     The minimum and maximum size of the ngram is respectively
                     NGRAM_MIN_LENGTH and NGRAM_MAX_LENGTH.
                     """
-
-                    for item in value_splitter(value): pass
+                    for term in edge_ngram_terms(value):
+                        document.add_term(term, weight)
+                        document.add_term(prefix + term, weight)
                     
                 def add_non_text_to_document(prefix, term, weight):
                     """

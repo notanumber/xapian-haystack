@@ -356,6 +356,7 @@ class BackendIndexationTestCase(HaystackBackendTestCase, TestCase):
         self.assertTrue('davi' in terms)
         self.assertTrue('david' in terms)
 
+
 class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
     """
     Tests supported features on the backend side.
@@ -446,7 +447,7 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
 
         # Other `result_class`
         self.assertTrue(isinstance(self.backend.search(xapian.Query('indexed'),
-            result_class=MockSearchResult)['results'][0], MockSearchResult))
+                                                       result_class=MockSearchResult)['results'][0], MockSearchResult))
 
     def test_search_field_with_punctuation(self):
         self.assertEqual(pks(self.backend.search(xapian.Query('http://example.com/1/'))['results']),
