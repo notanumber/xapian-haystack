@@ -7,7 +7,7 @@ import os
 import re
 import shutil
 import sys
-import six
+from django.utils import six
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
