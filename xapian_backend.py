@@ -66,7 +66,7 @@ DEFAULT_CHECK_AT_LEAST = 1000
 
 # field types accepted to be serialized as values in Xapian
 FIELD_TYPES = {'text', 'integer', 'date', 'datetime', 'float', 'boolean',
-    'edge_ngram'}
+    'edge_ngram', 'ngram'}
 
 # defines the format used to store types in Xapian
 # this format ensures datetimes are sorted correctly
@@ -326,33 +326,50 @@ class XapianSearchBackend(BaseSearchBackend):
                 termpos = _add_literal_text(termpos, text, weight, prefix='')
                 return termpos
 
+            def __get_ngram_lenths(value):
+                values = value.split()
+                for item in values:
+                    for edge_ngram_length in six.moves.range(EDGE_NGRAM_MIN_LENGTH, EDGE_NGRAM_MAX_LENGTH + 1):
+                        yield item, edge_ngram_length
+
             for obj in iterable:
                 document = xapian.Document()
                 term_generator.set_document(document)
 
-                def edge_ngram_terms(value):
-                    values = value.split()
-                    n = len(values)
-                    for item in values:
+                def ngram_terms(value):
+                    for item, length in __get_ngram_lenths(value):
                         item_length = len(item)
-                        for edge_ngram_length in six.moves.range(EDGE_NGRAM_MIN_LENGTH, EDGE_NGRAM_MAX_LENGTH + 1):
-                            for start in six.moves.range(0, item_length - edge_ngram_length + 1):
-                                for size in six.moves.range(edge_ngram_length, edge_ngram_length + 1):
-                                    end = start + size
-                                    if end > item_length:
-                                        continue
-                                    yield _to_xapian_term(item[start:end])
+                        for start in six.moves.range(0, item_length - length + 1):
+                            for size in six.moves.range(length, length + 1):
+                                end = start + size
+                                if end > item_length:
+                                    continue
+                                yield _to_xapian_term(item[start:end])
+
+                def edge_ngram_terms(value):
+                    for item, length in __get_ngram_lenths(value):
+                        yield _to_xapian_term(item[0:length])
 
                 def add_edge_ngram_to_document(prefix, value, weight):
                     """
                     Splits the term in ngrams and adds each ngram to the index.
                     The minimum and maximum size of the ngram is respectively
-                    NGRAM_MIN_LENGTH and NGRAM_MAX_LENGTH.
+                    EDGE_NGRAM_MIN_LENGTH and EDGE_NGRAM_MAX_LENGTH.
                     """
                     for term in edge_ngram_terms(value):
                         document.add_term(term, weight)
                         document.add_term(prefix + term, weight)
-                    
+
+                def add_ngram_to_document(prefix, value, weight):
+                    """
+                    Splits the term in ngrams and adds each ngram to the index.
+                    The minimum and maximum size of the ngram is respectively
+                    NGRAM_MIN_LENGTH and NGRAM_MAX_LENGTH.
+                    """
+                    for term in ngram_terms(value):
+                        document.add_term(term, weight)
+                        document.add_term(prefix + term, weight)
+
                 def add_non_text_to_document(prefix, term, weight):
                     """
                     Adds term to the document without positional information
@@ -432,7 +449,8 @@ class XapianSearchBackend(BaseSearchBackend):
                             termpos = add_text(termpos, prefix, term, weight)
                         elif field['type'] == 'datetime':
                             termpos = add_datetime_to_document(termpos, prefix, term, weight)
-                        #elif field['type'] == 'ngram': pass
+                        elif field['type'] == 'ngram':
+                            add_ngram_to_document(prefix, value, weight)
                         elif field['type'] == 'edge_ngram':
                             add_edge_ngram_to_document(prefix, value, weight)
                         else:
