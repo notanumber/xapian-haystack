@@ -350,13 +350,6 @@ class BackendIndexationTestCase(HaystackBackendTestCase, TestCase):
         terms = get_terms(self.backend, '-a')
         self.assertIn('corrup\xe7\xe3o', terms)
 
-    def test_edge_ngram_field(self):
-        terms = get_terms(self.backend, '-a')
-        self.assertTrue('da' in terms)
-        self.assertTrue('dav' in terms)
-        self.assertTrue('davi' in terms)
-        self.assertTrue('david' in terms)
-
 
 class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
     """
@@ -426,18 +419,6 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
 
         self.backend.clear([AnotherMockModel, XapianMockModel])
         self.assertEqual(self.backend.document_count(), 0)
-    
-    def test_edge_ngram_search(self):
-        """Tests edge ngram search with different parts of words"""
-        # Minimun length of query string must be equal to EDGE_NGRAM_MIN_LENGTH.
-        self.assertEqual(pks(self.backend.search(xapian.Query('da'))['results']),
-                         [1, 2, 3])
-
-        self.assertEqual(pks(self.backend.search(xapian.Query('avi'))['results']),
-                         [1, 2, 3])
-
-        self.assertEqual(pks(self.backend.search(xapian.Query('vid1'))['results']),
-                         [1])
         
     def test_search(self):
         # no match query
