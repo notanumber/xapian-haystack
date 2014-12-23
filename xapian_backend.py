@@ -7,8 +7,8 @@ import os
 import re
 import shutil
 import sys
-from django.utils import six
 
+from django.utils import six
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.utils.encoding import force_text
@@ -326,7 +326,7 @@ class XapianSearchBackend(BaseSearchBackend):
                 termpos = _add_literal_text(termpos, text, weight, prefix='')
                 return termpos
 
-            def __get_ngram_lengths(value):
+            def _get_ngram_lengths(value):
                 values = value.split()
                 for item in values:
                     for ngram_length in six.moves.range(NGRAM_MIN_LENGTH, NGRAM_MAX_LENGTH + 1):
@@ -337,7 +337,7 @@ class XapianSearchBackend(BaseSearchBackend):
                 term_generator.set_document(document)
 
                 def ngram_terms(value):
-                    for item, length in __get_ngram_lengths(value):
+                    for item, length in _get_ngram_lengths(value):
                         item_length = len(item)
                         for start in six.moves.range(0, item_length - length + 1):
                             for size in six.moves.range(length, length + 1):
@@ -347,7 +347,7 @@ class XapianSearchBackend(BaseSearchBackend):
                                 yield _to_xapian_term(item[start:end])
 
                 def edge_ngram_terms(value):
-                    for item, length in __get_ngram_lengths(value):
+                    for item, length in _get_ngram_lengths(value):
                         yield _to_xapian_term(item[0:length])
 
                 def add_edge_ngram_to_document(prefix, value, weight):

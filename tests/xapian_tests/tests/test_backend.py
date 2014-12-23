@@ -120,7 +120,6 @@ class XapianSimpleMockIndex(indexes.SearchIndex):
 
     multi_value = indexes.MultiValueField()
 
-
     def get_model(self):
         return XapianMockModel
 
@@ -427,7 +426,7 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
 
         self.backend.clear([AnotherMockModel, XapianMockModel])
         self.assertEqual(self.backend.document_count(), 0)
-        
+
     def test_search(self):
         # no match query
         self.assertEqual(self.backend.search(xapian.Query()), {'hits': 0, 'results': []})
@@ -738,7 +737,7 @@ class IndexationNGramTestCase(HaystackBackendTestCase, TestCase):
 
         self.backend.update(self.index, [mock, mock1])
 
-    def test_ngram_field(self):
+    def test_field(self):
         terms = get_terms(self.backend, '-a')
 
         self.assertTrue('da' in terms)
@@ -757,7 +756,7 @@ class IndexationNGramTestCase(HaystackBackendTestCase, TestCase):
         self.assertTrue('av' in terms)
         self.assertTrue('XNGRAMav' in terms)
 
-    def test_ngram_search(self):
+    def test_search(self):
         """Tests edge ngram search with different parts of words"""
         # Minimun length of query string must be equal to EDGE_NGRAM_MIN_LENGTH.
         self.assertEqual(pks(self.backend.search(xapian.Query('da'))['results']),
@@ -784,7 +783,7 @@ class IndexationEdgeNGramTestCase(HaystackBackendTestCase, TestCase):
 
         self.backend.update(self.index, [mock, mock1])
 
-    def test_ngram_field(self):
+    def test_field(self):
         terms = get_terms(self.backend, '-a')
 
         self.assertTrue('da' in terms)
@@ -803,7 +802,7 @@ class IndexationEdgeNGramTestCase(HaystackBackendTestCase, TestCase):
         self.assertTrue('av' not in terms)
         self.assertTrue('XEDGE_NGRAMav' not in terms)
 
-    def test_edge_ngram_search(self):
+    def test_search(self):
         """Tests edge ngram search with different parts of words"""
         # Minimun length of query string must be equal to NGRAM_MIN_LENGTH.
         self.assertEqual(pks(self.backend.search(xapian.Query('da'))['results']),
