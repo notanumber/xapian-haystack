@@ -21,6 +21,7 @@ class StemmingTestCase(TestCase):
 
     def setUp(self):
         super(StemmingTestCase, self).setUp()
+        # Words (especialy nouns) start with an upper case letter in some languages (German, ...)
         words = ['Connection', 'connection']
 
         for i in range(1, 3):
@@ -46,7 +47,9 @@ class StemmingTestCase(TestCase):
 
     def test_stemmeing(self):
         object_ids = set(pks(Document.objects.all()))
+        # Searches for the exact term sould return both documents
         self.assertEqual(set(pks(self.queryset.auto_query("Connection"))), object_ids)
         self.assertEqual(set(pks(self.queryset.auto_query("connection"))), object_ids)
+        # Same should apply for the stemmed values
         self.assertEqual(set(pks(self.queryset.auto_query("connect"))), object_ids)
         self.assertEqual(set(pks(self.queryset.auto_query("Connect"))), object_ids)
