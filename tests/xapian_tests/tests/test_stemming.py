@@ -12,6 +12,7 @@ from xapian_tests.tests.test_backend import pks
 class DocumentIndex(indexes.SearchIndex):
     text = indexes.CharField(document=True)
     word = indexes.CharField(model_attr='name')
+    wordngram = indexes.EdgeNgramField(model_attr='name')
 
     def get_model(self):
         return Document
@@ -45,7 +46,7 @@ class StemmingTestCase(TestCase):
         Document.objects.all().delete()
         super(StemmingTestCase, self).tearDown()
 
-    def test_stemmeing(self):
+    def test_stemming(self):
         object_ids = set(pks(Document.objects.all()))
         # Searches for the exact term sould return both documents
         self.assertEqual(set(pks(self.queryset.auto_query("Connection"))), object_ids)
@@ -53,3 +54,38 @@ class StemmingTestCase(TestCase):
         # Same should apply for the stemmed values
         self.assertEqual(set(pks(self.queryset.auto_query("connect"))), object_ids)
         self.assertEqual(set(pks(self.queryset.auto_query("Connect"))), object_ids)
+
+
+class StemmingEdgeNgramTestCase(TestCase):
+
+    def setUp(self):
+        super(StemmingEdgeNgramTestCase, self).setUp()
+
+        doc = Document()
+        doc.number = 1
+        doc.date = datetime.date.today()
+        doc.name = 'Plattenkreuz'
+        doc.text = ''
+        doc.save()
+
+        self.index = DocumentIndex()
+        self.ui = connections['default'].get_unified_index()
+        self.ui.build(indexes=[self.index])
+
+        self.backend = connections['default'].get_backend()
+        self.backend.update(self.index, Document.objects.all())
+
+        self.queryset = SearchQuerySet()
+
+    def tearDown(self):
+        Document.objects.all().delete()
+        super(StemmingEdgeNgramTestCase, self).tearDown()
+
+    def test_stemmeing(self):
+        object_ids = set(pks(Document.objects.all()))
+        # Searches for the exact term sould return both documents
+        self.assertEqual(set(pks(self.queryset.auto_query("Plattenkreuz"))), object_ids)
+        self.assertEqual(set(pks(self.queryset.auto_query("plattenkreuz"))), object_ids)
+        # Same should apply for the stemmed values
+        self.assertEqual(set(pks(self.queryset.auto_query("Plat"))), object_ids)
+        self.assertEqual(set(pks(self.queryset.auto_query("plat"))), object_ids)
