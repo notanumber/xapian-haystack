@@ -30,17 +30,17 @@ Xapian-Haystack provides all the standard features of Haystack:
 Requirements
 ------------
 
-- Python 2.4+ (Python 3.3 not support `yet <http://trac.xapian.org/ticket/346>`_).
+- Python 2.7 or 3.3
 - Django 1.6+
-- Django-Haystack 2.0.X
-- Xapian 1.0.13+
+- Django-Haystack 2
+- Xapian 1.2.13+
 
 In particular, we build this backend on `Travis`_ using:
 
-- Python 2.7.6
+- Python 2.7 and 3.3
 - Django 1.6, 1.7 and 1.8
 - Django-Haystack (master)
-- Xapian 1.2.8 (libxapian22)
+- Xapian 1.2.21 and 1.3.3
 
 
 Installation
