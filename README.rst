@@ -85,6 +85,11 @@ The backend has the following optional settings:
   See `here <http://xapian.org/docs/apidoc/html/classXapian_1_1QueryParser.html>`_ for more information
   on what they mean.
 
+- ``HAYSTACK_XAPIAN_STEMMING_STRATEGY``: This option lets you chose the stemming strategy used by Xapian. Possible
+  values are ``STEM_NONE``, ``STEM_SOME``, ``STEM_ALL``, ``STEM_ALL_Z``, where ``STEM_SOME`` is the default.
+  See `here <http://xapian.org/docs/apidoc/html/classXapian_1_1QueryParser.html#ac7dc3b55b6083bd3ff98fc8b2726c8fd>`_ for
+  more information about the different strategies.
+
 
 Testing
 -------

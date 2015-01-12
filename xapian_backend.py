@@ -192,6 +192,9 @@ class XapianSearchBackend(BaseSearchBackend):
         self.flags = connection_options.get('FLAGS', DEFAULT_XAPIAN_FLAGS)
         self.language = getattr(settings, 'HAYSTACK_XAPIAN_LANGUAGE', 'english')
 
+        stemming_strategy_string = getattr(settings, 'HAYSTACK_XAPIAN_STEMMING_STRATEGY', 'STEM_SOME')
+        self.stemming_strategy = getattr(xapian.QueryParser, stemming_strategy_string, xapian.QueryParser.STEM_SOME)
+
         # these 4 attributes are caches populated in `build_schema`
         # they are checked in `_update_cache`
         # use property to retrieve them
@@ -273,6 +276,7 @@ class XapianSearchBackend(BaseSearchBackend):
             term_generator = xapian.TermGenerator()
             term_generator.set_database(database)
             term_generator.set_stemmer(xapian.Stem(self.language))
+            term_generator.set_stemming_strategy(self.stemming_strategy)
             if self.include_spelling is True:
                 term_generator.set_flags(xapian.TermGenerator.FLAG_SPELLING)
 
@@ -805,7 +809,7 @@ class XapianSearchBackend(BaseSearchBackend):
         qp = xapian.QueryParser()
         qp.set_database(self._database())
         qp.set_stemmer(xapian.Stem(self.language))
-        qp.set_stemming_strategy(xapian.QueryParser.STEM_SOME)
+        qp.set_stemming_strategy(self.stemming_strategy)
         qp.set_default_op(XAPIAN_OPTS[DEFAULT_OPERATOR])
         qp.add_boolean_prefix('django_ct', TERM_PREFIXES['django_ct'])
 
