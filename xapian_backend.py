@@ -233,7 +233,7 @@ class XapianSearchBackend(BaseSearchBackend):
         self._update_cache()
         return self._columns
 
-    def update(self, index, iterable):
+    def update(self, index, iterable, commit=True):
         """
         Updates the `index` with any objects in `iterable` by adding/updating
         the database as needed.
@@ -241,6 +241,8 @@ class XapianSearchBackend(BaseSearchBackend):
         Required arguments:
             `index` -- The `SearchIndex` to process
             `iterable` -- An iterable of model instances to index
+        Optional arguments:
+            `commit` -- ignored (present for compatibility with django-haystack 1.4)
 
         For each object in `iterable`, a document is created containing all
         of the terms extracted from `index.full_prepare(obj)` with field prefixes,
