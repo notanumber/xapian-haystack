@@ -240,6 +240,7 @@ class XapianSearchBackend(BaseSearchBackend):
         Required arguments:
             `index` -- The `SearchIndex` to process
             `iterable` -- An iterable of model instances to index
+        Optional arguments:
             `commit` -- ignored (present for compatibility with django-haystack 1.4)
 
         For each object in `iterable`, a document is created containing all
