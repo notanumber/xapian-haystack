@@ -15,7 +15,7 @@ install:
   - git clone https://github.com/toastdriven/django-haystack.git
   - sudo apt-get install uuid-dev
   # install Xapian 1.2.19
-  - curl https://gist.githubusercontent.com/jorgecarleitao/45c312987f0d0e0f843d/raw/d27dbae4fb2a293bbba5067038399f204bb8b6e7 | bash -s 1.2.19
+  - curl https://gist.githubusercontent.com/jorgecarleitao/45c312987f0d0e0f843d/raw/d27dbae4fb2a293bbba5067038399f204bb8b6e7 | sudo bash -s 1.2.19
 
 # move xapian-haystack to django-haystack
 before_script:
