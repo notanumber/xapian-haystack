@@ -2,9 +2,14 @@ language: python
 python:
   - "2.7"
 
+env:
+  - DJANGO_VERSION=1.6.11
+  - DJANGO_VERSION=1.7.7
+  - DJANGO_VERSION=1.8.0
+
 # command to install dependencies
 install:
-  - pip install -r requirements.txt
+  - pip install -q Django==$DJANGO_VERSION --use-mirrors
   - cd ..
   - git clone https://github.com/toastdriven/django-haystack.git
   - sudo apt-get install -qq libxapian22 xapian-tools python-xapian
