@@ -22,5 +22,5 @@ before_script:
 
 # command to run tests
 script:
-  - cd django-haystack/test_haystack/
-  - PYTHONPATH=`pwd`/..:`pwd` django-admin.py test xapian_tests --settings=xapian_settings
+  - cd django-haystack/
+  - PYTHONPATH=`pwd` django-admin.py test test_haystack.xapian_tests --settings=test_haystack.xapian_settings
