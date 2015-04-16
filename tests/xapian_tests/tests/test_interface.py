@@ -8,9 +8,9 @@ from haystack import connections
 from haystack.inputs import AutoQuery
 from haystack.query import SearchQuerySet
 
-from xapian_tests.models import Document
-from xapian_tests.search_indexes import DocumentIndex
-from xapian_tests.tests.test_backend import pks, get_terms
+from ..models import Document
+from ..search_indexes import DocumentIndex
+from ..tests.test_backend import pks, get_terms
 
 
 class InterfaceTestCase(TestCase):
