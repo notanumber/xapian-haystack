@@ -3,7 +3,7 @@ from haystack import indexes
 from . import models
 
 
-class DocumentIndex(indexes.SearchIndex):
+class DocumentIndex(indexes.SearchIndex, indexes.Indexable):
     text = indexes.CharField(document=True)
     summary = indexes.CharField(model_attr='summary')
 
@@ -17,7 +17,7 @@ class DocumentIndex(indexes.SearchIndex):
     tags = indexes.MultiValueField()
 
     def get_model(self):
-        return models.Document()
+        return models.Document
 
     def prepare_tags(self, obj):
         l = [['tag', 'tag-test', 'tag-test-test'],

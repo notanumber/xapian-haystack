@@ -10,9 +10,9 @@ from haystack import connections, reset_search_queries
 from haystack.models import SearchResult
 from haystack.query import SearchQuerySet, SQ
 
-from core.models import MockModel, AnotherMockModel, AFourthMockModel
-from mocks import MockSearchResult
-from xapian_tests.tests.test_backend import HaystackBackendTestCase
+from ...core.models import MockModel, AnotherMockModel, AFourthMockModel
+from ...mocks import MockSearchResult
+from ..tests.test_backend import HaystackBackendTestCase
 
 
 class MockQueryIndex(indexes.SearchIndex):

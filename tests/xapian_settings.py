@@ -1,8 +1,9 @@
 import os
 from settings import *
 
-INSTALLED_APPS += [
-    'xapian_tests',
+INSTALLED_APPS = [
+    'test_haystack.core',
+    'test_haystack.xapian_tests',
 ]
 
 HAYSTACK_CONNECTIONS = {

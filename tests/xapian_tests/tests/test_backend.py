@@ -8,14 +8,21 @@ import os
 
 from django.db import models
 from django.test import TestCase
+from django.db.models.loading import get_model
 
 from haystack import connections
 from haystack import indexes
 from haystack.backends.xapian_backend import InvalidIndexError, _term_to_xapian_value
+from haystack.models import SearchResult
 from haystack.utils.loading import UnifiedIndex
 
-from core.models import MockTag, MockModel, AnotherMockModel
-from mocks import MockSearchResult
+from ...core.models import AnotherMockModel, MockTag
+
+
+class XapianMockSearchResult(SearchResult):
+    def __init__(self, app_label, model_name, pk, score, **kwargs):
+        super(XapianMockSearchResult, self).__init__(app_label, model_name, pk, score, **kwargs)
+        self._model = get_model('xapian_tests', model_name)
 
 
 def get_terms(backend, *args):
@@ -435,8 +442,9 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
                          [1, 2, 3])
 
         # Other `result_class`
-        self.assertTrue(isinstance(self.backend.search(xapian.Query('indexed'),
-                                                       result_class=MockSearchResult)['results'][0], MockSearchResult))
+        self.assertTrue(
+            isinstance(self.backend.search(xapian.Query('indexed'), result_class=XapianMockSearchResult)['results'][0],
+                       XapianMockSearchResult))
 
     def test_search_field_with_punctuation(self):
         self.assertEqual(pks(self.backend.search(xapian.Query('http://example.com/1/'))['results']),
@@ -559,9 +567,9 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
         self.assertEqual(pks(results['results']), [3, 2])
 
         # Other `result_class`
-        self.assertTrue(isinstance(self.backend.more_like_this(self.sample_objs[0],
-                                                               result_class=MockSearchResult)['results'][0],
-                                   MockSearchResult))
+        result = self.backend.more_like_this(self.sample_objs[0],
+                                             result_class=XapianMockSearchResult)
+        self.assertTrue(isinstance(result['results'][0], XapianMockSearchResult))
 
     def test_order_by(self):
         results = self.backend.search(xapian.Query(''), sort_by=['pub_date'])
