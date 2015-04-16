@@ -19,6 +19,7 @@ install:
 before_script:
   - cp xapian-haystack/xapian_backend.py django-haystack/haystack/backends
   - cp -r xapian-haystack/tests/* django-haystack/test_haystack/
+  - cp xapian-haystack/tests/__init__.py django-haystack/test_haystack/
 
 # command to run tests
 script:
