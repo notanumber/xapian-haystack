@@ -24,19 +24,20 @@ Xapian-Haystack provides all the standard features of Haystack:
 - Spelling suggestions
 - EdgeNGram and Ngram (for autocomplete)
 
+
 Requirements
 ------------
 
 - Python 2.4+ (Python 3.3 not support `yet <http://trac.xapian.org/ticket/346>`_).
-- Django 1.5+
+- Django 1.6+
 - Django-Haystack 2.0.X
 - Xapian 1.0.13+
 
 In particular, we build this backend on `Travis`_ using:
 
 - Python 2.7.6
-- Django 1.6.4
-- Django-Haystack (latest)
+- Django 1.6, 1.7 and 1.8
+- Django-Haystack (master)
 - Xapian 1.2.8 (libxapian22)
 
 
@@ -94,16 +95,8 @@ The backend has the following optional settings:
 Testing
 -------
 
-Xapian-Haystack has a test suite in continuous deployment in `Travis`_. The script ``.travis.yml`` contains
-all the steps required to run the test suite.
-
-Other way is to clone `Django-Haystack <https://github.com/toastdriven/django-haystack>`_,
-copy the content of the ``tests/`` folder of Xapian-Haystack to the ``tests/`` folder of Haystack,
-and copy ``xapian_backend.py`` to ``haystack/backends/`` folder.
-
-The tests can then be run from the folder ``tests/`` using::
-
-django-admin.py test --settings=xapian_settings xapian_tests
+Xapian-Haystack has a test suite in continuous deployment in `Travis`_. The script
+``.travis.yml`` contains the steps required to run the test suite.
 
 
 Source
@@ -127,6 +120,7 @@ License
 Xapian-haystack is free software licenced under GNU General Public Licence v2 and
 Copyright (c) 2009, 2010, 2011, 2012 David Sauve, 2009, 2010 Trapeze, 2014 Jorge C. Leitão.
 It may be redistributed under the terms specified in the LICENSE file.
+
 
 Questions, Comments, Concerns:
 ------------------------------
