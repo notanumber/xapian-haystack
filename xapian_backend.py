@@ -492,12 +492,15 @@ class XapianSearchBackend(BaseSearchBackend):
         finally:
             database.close()
 
-    def remove(self, obj):
+    def remove(self, obj, commit=True):
         """
         Remove indexes for `obj` from the database.
 
         We delete all instances of `Q<app_name>.<model_name>.<pk>` which
         should be unique to this object.
+
+        Optional arguments:
+           `commit` -- ignored (present for compatibility with django-haystack 1.4)
         """
         database = self._database(writable=True)
         database.delete_document(TERM_PREFIXES['id'] + get_identifier(obj))
