@@ -35,10 +35,10 @@ Requirements
 
 In particular, we build this backend on `Travis`_ using:
 
-- Python 2.7.6
+- Python 2.7 and 3.3
 - Django 1.6, 1.7 and 1.8
 - Django-Haystack (master)
-- Xapian 1.2.8 (libxapian22)
+- Xapian 1.2.19
 
 
 Installation

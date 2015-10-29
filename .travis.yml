@@ -1,6 +1,7 @@
 language: python
 python:
   - "2.7"
+  - "3.3"
 
 env:
   - DJANGO_VERSION=1.6.11
@@ -12,8 +13,9 @@ install:
   - pip install -q Django==$DJANGO_VERSION --use-mirrors
   - cd ..
   - git clone https://github.com/toastdriven/django-haystack.git
-  - sudo apt-get install -qq libxapian22 xapian-tools python-xapian
-  - ln -s /usr/lib/python2.7/dist-packages/xapian $VIRTUAL_ENV/lib/python2.7/site-packages/.
+  - sudo apt-get install uuid-dev
+  # install Xapian 1.2.19
+  - curl https://gist.githubusercontent.com/jorgecarleitao/45c312987f0d0e0f843d/raw/d27dbae4fb2a293bbba5067038399f204bb8b6e7 | sudo bash -s 1.2.19
 
 # move xapian-haystack to django-haystack
 before_script:
