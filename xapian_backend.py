@@ -429,8 +429,9 @@ class XapianSearchBackend(BaseSearchBackend):
                         # `django_id` is an int and `django_ct` is text;
                         # besides, they are indexed by their (unstemmed) value.
                         if field['field_name'] == 'django_id':
-                            value = int(value)
-                        value = _term_to_xapian_value(value, field['type'])
+                            value = str(value)
+                        value = _term_to_xapian_value(value, 'text')
+
 
                         document.add_term(TERM_PREFIXES[field['field_name']] + value, weight)
                         document.add_value(field['column'], value)
