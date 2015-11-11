@@ -17,6 +17,10 @@ from ..tests.test_backend import HaystackBackendTestCase
 
 
 class XapianSearchQueryTestCase(HaystackBackendTestCase, TestCase):
+    """
+    Tests the XapianSearchQuery, the class that converts SearchQuerySet queries
+    using the `__` notation to XapianQueries.
+    """
     def get_index(self):
         return MockQueryIndex()
 

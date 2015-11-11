@@ -365,6 +365,18 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
         self.assertEqual(results['facets']['fields']['sites'],
                          [('1', 1), ('3', 2), ('2', 2), ('4', 1), ('6', 2), ('9', 1)])
 
+        results = self.backend.search(xapian.Query('indexed'),
+                                      facets=['number'])
+        self.assertEqual(results['hits'], 3)
+        self.assertEqual(results['facets']['fields']['number'],
+                         [(5, 1), (10, 1), (15, 1)])
+
+        results = self.backend.search(xapian.Query('indexed'),
+                                      facets=['float_number'])
+        self.assertEqual(results['hits'], 3)
+        self.assertEqual(results['facets']['fields']['float_number'],
+                         [(35.5, 1), (834.0, 1), (972.0, 1)])
+
     def test_raise_index_error_on_wrong_field(self):
         """
         Regression test for #109.
