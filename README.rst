@@ -5,6 +5,8 @@ Xapian backend for Django-Haystack
 
 .. image:: https://travis-ci.org/notanumber/xapian-haystack.svg?branch=master
    :target: https://travis-ci.org/notanumber/xapian-haystack
+.. image:: https://coveralls.io/repos/notanumber/xapian-haystack/badge.svg?branch=master&service=github
+   :target: https://coveralls.io/github/notanumber/xapian-haystack?branch=master
 
 Xapian-haystack is a backend of `Django-Haystack <http://haystacksearch.org/>`_
 for the `Xapian <http://xapian.org>`_ search engine.

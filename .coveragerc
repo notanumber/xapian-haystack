@@ -1,0 +1,11 @@
+[report]
+exclude_lines =
+    def __repr__
+    raise NotImplementedError
+    raise MissingDependency
+    except xapian.DatabaseModifiedError
+
+[run]
+source =
+    haystack/backends/xapian_backend.py
+    test_haystack/xapian_tests
