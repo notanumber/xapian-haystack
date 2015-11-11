@@ -1,6 +1,5 @@
 from __future__ import unicode_literals
 
-import time
 import datetime
 import pickle
 import os
@@ -1010,61 +1009,75 @@ class XapianSearchBackend(BaseSearchBackend):
 
         eg. {
             'pub_date': [
-                ('2009-01-01T00:00:00Z', 5),
-                ('2009-02-01T00:00:00Z', 0),
-                ('2009-03-01T00:00:00Z', 0),
-                ('2009-04-01T00:00:00Z', 1),
-                ('2009-05-01T00:00:00Z', 2),
+                (datetime.datetime(2009, 1, 1, 0, 0), 5),
+                (datetime.datetime(2009, 2, 1, 0, 0), 0),
+                (datetime.datetime(2009, 3, 1, 0, 0), 0),
+                (datetime.datetime(2008, 4, 1, 0, 0), 1),
+                (datetime.datetime(2008, 5, 1, 0, 0), 2),
             ],
         }
         """
+        def next_datetime(previous, gap_value, gap_type):
+            year = previous.year
+            month = previous.month
+
+            if gap_type == 'year':
+                next = previous.replace(year=year + gap_value)
+            elif gap_type == 'month':
+                if month + gap_value <= 12:
+                    next = previous.replace(month=month + gap_value)
+                else:
+                    next = previous.replace(
+                        month=((month + gap_value) % 12),
+                        year=(year + (month + gap_value) / 12)
+                    )
+            elif gap_type == 'day':
+                next = previous + datetime.timedelta(days=gap_value)
+            elif gap_type == 'hour':
+                return previous + datetime.timedelta(hours=gap_value)
+            elif gap_type == 'minute':
+                next = previous + datetime.timedelta(minutes=gap_value)
+            elif gap_type == 'second':
+                next = previous + datetime.timedelta(seconds=gap_value)
+            else:
+                raise TypeError('\'gap_by\' must be '
+                                '{second, minute, day, month, year}')
+            return next
+
         facet_dict = {}
 
         for date_facet, facet_params in list(date_facets.items()):
             gap_type = facet_params.get('gap_by')
             gap_value = facet_params.get('gap_amount', 1)
             date_range = facet_params['start_date']
+
+            # construct the bins of the histogram
             facet_list = []
             while date_range < facet_params['end_date']:
-                facet_list.append((date_range.isoformat(), 0))
-                if gap_type == 'year':
-                    date_range = date_range.replace(
-                        year=date_range.year + int(gap_value)
-                    )
-                elif gap_type == 'month':
-                    if date_range.month + int(gap_value) > 12:
-                        date_range = date_range.replace(
-                            month=((date_range.month + int(gap_value)) % 12),
-                            year=(date_range.year + (date_range.month + int(gap_value)) / 12)
-                        )
-                    else:
-                        date_range = date_range.replace(
-                            month=date_range.month + int(gap_value)
-                        )
-                elif gap_type == 'day':
-                    date_range += datetime.timedelta(days=int(gap_value))
-                elif gap_type == 'hour':
-                    date_range += datetime.timedelta(hours=int(gap_value))
-                elif gap_type == 'minute':
-                    date_range += datetime.timedelta(minutes=int(gap_value))
-                elif gap_type == 'second':
-                    date_range += datetime.timedelta(seconds=int(gap_value))
+                facet_list.append((date_range, 0))
+                date_range = next_datetime(date_range, gap_value, gap_type)
 
             facet_list = sorted(facet_list, key=lambda x: x[0], reverse=True)
 
             for result in results:
                 result_date = getattr(result, date_facet)
-                if result_date:
-                    if not isinstance(result_date, datetime.datetime):
-                        result_date = datetime.datetime(
-                            year=result_date.year,
-                            month=result_date.month,
-                            day=result_date.day,
-                        )
-                    for n, facet_date in enumerate(facet_list):
-                        if result_date > datetime.datetime(*(time.strptime(facet_date[0], '%Y-%m-%dT%H:%M:%S')[0:6])):
-                            facet_list[n] = (facet_list[n][0], (facet_list[n][1] + 1))
-                            break
+
+                # convert date to datetime
+                if not isinstance(result_date, datetime.datetime):
+                    result_date = datetime.datetime(result_date.year,
+                                                    result_date.month,
+                                                    result_date.day)
+
+                # ignore results outside the boundaries.
+                if facet_list[0][0] < result_date < facet_list[-1][0]:
+                    continue
+
+                # populate the histogram by putting the result on the right bin.
+                for n, facet_date in enumerate(facet_list):
+                    if result_date > facet_date[0]:
+                        # equal to facet_list[n][1] += 1, but for a tuple
+                        facet_list[n] = (facet_list[n][0], (facet_list[n][1] + 1))
+                        break  # bin found; go to next result
 
             facet_dict[date_facet] = facet_list
 

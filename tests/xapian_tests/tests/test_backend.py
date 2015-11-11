@@ -383,7 +383,7 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
         """
         self.assertRaises(InvalidIndexError, self.backend.search, xapian.Query(''), facets=['dsdas'])
 
-    def test_date_facets(self):
+    def test_date_facets_month(self):
         facets = {'datetime': {'start_date': datetime.datetime(2008, 10, 26),
                                'end_date': datetime.datetime(2009, 3, 26),
                                'gap_by': 'month'}}
@@ -394,13 +394,31 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
         results = self.backend.search(xapian.Query('indexed'), date_facets=facets)
         self.assertEqual(results['hits'], 3)
         self.assertEqual(results['facets']['dates']['datetime'], [
-            (b'2009-02-26T00:00:00', 0),
-            (b'2009-01-26T00:00:00', 3),
-            (b'2008-12-26T00:00:00', 0),
-            (b'2008-11-26T00:00:00', 0),
-            (b'2008-10-26T00:00:00', 0),
+            (datetime.datetime(2009, 2, 26, 0, 0), 0),
+            (datetime.datetime(2009, 1, 26, 0, 0), 3),
+            (datetime.datetime(2008, 12, 26, 0, 0), 0),
+            (datetime.datetime(2008, 11, 26, 0, 0), 0),
+            (datetime.datetime(2008, 10, 26, 0, 0), 0),
         ])
 
+    def test_date_facets_seconds(self):
+        facets = {'datetime': {'start_date': datetime.datetime(2009, 2, 25, 1, 0, 57),
+                               'end_date': datetime.datetime(2009, 2, 25, 1, 1, 1),
+                               'gap_by': 'second'}}
+
+        self.assertEqual(self.backend.search(xapian.Query(), date_facets=facets),
+                         {'hits': 0, 'results': []})
+
+        results = self.backend.search(xapian.Query('indexed'), date_facets=facets)
+        self.assertEqual(results['hits'], 3)
+        self.assertEqual(results['facets']['dates']['datetime'], [
+            (datetime.datetime(2009, 2, 25, 1, 1, 0), 0),
+            (datetime.datetime(2009, 2, 25, 1, 0, 59), 1),
+            (datetime.datetime(2009, 2, 25, 1, 0, 58), 1),
+            (datetime.datetime(2009, 2, 25, 1, 0, 57), 1),
+        ])
+
+    def test_date_facets_days(self):
         facets = {'date': {'start_date': datetime.datetime(2009, 2, 1),
                            'end_date': datetime.datetime(2009, 3, 15),
                            'gap_by': 'day',
@@ -408,9 +426,9 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
         results = self.backend.search(xapian.Query('indexed'), date_facets=facets)
         self.assertEqual(results['hits'], 3)
         self.assertEqual(results['facets']['dates']['date'], [
-            (b'2009-03-03T00:00:00', 0),
-            (b'2009-02-16T00:00:00', 3),
-            (b'2009-02-01T00:00:00', 0)
+            (datetime.datetime(2009, 3, 3, 0, 0), 0),
+            (datetime.datetime(2009, 2, 16, 0, 0), 3),
+            (datetime.datetime(2009, 2, 1, 0, 0), 0)
         ])
 
     def test_query_facets(self):
