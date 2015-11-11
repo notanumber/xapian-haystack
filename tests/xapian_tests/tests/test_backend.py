@@ -1,183 +1,43 @@
 from __future__ import unicode_literals
 
+from decimal import Decimal
 import datetime
 import sys
 import xapian
 import subprocess
 import os
 
-from django.db import models
 from django.test import TestCase
 from django.db.models.loading import get_model
 
 from haystack import connections
-from haystack import indexes
 from haystack.backends.xapian_backend import InvalidIndexError, _term_to_xapian_value
 from haystack.models import SearchResult
 from haystack.utils.loading import UnifiedIndex
 
-from ...core.models import AnotherMockModel, MockTag
+from ..search_indexes import XapianNGramIndex, XapianEdgeNGramIndex, \
+    CompleteBlogEntryIndex, BlogSearchIndex
+from ..models import BlogEntry, AnotherMockModel, MockTag
 
 
-class XapianMockSearchResult(SearchResult):
+class XapianSearchResult(SearchResult):
     def __init__(self, app_label, model_name, pk, score, **kwargs):
-        super(XapianMockSearchResult, self).__init__(app_label, model_name, pk, score, **kwargs)
+        super(XapianSearchResult, self).__init__(app_label, model_name, pk, score, **kwargs)
         self._model = get_model('xapian_tests', model_name)
 
 
 def get_terms(backend, *args):
     result = subprocess.check_output(['delve'] + list(args) + [backend.path],
                                      env=os.environ.copy()).decode('utf-8')
-    result = result.split(": ")[1].strip()
-    return result.split(" ")
+    result = result.split(": ")
+    if len(result) > 1:
+        return result[1].strip().split(" ")
+
+    return []
 
 
 def pks(results):
     return [result.pk for result in results]
-
-
-class XapianMockModel(models.Model):
-    """
-    Same as tests.core.MockModel with a few extra fields for testing various
-    sorting and ordering criteria.
-    """
-    author = models.CharField(max_length=255)
-    foo = models.CharField(max_length=255, blank=True)
-    pub_date = models.DateTimeField(default=datetime.datetime.now)
-    exp_date = models.DateTimeField(default=datetime.datetime.now)
-    tag = models.ForeignKey(MockTag)
-
-    value = models.IntegerField(default=0)
-    flag = models.BooleanField(default=True)
-    slug = models.SlugField()
-    popularity = models.FloatField(default=0.0)
-    url = models.URLField()
-
-    def __unicode__(self):
-        return self.author
-
-
-class XapianMockSearchIndex(indexes.SearchIndex):
-    text = indexes.CharField(
-        document=True, use_template=True,
-        template_name='search/indexes/core/mockmodel_text.txt'
-    )
-    name = indexes.CharField(model_attr='author', faceted=True)
-    pub_date = indexes.DateField(model_attr='pub_date')
-    exp_date = indexes.DateField(model_attr='exp_date')
-    value = indexes.IntegerField(model_attr='value')
-    flag = indexes.BooleanField(model_attr='flag')
-    slug = indexes.CharField(indexed=False, model_attr='slug')
-    popularity = indexes.FloatField(model_attr='popularity')
-    month = indexes.CharField(indexed=False)
-    url = indexes.CharField(model_attr='url')
-    empty = indexes.CharField()
-
-    # Various MultiValueFields
-    sites = indexes.MultiValueField()
-    tags = indexes.MultiValueField()
-    keys = indexes.MultiValueField()
-    titles = indexes.MultiValueField()
-
-    def get_model(self):
-        return XapianMockModel
-
-    def prepare_sites(self, obj):
-        return ['%d' % (i * obj.id) for i in range(1, 4)]
-
-    def prepare_tags(self, obj):
-        if obj.id == 1:
-            return ['a', 'b', 'c']
-        elif obj.id == 2:
-            return ['ab', 'bc', 'cd']
-        else:
-            return ['an', 'to', 'or']
-
-    def prepare_keys(self, obj):
-        return [i * obj.id for i in range(1, 4)]
-
-    def prepare_titles(self, obj):
-        if obj.id == 1:
-            return ['object one title one', 'object one title two']
-        elif obj.id == 2:
-            return ['object two title one', 'object two title two']
-        else:
-            return ['object three title one', 'object three title two']
-
-    def prepare_month(self, obj):
-        return '%02d' % obj.pub_date.month
-
-    def prepare_empty(self, obj):
-        return ''
-
-
-class XapianSimpleMockIndex(indexes.SearchIndex):
-    text = indexes.CharField(document=True)
-    author = indexes.CharField(model_attr='author')
-    url = indexes.CharField()
-    non_anscii = indexes.CharField()
-    funny_text = indexes.CharField()
-
-    datetime = indexes.DateTimeField(model_attr='pub_date')
-    date = indexes.DateField()
-
-    number = indexes.IntegerField()
-    float_number = indexes.FloatField()
-    decimal_number = indexes.DecimalField()
-
-    multi_value = indexes.MultiValueField()
-
-    def get_model(self):
-        return XapianMockModel
-
-    def prepare_text(self, obj):
-        return 'this_is_a_word inside a big text'
-
-    def prepare_author(self, obj):
-        return 'david holland'
-
-    def prepare_url(self, obj):
-        return 'http://example.com/1/'
-
-    def prepare_non_anscii(self, obj):
-        return 'thsi sdas das corrup\xe7\xe3o das'
-
-    def prepare_funny_text(self, obj):
-        return 'this-text has funny.words!!'
-
-    def prepare_datetime(self, obj):
-        return datetime.datetime(2009, 2, 25, 1, 1, 1)
-
-    def prepare_date(self, obj):
-        return datetime.date(2008, 8, 8)
-
-    def prepare_number(self, obj):
-        return 123456789
-
-    def prepare_float_number(self, obj):
-        return 123.123456789
-
-    def prepare_decimal_number(self, obj):
-        return '22.34'
-
-    def prepare_multi_value(self, obj):
-        return ['tag', 'tag-tag', 'tag-tag-tag']
-
-
-class XapianNGramIndex(indexes.SearchIndex):
-    text = indexes.CharField(model_attr='author', document=True)
-    ngram = indexes.NgramField(model_attr='author')
-
-    def get_model(self):
-        return XapianMockModel
-
-
-class XapianEdgeNGramIndex(indexes.SearchIndex):
-    text = indexes.CharField(model_attr='author', document=True)
-    edge_ngram = indexes.EdgeNgramField(model_attr='author')
-
-    def get_model(self):
-        return XapianMockModel
 
 
 class HaystackBackendTestCase(object):
@@ -189,9 +49,6 @@ class HaystackBackendTestCase(object):
     that must be overwritten.
     """
     def get_index(self):
-        raise NotImplementedError
-
-    def get_objects(self):
         raise NotImplementedError
 
     def setUp(self):
@@ -216,14 +73,34 @@ class BackendIndexationTestCase(HaystackBackendTestCase, TestCase):
     """
 
     def get_index(self):
-        return XapianSimpleMockIndex()
+        return CompleteBlogEntryIndex()
 
     def setUp(self):
         super(BackendIndexationTestCase, self).setUp()
-        mock = XapianMockModel()
-        mock.id = 1
-        mock.author = u'david'
-        self.backend.update(self.index, [mock])
+
+        tag1 = MockTag.objects.create(name='tag')
+        tag2 = MockTag.objects.create(name='tag-tag')
+        tag3 = MockTag.objects.create(name='tag-tag-tag')
+
+        entry = BlogEntry()
+        entry.id = 1
+        entry.text = 'this_is_a_word inside a big text'
+        entry.author = 'david'
+        entry.url = 'http://example.com/1/'
+        entry.boolean = True
+        entry.number = 123456789
+        entry.float_number = 123.123456789
+        entry.decimal_number = Decimal('22.34')
+        entry.funny_text = 'this-text das das'
+        entry.non_ascii = 'thsi sdas das corrup\xe7\xe3o das'
+        entry.datetime = datetime.datetime(2009, 2, 25, 1, 1, 1)
+        entry.date = datetime.date(2008, 8, 8)
+        entry.save()
+        entry.tags.add(tag1, tag2, tag3)
+
+        self.backend.update(self.index, [entry])
+
+        self.entry = entry
 
     def test_app_is_not_split(self):
         """
@@ -329,6 +206,11 @@ class BackendIndexationTestCase(HaystackBackendTestCase, TestCase):
         terms = get_terms(self.backend, '-a')
         self.assertTrue('http://example.com/1/' in terms)
 
+    def test_bool_field(self):
+        terms = get_terms(self.backend, '-a')
+        self.assertTrue('XBOOLEANtrue' in terms)
+        self.assertFalse('ZXBOOLEANtrue' in terms)
+
     def test_integer_field(self):
         terms = get_terms(self.backend, '-a')
         self.assertTrue('123456789' in terms)
@@ -374,7 +256,21 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
     """
 
     def get_index(self):
-        return XapianMockSearchIndex()
+        return BlogSearchIndex()
+
+    @staticmethod
+    def get_entry(i):
+        entry = BlogEntry()
+        entry.id = i
+        entry.author = 'david%s' % i
+        entry.url = 'http://example.com/%d/' % i
+        entry.boolean = bool(i % 2)
+        entry.number = i*5
+        entry.float_number = i*5.0
+        entry.decimal_number = Decimal('22.34')
+        entry.datetime = datetime.datetime(2009, 2, 25, 1, 1, 1) - datetime.timedelta(seconds=i)
+        entry.date = datetime.date(2009, 2, 23) + datetime.timedelta(days=i)
+        return entry
 
     def setUp(self):
         super(BackendFeaturesTestCase, self).setUp()
@@ -382,22 +278,16 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
         self.sample_objs = []
 
         for i in range(1, 4):
-            mock = XapianMockModel()
-            mock.id = i
-            mock.author = 'david%s' % i
-            mock.pub_date = datetime.date(2009, 2, 25) - datetime.timedelta(days=i)
-            mock.exp_date = datetime.date(2009, 2, 23) + datetime.timedelta(days=i)
-            mock.value = i * 5
-            mock.flag = bool(i % 2)
-            mock.slug = 'http://example.com/%d/' % i
-            mock.url = 'http://example.com/%d/' % i
-            self.sample_objs.append(mock)
+            entry = self.get_entry(i)
+            self.sample_objs.append(entry)
 
-        self.sample_objs[0].popularity = 834.0
-        self.sample_objs[1].popularity = 35.5
-        self.sample_objs[2].popularity = 972.0
+        self.sample_objs[0].float_number = 834.0
+        self.sample_objs[1].float_number = 35.5
+        self.sample_objs[2].float_number = 972.0
+        for obj in self.sample_objs:
+            obj.save()
 
-        self.backend.update(self.index, self.sample_objs)
+        self.backend.update(self.index, BlogEntry.objects.all())
 
     def test_update(self):
         self.assertEqual(pks(self.backend.search(xapian.Query(''))['results']),
@@ -425,13 +315,13 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
         self.backend.clear([AnotherMockModel])
         self.assertEqual(self.backend.document_count(), 3)
 
-        self.backend.clear([XapianMockModel])
+        self.backend.clear([BlogEntry])
         self.assertEqual(self.backend.document_count(), 0)
 
         self.backend.update(self.index, self.sample_objs)
         self.assertEqual(self.backend.document_count(), 3)
 
-        self.backend.clear([AnotherMockModel, XapianMockModel])
+        self.backend.clear([AnotherMockModel, BlogEntry])
         self.assertEqual(self.backend.document_count(), 0)
 
     def test_search(self):
@@ -443,8 +333,8 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
 
         # Other `result_class`
         self.assertTrue(
-            isinstance(self.backend.search(xapian.Query('indexed'), result_class=XapianMockSearchResult)['results'][0],
-                       XapianMockSearchResult))
+            isinstance(self.backend.search(xapian.Query('indexed'), result_class=XapianSearchResult)['results'][0],
+                       XapianSearchResult))
 
     def test_search_field_with_punctuation(self):
         self.assertEqual(pks(self.backend.search(xapian.Query('http://example.com/1/'))['results']),
@@ -465,9 +355,9 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
         self.assertEqual(results['facets']['fields']['name'],
                          [('david1', 1), ('david2', 1), ('david3', 1)])
 
-        results = self.backend.search(xapian.Query('indexed'), facets=['flag'])
+        results = self.backend.search(xapian.Query('indexed'), facets=['boolean'])
         self.assertEqual(results['hits'], 3)
-        self.assertEqual(results['facets']['fields']['flag'],
+        self.assertEqual(results['facets']['fields']['boolean'],
                          [(False, 1), (True, 2)])
 
         results = self.backend.search(xapian.Query('indexed'), facets=['sites'])
@@ -482,7 +372,7 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
         self.assertRaises(InvalidIndexError, self.backend.search, xapian.Query(''), facets=['dsdas'])
 
     def test_date_facets(self):
-        facets = {'pub_date': {'start_date': datetime.datetime(2008, 10, 26),
+        facets = {'datetime': {'start_date': datetime.datetime(2008, 10, 26),
                                'end_date': datetime.datetime(2009, 3, 26),
                                'gap_by': 'month'}}
 
@@ -491,24 +381,24 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
 
         results = self.backend.search(xapian.Query('indexed'), date_facets=facets)
         self.assertEqual(results['hits'], 3)
-        self.assertEqual(results['facets']['dates']['pub_date'], [
-            ('2009-02-26T00:00:00', 0),
-            ('2009-01-26T00:00:00', 3),
-            ('2008-12-26T00:00:00', 0),
-            ('2008-11-26T00:00:00', 0),
-            ('2008-10-26T00:00:00', 0),
+        self.assertEqual(results['facets']['dates']['datetime'], [
+            (b'2009-02-26T00:00:00', 0),
+            (b'2009-01-26T00:00:00', 3),
+            (b'2008-12-26T00:00:00', 0),
+            (b'2008-11-26T00:00:00', 0),
+            (b'2008-10-26T00:00:00', 0),
         ])
 
-        facets = {'pub_date': {'start_date': datetime.datetime(2009, 2, 1),
-                               'end_date': datetime.datetime(2009, 3, 15),
-                               'gap_by': 'day',
-                               'gap_amount': 15}}
+        facets = {'date': {'start_date': datetime.datetime(2009, 2, 1),
+                           'end_date': datetime.datetime(2009, 3, 15),
+                           'gap_by': 'day',
+                           'gap_amount': 15}}
         results = self.backend.search(xapian.Query('indexed'), date_facets=facets)
         self.assertEqual(results['hits'], 3)
-        self.assertEqual(results['facets']['dates']['pub_date'], [
-            ('2009-03-03T00:00:00', 0),
-            ('2009-02-16T00:00:00', 3),
-            ('2009-02-01T00:00:00', 0)
+        self.assertEqual(results['facets']['dates']['date'], [
+            (b'2009-03-03T00:00:00', 0),
+            (b'2009-02-16T00:00:00', 3),
+            (b'2009-02-01T00:00:00', 0)
         ])
 
     def test_query_facets(self):
@@ -568,21 +458,22 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
 
         # Other `result_class`
         result = self.backend.more_like_this(self.sample_objs[0],
-                                             result_class=XapianMockSearchResult)
-        self.assertTrue(isinstance(result['results'][0], XapianMockSearchResult))
+                                             result_class=XapianSearchResult)
+        self.assertTrue(isinstance(result['results'][0], XapianSearchResult))
 
     def test_order_by(self):
-        results = self.backend.search(xapian.Query(''), sort_by=['pub_date'])
-        self.assertEqual(pks(results['results']), [3, 2, 1])
+        #results = self.backend.search(xapian.Query(''), sort_by=['datetime'])
+        #print([d.datetime for d in results['results']])
+        #self.assertEqual(pks(results['results']), [3, 2, 1])
 
-        results = self.backend.search(xapian.Query(''), sort_by=['-pub_date'])
-        self.assertEqual(pks(results['results']), [1, 2, 3])
+        #results = self.backend.search(xapian.Query(''), sort_by=['-datetime'])
+        #self.assertEqual(pks(results['results']), [1, 2, 3])
 
-        results = self.backend.search(xapian.Query(''), sort_by=['exp_date'])
-        self.assertEqual(pks(results['results']), [1, 2, 3])
+        #results = self.backend.search(xapian.Query(''), sort_by=['date'])
+        #self.assertEqual(pks(results['results']), [1, 2, 3])
 
-        results = self.backend.search(xapian.Query(''), sort_by=['-exp_date'])
-        self.assertEqual(pks(results['results']), [3, 2, 1])
+        #results = self.backend.search(xapian.Query(''), sort_by=['-date'])
+        #self.assertEqual(pks(results['results']), [3, 2, 1])
 
         results = self.backend.search(xapian.Query(''), sort_by=['id'])
         self.assertEqual(pks(results['results']), [1, 2, 3])
@@ -590,22 +481,22 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
         results = self.backend.search(xapian.Query(''), sort_by=['-id'])
         self.assertEqual(pks(results['results']), [3, 2, 1])
 
-        results = self.backend.search(xapian.Query(''), sort_by=['value'])
+        results = self.backend.search(xapian.Query(''), sort_by=['number'])
         self.assertEqual(pks(results['results']), [1, 2, 3])
 
-        results = self.backend.search(xapian.Query(''), sort_by=['-value'])
+        results = self.backend.search(xapian.Query(''), sort_by=['-number'])
         self.assertEqual(pks(results['results']), [3, 2, 1])
 
-        results = self.backend.search(xapian.Query(''), sort_by=['popularity'])
+        results = self.backend.search(xapian.Query(''), sort_by=['float_number'])
         self.assertEqual(pks(results['results']), [2, 1, 3])
 
-        results = self.backend.search(xapian.Query(''), sort_by=['-popularity'])
+        results = self.backend.search(xapian.Query(''), sort_by=['-float_number'])
         self.assertEqual(pks(results['results']), [3, 1, 2])
 
-        results = self.backend.search(xapian.Query(''), sort_by=['flag', 'id'])
+        results = self.backend.search(xapian.Query(''), sort_by=['boolean', 'id'])
         self.assertEqual(pks(results['results']), [2, 1, 3])
 
-        results = self.backend.search(xapian.Query(''), sort_by=['flag', '-id'])
+        results = self.backend.search(xapian.Query(''), sort_by=['boolean', '-id'])
         self.assertEqual(pks(results['results']), [2, 3, 1])
 
     def test_verify_type(self):
@@ -638,20 +529,20 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
             {'column': 0, 'type': 'text', 'field_name': 'id', 'multi_valued': 'false'},
             {'column': 1, 'type': 'integer', 'field_name': 'django_id', 'multi_valued': 'false'},
             {'column': 2, 'type': 'text', 'field_name': 'django_ct', 'multi_valued': 'false'},
-            {'column': 3, 'type': 'text', 'field_name': 'empty', 'multi_valued': 'false'},
-            {'column': 4, 'type': 'date', 'field_name': 'exp_date', 'multi_valued': 'false'},
-            {'column': 5, 'type': 'boolean', 'field_name': 'flag', 'multi_valued': 'false'},
-            {'column': 6, 'type': 'text', 'field_name': 'keys', 'multi_valued': 'true'},
-            {'column': 7, 'type': 'text', 'field_name': 'name', 'multi_valued': 'false'},
-            {'column': 8, 'type': 'text', 'field_name': 'name_exact', 'multi_valued': 'false'},
-            {'column': 9, 'type': 'float', 'field_name': 'popularity', 'multi_valued': 'false'},
-            {'column': 10, 'type': 'date', 'field_name': 'pub_date', 'multi_valued': 'false'},
-            {'column': 11, 'type': 'text', 'field_name': 'sites', 'multi_valued': 'true'},
-            {'column': 12, 'type': 'text', 'field_name': 'tags', 'multi_valued': 'true'},
-            {'column': 13, 'type': 'text', 'field_name': 'text', 'multi_valued': 'false'},
-            {'column': 14, 'type': 'text', 'field_name': 'titles', 'multi_valued': 'true'},
-            {'column': 15, 'type': 'text', 'field_name': 'url', 'multi_valued': 'false'},
-            {'column': 16, 'type': 'integer', 'field_name': 'value', 'multi_valued': 'false'}
+            {'column': 3, 'type': 'boolean', 'field_name': 'boolean', 'multi_valued': 'false'},
+            {'column': 4, 'type': 'date', 'field_name': 'date', 'multi_valued': 'false'},
+            {'column': 5, 'type': 'date', 'field_name': 'datetime', 'multi_valued': 'false'},
+            {'column': 6, 'type': 'text', 'field_name': 'empty', 'multi_valued': 'false'},
+            {'column': 7, 'type': 'float', 'field_name': 'float_number', 'multi_valued': 'false'},
+            {'column': 8, 'type': 'text', 'field_name': 'keys', 'multi_valued': 'true'},
+            {'column': 9, 'type': 'text', 'field_name': 'name', 'multi_valued': 'false'},
+            {'column': 10, 'type': 'text', 'field_name': 'name_exact', 'multi_valued': 'false'},
+            {'column': 11, 'type': 'integer', 'field_name': 'number', 'multi_valued': 'false'},
+            {'column': 12, 'type': 'text', 'field_name': 'sites', 'multi_valued': 'true'},
+            {'column': 13, 'type': 'text', 'field_name': 'tags', 'multi_valued': 'true'},
+            {'column': 14, 'type': 'text', 'field_name': 'text', 'multi_valued': 'false'},
+            {'column': 15, 'type': 'text', 'field_name': 'titles', 'multi_valued': 'true'},
+            {'column': 16, 'type': 'text', 'field_name': 'url', 'multi_valued': 'false'},
         ])
 
     def test_parse_query(self):
@@ -674,15 +565,15 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
                              'XNAMEdavid3:(pos=1)))')
 
         self.assertEqual(str(self.backend.parse_query('name:david1..david2')),
-                         'Xapian::Query(VALUE_RANGE 7 david1 david2)')
-        self.assertEqual(str(self.backend.parse_query('value:0..10')),
-                         'Xapian::Query(VALUE_RANGE 16 000000000000 000000000010)')
-        self.assertEqual(str(self.backend.parse_query('value:..10')),
-                         'Xapian::Query(VALUE_RANGE 16 %012d 000000000010)' % (-sys.maxsize - 1))
-        self.assertEqual(str(self.backend.parse_query('value:10..*')),
-                         'Xapian::Query(VALUE_RANGE 16 000000000010 %012d)' % sys.maxsize)
-        self.assertEqual(str(self.backend.parse_query('popularity:25.5..100.0')),
-                         b'Xapian::Query(VALUE_RANGE 9 \xb2` \xba@)')
+                         'Xapian::Query(VALUE_RANGE 9 david1 david2)')
+        self.assertEqual(str(self.backend.parse_query('number:0..10')),
+                         'Xapian::Query(VALUE_RANGE 11 000000000000 000000000010)')
+        self.assertEqual(str(self.backend.parse_query('number:..10')),
+                         'Xapian::Query(VALUE_RANGE 11 %012d 000000000010)' % (-sys.maxsize - 1))
+        self.assertEqual(str(self.backend.parse_query('number:10..*')),
+                         'Xapian::Query(VALUE_RANGE 11 000000000010 %012d)' % sys.maxsize)
+        self.assertEqual(str(self.backend.parse_query('float_number:25.5..100.0')),
+                         b'Xapian::Query(VALUE_RANGE 7 \xb2` \xba@)')
 
     def test_order_by_django_id(self):
         """
@@ -692,17 +583,11 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
         self.sample_objs = []
         number_list = list(range(1, 101))
         for i in number_list:
-            mock = XapianMockModel()
-            mock.id = i
-            mock.author = 'david%s' % i
-            mock.pub_date = datetime.date(2009, 2, 25) - datetime.timedelta(days=i)
-            mock.exp_date = datetime.date(2009, 2, 23) + datetime.timedelta(days=i)
-            mock.value = i * 5
-            mock.flag = bool(i % 2)
-            mock.slug = 'http://example.com/%d/' % i
-            mock.url = 'http://example.com/%d/' % i
-            mock.popularity = i*2
-            self.sample_objs.append(mock)
+            entry = self.get_entry(i)
+            self.sample_objs.append(entry)
+
+        for obj in self.sample_objs:
+            obj.save()
 
         self.backend.clear()
         self.backend.update(self.index, self.sample_objs)
@@ -716,7 +601,7 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
          with an unindexed model and if silently_fail is True.
          Also tests the other way around.
         """
-        mock = XapianMockModel()
+        mock = BlogEntry()
         mock.id = 10
         mock.author = 'david10'
 
@@ -735,13 +620,13 @@ class IndexationNGramTestCase(HaystackBackendTestCase, TestCase):
 
     def setUp(self):
         super(IndexationNGramTestCase, self).setUp()
-        mock = XapianMockModel()
+        mock = BlogEntry()
         mock.id = 1
-        mock.author = u'david'
+        mock.author = 'david'
 
-        mock1 = XapianMockModel()
+        mock1 = BlogEntry()
         mock1.id = 2
-        mock1.author = u'da1id'
+        mock1.author = 'da1id'
 
         self.backend.update(self.index, [mock, mock1])
 
@@ -776,18 +661,19 @@ class IndexationNGramTestCase(HaystackBackendTestCase, TestCase):
 
 
 class IndexationEdgeNGramTestCase(HaystackBackendTestCase, TestCase):
+
     def get_index(self):
         return XapianEdgeNGramIndex()
 
     def setUp(self):
         super(IndexationEdgeNGramTestCase, self).setUp()
-        mock = XapianMockModel()
+        mock = BlogEntry()
         mock.id = 1
-        mock.author = u'david'
+        mock.author = 'david'
 
-        mock1 = XapianMockModel()
+        mock1 = BlogEntry()
         mock1.id = 2
-        mock1.author = u'da1id'
+        mock1.author = 'da1id'
 
         self.backend.update(self.index, [mock, mock1])
 

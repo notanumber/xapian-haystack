@@ -1,6 +1,7 @@
 from __future__ import unicode_literals
 
 import datetime
+
 from django.db.models import Q
 from django.test import TestCase
 
@@ -10,7 +11,7 @@ from haystack.query import SearchQuerySet
 
 from ..models import Document
 from ..search_indexes import DocumentIndex
-from ..tests.test_backend import pks, get_terms
+from ..tests.test_backend import pks
 
 
 class InterfaceTestCase(TestCase):

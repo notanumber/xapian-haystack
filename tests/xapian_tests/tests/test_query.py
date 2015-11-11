@@ -5,24 +5,15 @@ import datetime
 from django.conf import settings
 from django.test import TestCase
 
-from haystack import indexes
 from haystack import connections, reset_search_queries
 from haystack.models import SearchResult
 from haystack.query import SearchQuerySet, SQ
 
-from ...core.models import MockModel, AnotherMockModel, AFourthMockModel
 from ...mocks import MockSearchResult
+
+from ..models import MockModel, AnotherMockModel, AFourthMockModel
+from ..search_indexes import MockQueryIndex, MockSearchIndex, BoostMockSearchIndex
 from ..tests.test_backend import HaystackBackendTestCase
-
-
-class MockQueryIndex(indexes.SearchIndex):
-    text = indexes.CharField(document=True)
-    pub_date = indexes.DateTimeField()
-    title = indexes.CharField()
-    foo = indexes.CharField()
-
-    def get_model(self):
-        return MockModel
 
 
 class XapianSearchQueryTestCase(HaystackBackendTestCase, TestCase):
@@ -33,68 +24,68 @@ class XapianSearchQueryTestCase(HaystackBackendTestCase, TestCase):
         super(XapianSearchQueryTestCase, self).setUp()
         self.sq = connections['default'].get_query()
 
-    def test_build_query_all(self):
+    def test_all(self):
         self.assertEqual(str(self.sq.build_query()),
                          'Xapian::Query(<alldocuments>)')
 
-    def test_build_query_single_word(self):
+    def test_single_word(self):
         self.sq.add_filter(SQ(content='hello'))
         self.assertEqual(str(self.sq.build_query()),
                          'Xapian::Query((Zhello OR hello))')
 
-    def test_build_query_single_word_not(self):
+    def test_single_word_not(self):
         self.sq.add_filter(~SQ(content='hello'))
         self.assertEqual(str(self.sq.build_query()),
                          'Xapian::Query((<alldocuments> AND_NOT (Zhello OR hello)))')
 
-    def test_build_query_single_word_field_exact(self):
+    def test_single_word_field_exact(self):
         self.sq.add_filter(SQ(foo='hello'))
         self.assertEqual(str(self.sq.build_query()),
                          'Xapian::Query((ZXFOOhello OR XFOOhello))')
 
-    def test_build_query_single_word_field_exact_not(self):
+    def test_single_word_field_exact_not(self):
         self.sq.add_filter(~SQ(foo='hello'))
         self.assertEqual(str(self.sq.build_query()),
                          'Xapian::Query((<alldocuments> AND_NOT (ZXFOOhello OR XFOOhello)))')
 
-    def test_build_query_boolean(self):
+    def test_boolean(self):
         self.sq.add_filter(SQ(content=True))
         self.assertEqual(str(self.sq.build_query()),
                          'Xapian::Query((Ztrue OR true))')
 
-    def test_build_query_date(self):
+    def test_date(self):
         self.sq.add_filter(SQ(content=datetime.date(2009, 5, 8)))
         self.assertEqual(str(self.sq.build_query()),
                          'Xapian::Query((Z2009-05-08 OR 2009-05-08))')
 
-    def test_build_query_date_not(self):
+    def test_date_not(self):
         self.sq.add_filter(~SQ(content=datetime.date(2009, 5, 8)))
         self.assertEqual(str(self.sq.build_query()),
                          'Xapian::Query((<alldocuments> AND_NOT (Z2009-05-08 OR 2009-05-08)))')
 
-    def test_build_query_datetime(self):
+    def test_datetime(self):
         self.sq.add_filter(SQ(content=datetime.datetime(2009, 5, 8, 11, 28)))
         self.assertEqual(str(self.sq.build_query()),
                          'Xapian::Query((Z2009-05-08 OR 2009-05-08 OR Z11:28:00 OR 11:28:00))')
 
-    def test_build_query_datetime_not(self):
+    def test_datetime_not(self):
         self.sq.add_filter(~SQ(content=datetime.datetime(2009, 5, 8, 11, 28)))
         self.assertEqual(str(self.sq.build_query()),
                          'Xapian::Query((<alldocuments> AND_NOT '
                          '(Z2009-05-08 OR 2009-05-08 OR Z11:28:00 OR 11:28:00)))')
 
-    def test_build_query_float(self):
+    def test_float(self):
         self.sq.add_filter(SQ(content=25.52))
         self.assertEqual(str(self.sq.build_query()),
                          'Xapian::Query((Z25.52 OR 25.52))')
 
-    def test_build_query_multiple_words_and(self):
+    def test_multiple_words_and(self):
         self.sq.add_filter(SQ(content='hello'))
         self.sq.add_filter(SQ(content='world'))
         self.assertEqual(str(self.sq.build_query()),
                          'Xapian::Query(((Zhello OR hello) AND (Zworld OR world)))')
 
-    def test_build_query_multiple_words_not(self):
+    def test_multiple_words_not(self):
         self.sq.add_filter(~SQ(content='hello'))
         self.sq.add_filter(~SQ(content='world'))
         self.assertEqual(str(self.sq.build_query()),
@@ -102,19 +93,19 @@ class XapianSearchQueryTestCase(HaystackBackendTestCase, TestCase):
                          '(<alldocuments> AND_NOT (Zhello OR hello)) AND '
                          '(<alldocuments> AND_NOT (Zworld OR world))))')
 
-    def test_build_query_multiple_words_or(self):
+    def test_multiple_words_or(self):
         self.sq.add_filter(SQ(content='hello') | SQ(content='world'))
         self.assertEqual(str(self.sq.build_query()),
                          'Xapian::Query((Zhello OR hello OR Zworld OR world))')
 
-    def test_build_query_multiple_words_or_not(self):
+    def test_multiple_words_or_not(self):
         self.sq.add_filter(~SQ(content='hello') | ~SQ(content='world'))
         self.assertEqual(str(self.sq.build_query()),
                          'Xapian::Query(('
                          '(<alldocuments> AND_NOT (Zhello OR hello)) OR '
                          '(<alldocuments> AND_NOT (Zworld OR world))))')
 
-    def test_build_query_multiple_words_mixed(self):
+    def test_multiple_words_mixed(self):
         self.sq.add_filter(SQ(content='why') | SQ(content='hello'))
         self.sq.add_filter(~SQ(content='world'))
         self.assertEqual(str(self.sq.build_query()),
@@ -122,7 +113,7 @@ class XapianSearchQueryTestCase(HaystackBackendTestCase, TestCase):
                          '(Zwhi OR why OR Zhello OR hello) AND '
                          '(<alldocuments> AND_NOT (Zworld OR world))))')
 
-    def test_build_query_multiple_word_field_exact(self):
+    def test_multiple_word_field_exact(self):
         self.sq.add_filter(SQ(foo='hello'))
         self.sq.add_filter(SQ(title='world'))
         self.assertEqual(str(self.sq.build_query()),
@@ -130,7 +121,7 @@ class XapianSearchQueryTestCase(HaystackBackendTestCase, TestCase):
                          '(ZXFOOhello OR XFOOhello) AND '
                          '(ZXTITLEworld OR XTITLEworld)))')
 
-    def test_build_query_multiple_word_field_exact_not(self):
+    def test_multiple_word_field_exact_not(self):
         self.sq.add_filter(~SQ(foo='hello'))
         self.sq.add_filter(~SQ(title='world'))
         self.assertEqual(str(self.sq.build_query()),
@@ -138,18 +129,18 @@ class XapianSearchQueryTestCase(HaystackBackendTestCase, TestCase):
                          '(<alldocuments> AND_NOT (ZXFOOhello OR XFOOhello)) AND '
                          '(<alldocuments> AND_NOT (ZXTITLEworld OR XTITLEworld))))')
 
-    def test_build_query_or(self):
+    def test_or(self):
         self.sq.add_filter(SQ(content='hello world'))
         self.assertEqual(str(self.sq.build_query()),
                          'Xapian::Query((Zhello OR hello OR Zworld OR world))')
 
-    def test_build_query_not_or(self):
+    def test_not_or(self):
         self.sq.add_filter(~SQ(content='hello world'))
         self.assertEqual(str(self.sq.build_query()),
                          'Xapian::Query('
                          '(<alldocuments> AND_NOT (Zhello OR hello OR Zworld OR world)))')
 
-    def test_build_query_boost(self):
+    def test_boost(self):
         self.sq.add_filter(SQ(content='hello'))
         self.sq.add_boost('world', 5)
         self.assertEqual(str(self.sq.build_query()),
@@ -157,7 +148,7 @@ class XapianSearchQueryTestCase(HaystackBackendTestCase, TestCase):
                          '(Zhello OR hello) AND_MAYBE '
                          '5 * (Zworld OR world)))')
 
-    def test_build_query_not_in_filter_single_words(self):
+    def test_not_in_filter_single_words(self):
         self.sq.add_filter(SQ(content='why'))
         self.sq.add_filter(~SQ(title__in=["Dune", "Jaws"]))
         self.assertEqual(str(self.sq.build_query()),
@@ -167,7 +158,7 @@ class XapianSearchQueryTestCase(HaystackBackendTestCase, TestCase):
                          '(XTITLE^ PHRASE 3 XTITLEdune PHRASE 3 XTITLE$) OR '
                          '(XTITLE^ PHRASE 3 XTITLEjaws PHRASE 3 XTITLE$)))))')
 
-    def test_build_query_in_filter_multiple_words(self):
+    def test_in_filter_multiple_words(self):
         self.sq.add_filter(SQ(content='why'))
         self.sq.add_filter(SQ(title__in=["A Famous Paper", "An Infamous Article"]))
         self.assertEqual(str(self.sq.build_query()),
@@ -177,7 +168,7 @@ class XapianSearchQueryTestCase(HaystackBackendTestCase, TestCase):
                          '(XTITLE^ PHRASE 5 XTITLEan PHRASE 5 XTITLEinfamous PHRASE 5 '
                          'XTITLEarticle PHRASE 5 XTITLE$))))')
 
-    def test_build_query_in_filter_multiple_words_with_punctuation(self):
+    def test_in_filter_multiple_words_with_punctuation(self):
         self.sq.add_filter(SQ(title__in=["A Famous Paper", "An Infamous Article", "My Store Inc."]))
         self.assertEqual(str(self.sq.build_query()),
                          'Xapian::Query(('
@@ -188,7 +179,7 @@ class XapianSearchQueryTestCase(HaystackBackendTestCase, TestCase):
                          '(XTITLE^ PHRASE 5 XTITLEmy PHRASE 5 XTITLEstore PHRASE 5'
                          ' XTITLEinc. PHRASE 5 XTITLE$)))')
 
-    def test_build_query_not_in_filter_multiple_words(self):
+    def test_not_in_filter_multiple_words(self):
         self.sq.add_filter(SQ(content='why'))
         self.sq.add_filter(~SQ(title__in=["A Famous Paper", "An Infamous Article"]))
         self.assertEqual(str(self.sq.build_query()),
@@ -199,7 +190,7 @@ class XapianSearchQueryTestCase(HaystackBackendTestCase, TestCase):
                          'XTITLEan PHRASE 5 XTITLEinfamous PHRASE 5 '
                          'XTITLEarticle PHRASE 5 XTITLE$)))))')
 
-    def test_build_query_in_filter_datetime(self):
+    def test_in_filter_datetime(self):
         self.sq.add_filter(SQ(content='why'))
         self.sq.add_filter(SQ(pub_date__in=[datetime.datetime(2009, 7, 6, 1, 56, 21)]))
         self.assertEqual(str(self.sq.build_query()),
@@ -214,7 +205,7 @@ class XapianSearchQueryTestCase(HaystackBackendTestCase, TestCase):
         self.assertEqual(self.sq.clean('so please NOTe i am in a bAND and bORed'),
                          'so please NOTe i am in a bAND and bORed')
 
-    def test_build_query_with_models(self):
+    def test_with_models(self):
         self.sq.add_filter(SQ(content='hello'))
         self.sq.add_model(MockModel)
         self.assertEqual(str(self.sq.build_query()),
@@ -231,7 +222,7 @@ class XapianSearchQueryTestCase(HaystackBackendTestCase, TestCase):
             '(0 * CONTENTTYPEcore.mockmodel OR '
             '0 * CONTENTTYPEcore.anothermockmodel)))'))
 
-    def test_build_query_with_punctuation(self):
+    def test_with_punctuation(self):
         self.sq.add_filter(SQ(content='http://www.example.com'))
         self.assertEqual(str(self.sq.build_query()), 'Xapian::Query((Zhttp://www.example.com OR '
                                                      'http://www.example.com))')
@@ -245,16 +236,6 @@ class XapianSearchQueryTestCase(HaystackBackendTestCase, TestCase):
                          '(XTITLE^ PHRASE 3 XTITLE1 PHRASE 3 XTITLE$) OR '
                          '(XTITLE^ PHRASE 3 XTITLE2 PHRASE 3 XTITLE$) OR '
                          '(XTITLE^ PHRASE 3 XTITLE3 PHRASE 3 XTITLE$))))')
-
-
-class MockSearchIndex(indexes.SearchIndex):
-    text = indexes.CharField(document=True, use_template=True)
-    name = indexes.CharField(model_attr='author', faceted=True)
-    pub_date = indexes.DateTimeField(model_attr='pub_date')
-    title = indexes.CharField()
-
-    def get_model(self):
-        return MockModel
 
 
 class SearchQueryTestCase(HaystackBackendTestCase, TestCase):
@@ -283,19 +264,19 @@ class SearchQueryTestCase(HaystackBackendTestCase, TestCase):
         self.sq.add_filter(SQ(name__startswith='da'))
         self.assertEqual([result.pk for result in self.sq.get_results()], [1, 2, 3])
 
-    def test_build_query_gt(self):
+    def test_gt(self):
         self.sq.add_filter(SQ(name__gt='m'))
         self.assertEqual(str(self.sq.build_query()),
                          'Xapian::Query((<alldocuments> AND_NOT VALUE_RANGE 3 a m))')
 
-    def test_build_query_gte(self):
+    def test_gte(self):
         self.sq.add_filter(SQ(name__gte='m'))
         self.assertEqual(str(self.sq.build_query()),
                          'Xapian::Query(VALUE_RANGE 3 m zzzzzzzzzzzzzzzzzzzzzzzzzzzz'
                          'zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz'
                          'zzzzzzzzzzzzzz)')
 
-    def test_build_query_lt(self):
+    def test_lt(self):
         self.sq.add_filter(SQ(name__lt='m'))
         self.assertEqual(str(self.sq.build_query()),
                          'Xapian::Query((<alldocuments> AND_NOT '
@@ -303,11 +284,11 @@ class SearchQueryTestCase(HaystackBackendTestCase, TestCase):
                          'zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz'
                          'zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz))')
 
-    def test_build_query_lte(self):
+    def test_lte(self):
         self.sq.add_filter(SQ(name__lte='m'))
         self.assertEqual(str(self.sq.build_query()), 'Xapian::Query(VALUE_RANGE 3 a m)')
 
-    def test_build_query_multiple_filter_types(self):
+    def test_multiple_filter_types(self):
         self.sq.add_filter(SQ(content='why'))
         self.sq.add_filter(SQ(pub_date__lte=datetime.datetime(2009, 2, 10, 1, 59, 0)))
         self.sq.add_filter(SQ(name__gt='david'))
@@ -391,19 +372,6 @@ class LiveSearchQuerySetTestCase(HaystackBackendTestCase, TestCase):
 
     def test_facet(self):
         self.assertEqual(len(self.sqs.facet('name').facet_counts()['fields']['name']), 3)
-
-
-class BoostMockSearchIndex(indexes.SearchIndex):
-    text = indexes.CharField(
-        document=True, use_template=True,
-        template_name='search/indexes/core/mockmodel_template.txt'
-    )
-    author = indexes.CharField(model_attr='author', weight=2.0)
-    editor = indexes.CharField(model_attr='editor')
-    pub_date = indexes.DateField(model_attr='pub_date')
-
-    def get_model(self):
-        return AFourthMockModel
 
 
 class BoostFieldTestCase(HaystackBackendTestCase, TestCase):
