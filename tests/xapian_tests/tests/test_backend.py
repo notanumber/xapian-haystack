@@ -572,6 +572,10 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
                          'Xapian::Query(VALUE_RANGE 11 %012d 000000000010)' % (-sys.maxsize - 1))
         self.assertEqual(str(self.backend.parse_query('number:10..*')),
                          'Xapian::Query(VALUE_RANGE 11 000000000010 %012d)' % sys.maxsize)
+        self.assertEqual(str(self.backend.parse_query('float_number:25.5..*')),
+                         b'Xapian::Query(VALUE_RANGE 7 \xb2` \xff\xff\xff\xff\xff\xff\xff\xff\xff)')
+        self.assertEqual(str(self.backend.parse_query('float_number:..25.5')),
+                         b'Xapian::Query(VALUE_RANGE 7  \xb2`)')
         self.assertEqual(str(self.backend.parse_query('float_number:25.5..100.0')),
                          b'Xapian::Query(VALUE_RANGE 7 \xb2` \xba@)')
 
