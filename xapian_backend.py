@@ -150,7 +150,7 @@ class XHExpandDecider(xapian.ExpandDecider):
 
         Ignore terms related with the content type of objects.
         """
-        if term.startswith(TERM_PREFIXES['django_ct']):
+        if term.decode('utf-8').startswith(TERM_PREFIXES['django_ct']):
             return False
         return True
 
@@ -929,6 +929,7 @@ class XapianSearchBackend(BaseSearchBackend):
             `text` -- The text to be highlighted
         """
         for term in query:
+            term = term.decode('utf-8')
             for match in re.findall('[^A-Z]+', term):  # Ignore field identifiers
                 match_re = re.compile(match, re.I)
                 content = match_re.sub('<%s>%s</%s>' % (tag, term, tag), content)
@@ -962,7 +963,14 @@ class XapianSearchBackend(BaseSearchBackend):
 
             facet_dict[field_name] = []
             for facet in list(spy.values()):
-                facet_dict[field_name].append((_from_xapian_value(facet.term, field_type),
+                if field_type == 'float':
+                    # the float term is a Xapian serialized object, which is
+                    # in bytes.
+                    term = facet.term
+                else:
+                    term = facet.term.decode('utf-8')
+
+                facet_dict[field_name].append((_from_xapian_value(term, field_type),
                                                facet.termfreq))
         return facet_dict
 
@@ -1030,7 +1038,7 @@ class XapianSearchBackend(BaseSearchBackend):
                 else:
                     next = previous.replace(
                         month=((month + gap_value) % 12),
-                        year=(year + (month + gap_value) / 12)
+                        year=(year + (month + gap_value) // 12)
                     )
             elif gap_type == 'day':
                 next = previous + datetime.timedelta(days=gap_value)
@@ -1120,14 +1128,14 @@ class XapianSearchBackend(BaseSearchBackend):
         """
         if spelling_query:
             if ' ' in spelling_query:
-                return ' '.join([database.get_spelling_suggestion(term) for term in spelling_query.split()])
+                return ' '.join([database.get_spelling_suggestion(term).decode('utf-8') for term in spelling_query.split()])
             else:
-                return database.get_spelling_suggestion(spelling_query)
+                return database.get_spelling_suggestion(spelling_query).decode('utf-8')
 
         term_set = set()
         for term in query:
-            for match in re.findall('[^A-Z]+', term):  # Ignore field identifiers
-                term_set.add(database.get_spelling_suggestion(match))
+            for match in re.findall('[^A-Z]+', term.decode('utf-8')):  # Ignore field identifiers
+                term_set.add(database.get_spelling_suggestion(match).decode('utf-8'))
 
         return ' '.join(term_set)
 

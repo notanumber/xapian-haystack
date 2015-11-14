@@ -33,27 +33,26 @@ Requirements
 - Python 2.7 or 3.3
 - Django 1.6+
 - Django-Haystack 2
-- Xapian 1.2.13+
+- Xapian 1.2.19+
 
 In particular, we build this backend on `Travis`_ using:
 
 - Python 2.7 and 3.3
 - Django 1.6, 1.7 and 1.8
 - Django-Haystack (master)
-- Xapian 1.2.21 and 1.3.3
+- Xapian 1.2.19 (in Python 2) and 1.3.3 (in both)
 
 
 Installation
 ------------
 
-First you need to install Xapian in your machine.
-We recommend installing it on the virtual environment using
-`this gist <https://gist.github.com/jleclanche/ea0bc333b20ef6aa749c>`_:
-activate the virtual environment and run the script.
+First, install Xapian in your machine e.g. with the script provided,
+`install_xapian.sh`. Call it after activating the virtual environment to install::
 
-You can test if the installation was successful by running::
+    source <path>/bin/activate
+    ./install_xapian.sh <version>
 
-    python -c "import xapian"
+`<version>` must be >=1.3.0 for Python 3 envs. This takes around 10 minutes.
 
 Finally, install Xapian-Haystack by running::
 
