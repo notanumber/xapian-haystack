@@ -9,6 +9,7 @@ import os
 
 from django.test import TestCase
 from django.db.models.loading import get_model
+from django.utils.encoding import force_text
 
 from haystack import connections
 from haystack.backends.xapian_backend import InvalidIndexError, _term_to_xapian_value
@@ -20,6 +21,9 @@ from ..search_indexes import XapianNGramIndex, XapianEdgeNGramIndex, \
 from ..models import BlogEntry, AnotherMockModel, MockTag
 
 
+XAPIAN_VERSION = [int(x) for x in xapian.__version__.split('.')]
+
+
 class XapianSearchResult(SearchResult):
     def __init__(self, app_label, model_name, pk, score, **kwargs):
         super(XapianSearchResult, self).__init__(app_label, model_name, pk, score, **kwargs)
@@ -27,7 +31,18 @@ class XapianSearchResult(SearchResult):
 
 
 def get_terms(backend, *args):
-    result = subprocess.check_output(['delve'] + list(args) + [backend.path],
+    if XAPIAN_VERSION[1] <= 2:
+        # old versions use "delve".
+        executable = 'delve'
+    else:
+        # new versions use 'xapian-delve'
+        executable = 'xapian-delve'
+
+    # dev versions (odd minor) use a suffix
+    if XAPIAN_VERSION[1] % 2 != 0:
+        executable = executable+'-%d.%d' % tuple(XAPIAN_VERSION[0:2])
+
+    result = subprocess.check_output([executable] + list(args) + [backend.path],
                                      env=os.environ.copy()).decode('utf-8')
     result = result.split(": ")
     if len(result) > 1:
@@ -62,6 +77,22 @@ class HaystackBackendTestCase(object):
     def tearDown(self):
         self.backend.clear()
         connections['default']._index = self.old_ui
+
+    def assertExpectedQuery(self, query, string_or_list, xapian12string=''):
+        if isinstance(string_or_list, list):
+            strings = string_or_list
+        else:
+            strings = [string_or_list]
+
+        expected = ['Query(%s)' % string for string in strings]
+
+        if XAPIAN_VERSION[1] <= 2:
+            if xapian12string:
+                expected = ['Xapian::Query(%s)' % xapian12string]
+            else:
+                expected = ['Xapian::Query(%s)' % string for string in strings]
+
+        self.assertIn(str(query), expected)
 
 
 class BackendIndexationTestCase(HaystackBackendTestCase, TestCase):
@@ -362,8 +393,8 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
 
         results = self.backend.search(xapian.Query('indexed'), facets=['sites'])
         self.assertEqual(results['hits'], 3)
-        self.assertEqual(results['facets']['fields']['sites'],
-                         [('1', 1), ('3', 2), ('2', 2), ('4', 1), ('6', 2), ('9', 1)])
+        self.assertEqual(set(results['facets']['fields']['sites']),
+                         set([('1', 1), ('3', 2), ('2', 2), ('4', 1), ('6', 2), ('9', 1)]))
 
         results = self.backend.search(xapian.Query('indexed'),
                                       facets=['number'])
@@ -541,7 +572,7 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
         self.assertEqual(_term_to_xapian_value([1, 2, 3], 'text'), '[1, 2, 3]')
         self.assertEqual(_term_to_xapian_value((1, 2, 3), 'text'), '(1, 2, 3)')
         self.assertEqual(_term_to_xapian_value({'a': 1, 'c': 3, 'b': 2}, 'text'),
-                         "{u'a': 1, u'c': 3, u'b': 2}")
+                         force_text({'a': 1, 'c': 3, 'b': 2}))
         self.assertEqual(_term_to_xapian_value(datetime.datetime(2009, 5, 9, 16, 14), 'datetime'),
                          '20090509161400')
         self.assertEqual(_term_to_xapian_value(datetime.datetime(2009, 5, 9, 0, 0), 'date'),
@@ -576,17 +607,20 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
         ])
 
     def test_parse_query(self):
-        self.assertEqual(str(self.backend.parse_query('indexed')),
-                         'Xapian::Query(Zindex:(pos=1))')
-        self.assertEqual(str(self.backend.parse_query('name:david')),
-                         'Xapian::Query(ZXNAMEdavid:(pos=1))')
+        self.assertExpectedQuery(self.backend.parse_query('indexed'), 'Zindex@1',
+                                 xapian12string='Zindex:(pos=1)')
+
+        self.assertExpectedQuery(self.backend.parse_query('name:david'),
+                                 'ZXNAMEdavid@1', xapian12string='ZXNAMEdavid:(pos=1)')
 
         if xapian.minor_version() >= 2:
-            self.assertEqual(str(self.backend.parse_query('name:da*')),
-                             'Xapian::Query(('
-                             'XNAMEdavid1:(pos=1) SYNONYM '
-                             'XNAMEdavid2:(pos=1) SYNONYM '
-                             'XNAMEdavid3:(pos=1)))')
+            # todo: why `SYNONYM WILDCARD OR XNAMEda`?
+            self.assertExpectedQuery(
+                self.backend.parse_query('name:da*'),
+                '(SYNONYM WILDCARD OR XNAMEda)',
+                xapian12string='(XNAMEdavid1:(pos=1) SYNONYM '
+                'XNAMEdavid2:(pos=1) SYNONYM '
+                'XNAMEdavid3:(pos=1))')
         else:
             self.assertEqual(str(self.backend.parse_query('name:da*')),
                              'Xapian::Query(('
@@ -594,20 +628,19 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
                              'XNAMEdavid2:(pos=1) OR '
                              'XNAMEdavid3:(pos=1)))')
 
-        self.assertEqual(str(self.backend.parse_query('name:david1..david2')),
-                         'Xapian::Query(VALUE_RANGE 9 david1 david2)')
-        self.assertEqual(str(self.backend.parse_query('number:0..10')),
-                         'Xapian::Query(VALUE_RANGE 11 000000000000 000000000010)')
-        self.assertEqual(str(self.backend.parse_query('number:..10')),
-                         'Xapian::Query(VALUE_RANGE 11 %012d 000000000010)' % (-sys.maxsize - 1))
-        self.assertEqual(str(self.backend.parse_query('number:10..*')),
-                         'Xapian::Query(VALUE_RANGE 11 000000000010 %012d)' % sys.maxsize)
-        self.assertEqual(str(self.backend.parse_query('float_number:25.5..*')),
-                         b'Xapian::Query(VALUE_RANGE 7 \xb2` \xff\xff\xff\xff\xff\xff\xff\xff\xff)')
-        self.assertEqual(str(self.backend.parse_query('float_number:..25.5')),
-                         b'Xapian::Query(VALUE_RANGE 7  \xb2`)')
-        self.assertEqual(str(self.backend.parse_query('float_number:25.5..100.0')),
-                         b'Xapian::Query(VALUE_RANGE 7 \xb2` \xba@)')
+    def test_parse_query_range(self):
+        self.assertExpectedQuery(self.backend.parse_query('name:david1..david2'),
+                                 '0 * VALUE_RANGE 9 david1 david2',
+                                 xapian12string='VALUE_RANGE 9 david1 david2')
+        self.assertExpectedQuery(self.backend.parse_query('number:0..10'),
+                                 '0 * VALUE_RANGE 11 000000000000 000000000010',
+                                 xapian12string='VALUE_RANGE 11 000000000000 000000000010')
+        self.assertExpectedQuery(self.backend.parse_query('number:..10'),
+                                 '0 * VALUE_RANGE 11 %012d 000000000010' % (-sys.maxsize - 1),
+                                 xapian12string='VALUE_RANGE 11 %012d 000000000010' % (-sys.maxsize - 1))
+        self.assertExpectedQuery(self.backend.parse_query('number:10..*'),
+                                 '0 * VALUE_RANGE 11 000000000010 %012d' % sys.maxsize,
+                                 xapian12string='VALUE_RANGE 11 000000000010 %012d' % sys.maxsize)
 
     def test_order_by_django_id(self):
         """

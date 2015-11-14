@@ -1,5 +1,5 @@
 import os
-from settings import *
+from .settings import *
 
 INSTALLED_APPS = [
     'test_haystack.core',
