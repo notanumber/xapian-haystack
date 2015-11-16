@@ -8,11 +8,11 @@ Xapian backend for Django-Haystack
 .. image:: https://coveralls.io/repos/notanumber/xapian-haystack/badge.svg?branch=master&service=github
    :target: https://coveralls.io/github/notanumber/xapian-haystack?branch=master
 
-Xapian-haystack is a backend of `Django-Haystack <http://haystacksearch.org/>`_
-for the `Xapian <http://xapian.org>`_ search engine.
+Xapian-haystack is a backend of `Django-Haystack <http://haystacksearch.org/>`__
+for the `Xapian <http://xapian.org>`__ search engine.
 Thanks for checking it out.
 
-You can find more information about Xapian `here <http://getting-started-with-xapian.readthedocs.org>`_.
+You can find more information about Xapian `here <http://getting-started-with-xapian.readthedocs.org>`__.
 
 
 Features
@@ -76,20 +76,20 @@ which is done to a path to a directory, e.g::
 The backend has the following optional settings:
 
 - ``HAYSTACK_XAPIAN_LANGUAGE``: the stemming language; the default is `english` and the list of available languages
-  can be found `here <http://xapian.org/docs/apidoc/html/classXapian_1_1Stem.html>`_.
+  can be found `here <http://xapian.org/docs/apidoc/html/classXapian_1_1Stem.html>`__.
 
 - ``HAYSTACK_XAPIAN_WEIGHTING_SCHEME``: a tuple with parameters to be passed to the weighting scheme
-  `BM25 <https://en.wikipedia.org/wiki/Okapi_BM25>`_.
+  `BM25 <https://en.wikipedia.org/wiki/Okapi_BM25>`__.
   By default, it uses the same parameters as Xapian recommends; this setting allows you to change them.
 
 - ``HAYSTACK_XAPIAN_FLAGS``: the options used to parse `AutoQueries`;
   the default is ``FLAG_PHRASE | FLAG_BOOLEAN | FLAG_LOVEHATE | FLAG_WILDCARD | FLAG_PURE_NOT``
-  See `here <http://xapian.org/docs/apidoc/html/classXapian_1_1QueryParser.html>`_ for more information
+  See `here <http://xapian.org/docs/apidoc/html/classXapian_1_1QueryParser.html>`__ for more information
   on what they mean.
 
 - ``HAYSTACK_XAPIAN_STEMMING_STRATEGY``: This option lets you chose the stemming strategy used by Xapian. Possible
   values are ``STEM_NONE``, ``STEM_SOME``, ``STEM_ALL``, ``STEM_ALL_Z``, where ``STEM_SOME`` is the default.
-  See `here <http://xapian.org/docs/apidoc/html/classXapian_1_1QueryParser.html#ac7dc3b55b6083bd3ff98fc8b2726c8fd>`_ for
+  See `here <http://xapian.org/docs/apidoc/html/classXapian_1_1QueryParser.html#ac7dc3b55b6083bd3ff98fc8b2726c8fd>`__ for
   more information about the different strategies.
 
 
@@ -109,10 +109,10 @@ The source code can be found in `github <http://github.com/notanumber/xapian-hay
 Credits
 -------
 
-Xapian-Haystack is maintained by Jorge C. Leitão;
-`David Sauve <mailto:david.sauve@bag-of-holding.com>`_ was the main contributor of Xapian-Haystack and
-Xapian-Haystack was originally funded by `Trapeze <http://www.trapeze.com>`_.
-`ANtlord <https://github.com/ANtlord>`_ implemented support for EdgeNgram and Ngram.
+Xapian-Haystack is maintained by `Jorge C. Leitão <http://jorgecarleitao.net>`__;
+`David Sauve <mailto:david.sauve@bag-of-holding.com>`__ was the main contributor of Xapian-Haystack and
+Xapian-Haystack was originally funded by `Trapeze <http://www.trapeze.com>`__.
+`ANtlord <https://github.com/ANtlord>`__ implemented support for EdgeNgram and Ngram.
 
 
 License
@@ -126,8 +126,8 @@ It may be redistributed under the terms specified in the LICENSE file.
 Questions, Comments, Concerns:
 ------------------------------
 
-Feel free to open an issue `here <http://github.com/notanumber/xapian-haystack/issues>`_
+Feel free to open an issue `here <http://github.com/notanumber/xapian-haystack/issues>`__
 or pull request your work.
 
-You can ask questions on the django-haystack `mailing list <http://groups.google.com/group/django-haystack/>`_
+You can ask questions on the django-haystack `mailing list <http://groups.google.com/group/django-haystack/>`_:
 or in the irc ``#haystack``.
