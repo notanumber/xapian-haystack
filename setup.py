@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+import io
 import os
 from distutils.core import setup
 
 
 def read(fname):
-    return open(os.path.join(os.path.dirname(__file__), fname)).read()
+    return io.open(os.path.join(os.path.dirname(__file__), fname), encoding="utf-8").read()
 
 setup(
     name='xapian-haystack',
