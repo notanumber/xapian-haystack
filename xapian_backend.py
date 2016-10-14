@@ -1331,9 +1331,9 @@ class XapianSearchQuery(BaseSearchQuery):
 
             query_list.append(self._filter_contains(term, field_name, field_type, is_not))
             # when filter has no filter_type, haystack uses
-            # filter_type = 'contains'. Here we remove it
+            # filter_type = 'content'. Here we remove it
             # since the above query is already doing this
-            if filter_type == 'contains':
+            if filter_type == 'content':
                 filter_type = None
         else:
             # get the field_type from the backend
@@ -1357,7 +1357,7 @@ class XapianSearchQuery(BaseSearchQuery):
         # todo: we should check that the filter is valid for this field_type or raise InvalidIndexError
         if filter_type == 'contains':
             query_list.append(self._filter_contains(term, field_name, field_type, is_not))
-        elif filter_type == 'exact':
+        elif filter_type in ('content', 'exact'):
             query_list.append(self._filter_exact(term, field_name, field_type, is_not))
         elif filter_type == 'in':
             query_list.append(self._filter_in(term, field_name, field_type, is_not))

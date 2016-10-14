@@ -43,15 +43,15 @@ class XapianSearchQueryTestCase(HaystackBackendTestCase, TestCase):
                                  '(<alldocuments> AND_NOT (Zhello OR hello))')
 
     def test_single_word_field_exact(self):
-        self.sq.add_filter(SQ(foo='hello'))
+        self.sq.add_filter(SQ(foo__exact='hello'))
         self.assertExpectedQuery(self.sq.build_query(),
-                                 '(ZXFOOhello OR XFOOhello)')
+                                 '(XFOO^ PHRASE 3 XFOOhello PHRASE 3 XFOO$)')
 
     def test_single_word_field_exact_not(self):
         self.sq.add_filter(~SQ(foo='hello'))
         self.assertExpectedQuery(self.sq.build_query(),
                                  '(<alldocuments> AND_NOT '
-                                 '(ZXFOOhello OR XFOOhello))')
+                                 '(XFOO^ PHRASE 3 XFOOhello PHRASE 3 XFOO$))')
 
     def test_boolean(self):
         self.sq.add_filter(SQ(content=True))
@@ -128,15 +128,15 @@ class XapianSearchQueryTestCase(HaystackBackendTestCase, TestCase):
         self.sq.add_filter(SQ(foo='hello'))
         self.sq.add_filter(SQ(title='world'))
         self.assertExpectedQuery(self.sq.build_query(),
-                                 '((ZXFOOhello OR XFOOhello) AND'
-                                 ' (ZXTITLEworld OR XTITLEworld))')
+                                 '((XFOO^ PHRASE 3 XFOOhello PHRASE 3 XFOO$) AND'
+                                 ' (XTITLE^ PHRASE 3 XTITLEworld PHRASE 3 XTITLE$))')
 
     def test_multiple_word_field_exact_not(self):
         self.sq.add_filter(~SQ(foo='hello'))
         self.sq.add_filter(~SQ(title='world'))
         self.assertExpectedQuery(self.sq.build_query(),
-                                 '((<alldocuments> AND_NOT (ZXFOOhello OR XFOOhello)) AND'
-                                 ' (<alldocuments> AND_NOT (ZXTITLEworld OR XTITLEworld)))')
+                                 '((<alldocuments> AND_NOT (XFOO^ PHRASE 3 XFOOhello PHRASE 3 XFOO$)) AND'
+                                 ' (<alldocuments> AND_NOT (XTITLE^ PHRASE 3 XTITLEworld PHRASE 3 XTITLE$)))')
 
     def test_or(self):
         self.sq.add_filter(SQ(content='hello world'))
@@ -267,6 +267,13 @@ class SearchQueryTestCase(HaystackBackendTestCase, TestCase):
         self.assertEqual(self.sq.get_spelling_suggestion(), 'indexed')
         self.assertEqual(self.sq.get_spelling_suggestion('indxd'), 'indexed')
 
+    def test_contains(self):
+        self.sq.add_filter(SQ(content='circular'))
+        self.sq.add_filter(SQ(title__contains='haystack'))
+        self.assertExpectedQuery(self.sq.build_query(),
+                                 '((Zcircular OR circular) AND '
+                                 '(ZXTITLEhaystack OR XTITLEhaystack))')
+
     def test_startswith(self):
         self.sq.add_filter(SQ(name__startswith='da'))
         self.assertEqual([result.pk for result in self.sq.get_results()], [1, 2, 3])
@@ -328,7 +335,7 @@ class SearchQueryTestCase(HaystackBackendTestCase, TestCase):
         len(self.sq.get_results())
         self.assertEqual(len(connections['default'].queries), 1)
         self.assertExpectedQuery(connections['default'].queries[0]['query_string'],
-                                 '(ZXNAMEbar OR XNAMEbar)')
+                                 '(XNAME^ PHRASE 3 XNAMEbar PHRASE 3 XNAME$)')
 
         # And again, for good measure.
         self.sq = connections['default'].get_query()
@@ -337,10 +344,10 @@ class SearchQueryTestCase(HaystackBackendTestCase, TestCase):
         len(self.sq.get_results())
         self.assertEqual(len(connections['default'].queries), 2)
         self.assertExpectedQuery(connections['default'].queries[0]['query_string'],
-                                 '(ZXNAMEbar OR XNAMEbar)')
+                                 '(XNAME^ PHRASE 3 XNAMEbar PHRASE 3 XNAME$)')
         self.assertExpectedQuery(connections['default'].queries[1]['query_string'],
-                                 '((ZXNAMEbar OR XNAMEbar) AND'
-                                 ' (ZXTEXTmoof OR XTEXTmoof))')
+                                 '((XNAME^ PHRASE 3 XNAMEbar PHRASE 3 XNAME$) AND'
+                                 ' (XTEXT^ PHRASE 3 XTEXTmoof PHRASE 3 XTEXT$))')
 
         # Restore.
         settings.DEBUG = old_debug

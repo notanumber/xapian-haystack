@@ -74,18 +74,18 @@ class InterfaceTestCase(TestCase):
         self.assertEqual(pks(result)[:4], [1, 4, 7, 10])
 
     def test_field_search(self):
-        self.assertEqual(pks(self.queryset.filter(name='8')), [4])
+        self.assertEqual(pks(self.queryset.filter(name__contains='8')), [4])
         self.assertEqual(pks(self.queryset.filter(type_name='book')),
                          pks(Document.objects.filter(type_name='book')))
 
-        self.assertEqual(pks(self.queryset.filter(text='text huge')),
+        self.assertEqual(pks(self.queryset.filter(text__contains='text huge')),
                          pks(Document.objects.filter(text__contains='text huge')))
 
     def test_field_contains(self):
-        self.assertEqual(pks(self.queryset.filter(summary='huge')),
+        self.assertEqual(pks(self.queryset.filter(summary__contains='huge')),
                          pks(Document.objects.filter(summary__contains='huge')))
 
-        result = self.queryset.filter(summary='huge summary')
+        result = self.queryset.filter(summary__contains='huge summary')
         self.assertEqual(sorted(pks(result)),
                          pks(Document.objects.all()))
 
@@ -103,7 +103,7 @@ class InterfaceTestCase(TestCase):
         self.assertEqual(pks(self.queryset.filter(content='huge').filter(summary='medium')), [])
 
         self.assertEqual(len(self.queryset.filter(content='huge this')), 12)
-        self.assertEqual(len(self.queryset.filter(content='huge this').filter(summary='huge')), 4)
+        self.assertEqual(len(self.queryset.filter(content='huge this').filter(summary__contains='huge')), 4)
 
     def test_content_or(self):
         self.assertEqual(len(self.queryset.filter(content='huge medium')), 8)
@@ -113,7 +113,7 @@ class InterfaceTestCase(TestCase):
         self.assertEqual(pks(self.queryset.filter(name='8').filter(name='4')), [])
 
     def test_field_or(self):
-        self.assertEqual(pks(self.queryset.filter(name='8 4')), [2, 4])
+        self.assertEqual(pks(self.queryset.filter(name__contains='8 4')), [2, 4])
 
     def test_field_in(self):
         self.assertEqual(set(pks(self.queryset.filter(name__in=['magazine 2', 'article 4']))),
