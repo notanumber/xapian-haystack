@@ -10,8 +10,8 @@ BINDINGS=xapian-bindings-$VERSION
 
 # download
 echo "Downloading source..."
-curl -O http://oligarchy.co.uk/xapian/$VERSION/${CORE}.tar.xz
-curl -O http://oligarchy.co.uk/xapian/$VERSION/${BINDINGS}.tar.xz
+curl -O https://oligarchy.co.uk/xapian/$VERSION/${CORE}.tar.xz
+curl -O https://oligarchy.co.uk/xapian/$VERSION/${BINDINGS}.tar.xz
 
 # extract
 echo "Extracting source..."
