@@ -278,6 +278,11 @@ class SearchQueryTestCase(HaystackBackendTestCase, TestCase):
         self.sq.add_filter(SQ(name__startswith='da'))
         self.assertEqual([result.pk for result in self.sq.get_results()], [1, 2, 3])
 
+    def test_endswith(self):
+        with self.assertRaises(NotImplementedError):
+            self.sq.add_filter(SQ(name__endswith='el2'))
+            self.sq.get_results()
+
     def test_gt(self):
         self.sq.add_filter(SQ(name__gt='m'))
         self.assertExpectedQuery(self.sq.build_query(),

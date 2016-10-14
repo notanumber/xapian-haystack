@@ -1363,6 +1363,8 @@ class XapianSearchQuery(BaseSearchQuery):
             query_list.append(self._filter_in(term, field_name, field_type, is_not))
         elif filter_type == 'startswith':
             query_list.append(self._filter_startswith(term, field_name, field_type, is_not))
+        elif filter_type == 'endswith':
+            raise NotImplementedError("The Xapian search backend doesn't support endswith queries.")
         elif filter_type == 'gt':
             query_list.append(self._filter_gt(term, field_name, field_type, is_not))
         elif filter_type == 'gte':

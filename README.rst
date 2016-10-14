@@ -26,6 +26,11 @@ Xapian-Haystack provides all the standard features of Haystack:
 - Spelling suggestions
 - EdgeNGram and Ngram (for autocomplete)
 
+Limitations
+-----------
+
+The `endswith` search operation is not supported by Xapian-Haystack.
+
 
 Requirements
 ------------
