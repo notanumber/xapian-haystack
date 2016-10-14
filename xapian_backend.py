@@ -1373,6 +1373,8 @@ class XapianSearchQuery(BaseSearchQuery):
             query_list.append(self._filter_lt(term, field_name, field_type, is_not))
         elif filter_type == 'lte':
             query_list.append(self._filter_lte(term, field_name, field_type, is_not))
+        elif filter_type == 'range':
+            query_list.append(self._filter_range(term, field_name, field_type, is_not))
         return query_list
 
     def _all_query(self):
@@ -1552,6 +1554,21 @@ class XapianSearchQuery(BaseSearchQuery):
         """
         vrp = XHValueRangeProcessor(self.backend)
         pos, begin, end = vrp('%s:' % field_name, '%s' % _term_to_xapian_value(term, field_type))
+        if is_not:
+            return xapian.Query(xapian.Query.OP_AND_NOT,
+                                self._all_query(),
+                                xapian.Query(xapian.Query.OP_VALUE_RANGE, pos, begin, end)
+                                )
+        return xapian.Query(xapian.Query.OP_VALUE_RANGE, pos, begin, end)
+
+    def _filter_range(self, term, field_name, field_type, is_not):
+        """
+        Private method that returns a xapian.Query that searches for any term
+        that is between the values from the `term` list.
+        """
+        vrp = XHValueRangeProcessor(self.backend)
+        pos, begin, end = vrp('%s:%s' % (field_name, _term_to_xapian_value(term[0], field_type)),
+                              '%s' % _term_to_xapian_value(term[1], field_type))
         if is_not:
             return xapian.Query(xapian.Query.OP_AND_NOT,
                                 self._all_query(),

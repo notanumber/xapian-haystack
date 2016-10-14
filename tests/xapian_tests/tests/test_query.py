@@ -307,6 +307,15 @@ class SearchQueryTestCase(HaystackBackendTestCase, TestCase):
         self.sq.add_filter(SQ(name__lte='m'))
         self.assertExpectedQuery(self.sq.build_query(), 'VALUE_RANGE 3 a m')
 
+    def test_range(self):
+        self.sq.add_filter(SQ(django_id__range=[2, 4]))
+        self.assertExpectedQuery(self.sq.build_query(), 'VALUE_RANGE 1 000000000002 000000000004')
+        self.sq.add_filter(~SQ(django_id__range=[0, 2]))
+        self.assertExpectedQuery(self.sq.build_query(),
+                                 '(VALUE_RANGE 1 000000000002 000000000004 AND '
+                                 '(<alldocuments> AND_NOT VALUE_RANGE 1 000000000000 000000000002))')
+        self.assertEqual([result.pk for result in self.sq.get_results()], [3])
+
     def test_multiple_filter_types(self):
         self.sq.add_filter(SQ(content='why'))
         self.sq.add_filter(SQ(pub_date__lte=datetime.datetime(2009, 2, 10, 1, 59, 0)))
