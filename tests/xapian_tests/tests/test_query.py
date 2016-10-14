@@ -21,6 +21,8 @@ class XapianSearchQueryTestCase(HaystackBackendTestCase, TestCase):
     Tests the XapianSearchQuery, the class that converts SearchQuerySet queries
     using the `__` notation to XapianQueries.
     """
+    fixtures = ['base_data.json']
+
     def get_index(self):
         return MockQueryIndex()
 
@@ -248,7 +250,7 @@ class SearchQueryTestCase(HaystackBackendTestCase, TestCase):
     Tests expected behavior of
     SearchQuery.
     """
-    fixtures = ['initial_data.json']
+    fixtures = ['base_data.json']
 
     def get_index(self):
         return MockSearchIndex()
@@ -348,7 +350,7 @@ class LiveSearchQuerySetTestCase(HaystackBackendTestCase, TestCase):
     """
     SearchQuerySet specific tests
     """
-    fixtures = ['initial_data.json']
+    fixtures = ['base_data.json']
 
     def get_index(self):
         return MockSearchIndex()
