@@ -3,24 +3,24 @@ language: python
 
 matrix:
     include:
-        - python: 3.3
-          env: DJANGO_VERSION=1.6 XAPIAN_VERSION=1.3.3
-        - python: 3.3
-          env: DJANGO_VERSION=1.7 XAPIAN_VERSION=1.3.3
-        - python: 3.3
+        - python: 3.4
           env: DJANGO_VERSION=1.8 XAPIAN_VERSION=1.3.3
-        - python: 2.7
-          env: DJANGO_VERSION=1.6 XAPIAN_VERSION=1.3.3
-        - python: 2.7
-          env: DJANGO_VERSION=1.7 XAPIAN_VERSION=1.3.3
+        - python: 3.4
+          env: DJANGO_VERSION=1.9 XAPIAN_VERSION=1.3.3
+        - python: 3.4
+          env: DJANGO_VERSION=1.10 XAPIAN_VERSION=1.3.3
         - python: 2.7
           env: DJANGO_VERSION=1.8 XAPIAN_VERSION=1.3.3
         - python: 2.7
-          env: DJANGO_VERSION=1.6 XAPIAN_VERSION=1.2.19
+          env: DJANGO_VERSION=1.9 XAPIAN_VERSION=1.3.3
         - python: 2.7
-          env: DJANGO_VERSION=1.7 XAPIAN_VERSION=1.2.19
+          env: DJANGO_VERSION=1.10 XAPIAN_VERSION=1.3.3
         - python: 2.7
           env: DJANGO_VERSION=1.8 XAPIAN_VERSION=1.2.19
+        - python: 2.7
+          env: DJANGO_VERSION=1.9 XAPIAN_VERSION=1.2.19
+        - python: 2.7
+          env: DJANGO_VERSION=1.10 XAPIAN_VERSION=1.2.19
 
 addons:
   apt:

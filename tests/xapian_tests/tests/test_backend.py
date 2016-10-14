@@ -7,8 +7,8 @@ import xapian
 import subprocess
 import os
 
+from django.apps import apps
 from django.test import TestCase
-from django.db.models.loading import get_model
 from django.utils.encoding import force_text
 
 from haystack import connections
@@ -27,7 +27,7 @@ XAPIAN_VERSION = [int(x) for x in xapian.__version__.split('.')]
 class XapianSearchResult(SearchResult):
     def __init__(self, app_label, model_name, pk, score, **kwargs):
         super(XapianSearchResult, self).__init__(app_label, model_name, pk, score, **kwargs)
-        self._model = get_model('xapian_tests', model_name)
+        self._model = apps.get_model('xapian_tests', model_name)
 
 
 def get_terms(backend, *args):
