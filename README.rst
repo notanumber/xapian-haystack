@@ -40,12 +40,12 @@ Requirements
 - Django-Haystack 2
 - Xapian 1.2.19+
 
-In particular, we build this backend on `Travis`_ using:
+In particular, we build-test this backend in `Travis`_ using:
 
-- Python 2.7 and 3.3
+- Python 2.7 and 3.4
 - Django 1.8, 1.9 and 1.10
 - Django-Haystack (master)
-- Xapian 1.2.19 (in Python 2) and 1.3.3 (in both)
+- Xapian 1.2.19 (Python 2 only), 1.3.3 (both), and 1.4.1 (both)
 
 
 Installation
