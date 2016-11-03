@@ -117,6 +117,7 @@ Credits
 Xapian-Haystack is maintained by `Jorge C. Leitão <http://jorgecarleitao.net>`__;
 `David Sauve <mailto:david.sauve@bag-of-holding.com>`__ was the main contributor of Xapian-Haystack and
 Xapian-Haystack was originally funded by `Trapeze <http://www.trapeze.com>`__.
+`Claudep <http://www.2xlibre.net>`__ is a frequent contributor.
 `ANtlord <https://github.com/ANtlord>`__ implemented support for EdgeNgram and Ngram.
 
 
