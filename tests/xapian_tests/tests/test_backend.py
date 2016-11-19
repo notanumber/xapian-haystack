@@ -18,8 +18,8 @@ from haystack.models import SearchResult
 from haystack.utils.loading import UnifiedIndex
 
 from ..search_indexes import XapianNGramIndex, XapianEdgeNGramIndex, \
-    CompleteBlogEntryIndex, BlogSearchIndex, DjangoContentTypeIndex
-from ..models import BlogEntry, AnotherMockModel, MockTag, DjangoContentType
+    CompleteBlogEntryIndex, BlogSearchIndex, DjangoContentTypeIndex, UUIDBlogSearchIndex
+from ..models import BlogEntry, AnotherMockModel, MockTag, UUIDBlogEntry, DjangoContentType
 
 
 XAPIAN_VERSION = [int(x) for x in xapian.__version__.split('.')]
@@ -680,6 +680,74 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
 
         self.backend.silently_fail = False
         self.assertRaises(InvalidIndexError, self.backend.more_like_this, mock)
+
+
+class StringBasedPKModelBackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
+    """
+    Covers #138, Must not assume django_id is an int
+    """
+
+    def get_index(self):
+        return UUIDBlogSearchIndex()
+
+    @staticmethod
+    def get_entry(i):
+        entry = UUIDBlogEntry()
+        entry.uuid = 'uuid-%s' % i
+        entry.author = 'david%s' % i
+        entry.url = 'http://example.com/%d/' % i
+        entry.boolean = bool(i % 2)
+        entry.number = i*5
+        entry.float_number = i*5.0
+        entry.decimal_number = Decimal('22.34')
+        entry.datetime = (
+            datetime.datetime(2009, 2, 25, 1, 1, 1) - datetime.timedelta(seconds=i)
+        )
+        entry.date = datetime.date(2009, 2, 23) + datetime.timedelta(days=i)
+        return entry
+
+    def setUp(self):
+        super(StringBasedPKModelBackendFeaturesTestCase, self).setUp()
+
+        self.sample_objs = []
+
+        for i in range(1, 4):
+            entry = self.get_entry(i)
+            self.sample_objs.append(entry)
+
+        self.sample_objs[0].float_number = 834.0
+        self.sample_objs[1].float_number = 35.5
+        self.sample_objs[2].float_number = 972.0
+        for obj in self.sample_objs:
+            obj.save()
+
+        self.backend.update(self.index, UUIDBlogEntry.objects.all())
+
+    def test_update(self):
+        self.assertEqual(pks(self.backend.search(xapian.Query(''))['results']),
+                         ['uuid-1', 'uuid-2', 'uuid-3'])
+
+    def test_order_by_django_id(self):
+        """
+        We need this test because ordering on more than
+        10 entries was not correct at some point.
+        """
+        self.sample_objs = []
+        pk_list = []
+        for i in range(101, 200):
+            entry = self.get_entry(i)
+            self.sample_objs.append(entry)
+            pk_list.append('uuid-%03d' % i)
+
+        for obj in self.sample_objs:
+            obj.save()
+
+        self.backend.clear()
+        self.backend.update(self.index, self.sample_objs)
+
+        results = self.backend.search(xapian.Query(''), sort_by=['-django_id'])
+        self.assertEqual(pks(results['results']), list(reversed(pk_list)))
+
 
 
 class IndexationNGramTestCase(HaystackBackendTestCase, TestCase):

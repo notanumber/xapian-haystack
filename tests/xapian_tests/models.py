@@ -15,7 +15,7 @@ class Document(models.Model):
     text = models.TextField()
 
 
-class BlogEntry(models.Model):
+class AbstractBlogEntry(models.Model):
     """
     Same as tests.core.MockModel with a few extra fields for testing various
     sorting and ordering criteria.
@@ -35,6 +35,21 @@ class BlogEntry(models.Model):
     number = models.IntegerField()
     float_number = models.FloatField()
     decimal_number = models.DecimalField(max_digits=4, decimal_places=2)
+
+    class Meta:
+        abstract = True
+
+
+class BlogEntry(AbstractBlogEntry):
+    pass
+
+
+class UUIDBlogEntry(AbstractBlogEntry):
+    """
+    A blog entry with string based primary key instead of an integer.
+    Covers #138
+    """
+    uuid = models.CharField(primary_key=True, max_length=20)
 
 
 class DjangoContentType(models.Model):

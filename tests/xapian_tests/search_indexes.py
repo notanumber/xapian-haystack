@@ -82,6 +82,35 @@ class BlogSearchIndex(indexes.SearchIndex):
         return ''
 
 
+class UUIDBlogSearchIndex(BlogSearchIndex):
+
+    def get_model(self):
+        return models.UUIDBlogEntry
+
+    def prepare_sites(self, obj):
+        return ['%d' % (i * int(obj.pk.split('-')[1])) for i in range(1, 4)]
+
+    def prepare_tags(self, obj):
+        if obj.pk == 'uuid-1':
+            return ['a', 'b', 'c']
+        elif obj.pk == 'uuid-2':
+            return ['ab', 'bc', 'cd']
+        else:
+            return ['an', 'to', 'or']
+
+    def prepare_keys(self, obj):
+        return [i * int(obj.pk.split('-')[1]) for i in range(1, 4)]
+
+    def prepare_titles(self, obj):
+        if obj.pk == 'uuid-1':
+            return ['object one title one', 'object one title two']
+        elif obj.pk == 'uuid-2':
+            return ['object two title one', 'object two title two']
+        else:
+            return ['object three title one', 'object three title two']
+
+
+
 class CompleteBlogEntryIndex(indexes.SearchIndex):
     text = indexes.CharField(model_attr='text', document=True)
     author = indexes.CharField(model_attr='author')
