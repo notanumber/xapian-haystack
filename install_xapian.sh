@@ -3,7 +3,7 @@
 VERSION=$1
 
 # prepare
-mkdir $VIRTUAL_ENV/packages && cd $VIRTUAL_ENV/packages
+mkdir -p $VIRTUAL_ENV/packages && cd $VIRTUAL_ENV/packages
 
 CORE=xapian-core-$VERSION
 BINDINGS=xapian-bindings-$VERSION
@@ -15,8 +15,19 @@ curl -O https://oligarchy.co.uk/xapian/$VERSION/${BINDINGS}.tar.xz
 
 # extract
 echo "Extracting source..."
-tar xf ${CORE}.tar.xz
-tar xf ${BINDINGS}.tar.xz
+if [ $OSTYPE = 'darwin*' ]; then
+    xz -d ${CORE}.tar.xz
+    xz -d ${BINDINGS}.tar.xz
+
+    tar xf ${CORE}.tar
+    tar xf ${BINDINGS}.tar
+else
+    tar xf ${CORE}.tar.xz
+    tar xf ${BINDINGS}.tar.xz
+fi
+
+test -e $VIRTUAL_ENV/packages/${BINDINGS} || exit 1
+test -e $VIRTUAL_ENV/packages/${CORE} || exit 1
 
 # install
 echo "Installing Xapian-core..."
