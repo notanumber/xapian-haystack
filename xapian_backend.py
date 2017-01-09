@@ -566,7 +566,7 @@ class XapianSearchBackend(BaseSearchBackend):
     def search(self, query, sort_by=None, start_offset=0, end_offset=None,
                fields='', highlight=False, facets=None, date_facets=None,
                query_facets=None, narrow_queries=None, spelling_query=None,
-               limit_to_registered_models=True, result_class=None, **kwargs):
+               limit_to_registered_models=None, result_class=None, **kwargs):
         """
         Executes the Xapian::query as defined in `query`.
 
@@ -616,6 +616,9 @@ class XapianSearchBackend(BaseSearchBackend):
 
         database = self._database()
 
+        if limit_to_registered_models is None:
+            limit_to_registered_models = getattr(settings, 'HAYSTACK_LIMIT_TO_REGISTERED_MODELS', True)
+
         if result_class is None:
             result_class = SearchResult
 
@@ -660,6 +663,8 @@ class XapianSearchBackend(BaseSearchBackend):
             facets_spies = self._prepare_facet_field_spies(facets)
             for spy in facets_spies:
                 enquire.add_matchspy(spy)
+
+        print enquire.get_query()
 
         matches = self._get_enquire_mset(database, enquire, start_offset, end_offset)
 
