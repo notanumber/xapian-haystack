@@ -37,18 +37,18 @@ class NotSupportedError(Exception):
     """
     pass
 
-
 # this maps the different reserved fields to prefixes used to
 # create the database:
 # id str: unique document id.
 # django_id int: id of the django model instance.
 # django_ct str: of the content type of the django model.
 # field str: name of the field of the index.
-TERM_PREFIXES = {'id': 'Q',
-                 'django_id': 'QQ',
-                 'django_ct': 'CONTENTTYPE',
-                 'field': 'X'
-                 }
+TERM_PREFIXES = {
+    ID: 'Q',
+    DJANGO_ID: 'QQ',
+    DJANGO_CT: 'CONTENTTYPE',
+    'field': 'X'
+}
 
 MEMORY_DB_NAME = ':memory:'
 
@@ -149,7 +149,7 @@ class XHExpandDecider(xapian.ExpandDecider):
 
         Ignore terms related with the content type of objects.
         """
-        if term.decode('utf-8').startswith(TERM_PREFIXES['django_ct']):
+        if term.decode('utf-8').startswith(TERM_PREFIXES[DJANGO_CT]):
             return False
         return True
 
@@ -428,11 +428,11 @@ class XapianSearchBackend(BaseSearchBackend):
 
                     value = data[field['field_name']]
 
-                    if field['field_name'] in ('id', 'django_id', 'django_ct'):
+                    if field['field_name'] in (ID, DJANGO_ID, DJANGO_CT):
                         # Private fields are indexed in a different way:
                         # `django_id` is an int and `django_ct` is text;
                         # besides, they are indexed by their (unstemmed) value.
-                        if field['field_name'] == 'django_id':
+                        if field['field_name'] == DJANGO_ID:
                             value = int(value)
                         value = _term_to_xapian_value(value, field['type'])
 
@@ -479,7 +479,7 @@ class XapianSearchBackend(BaseSearchBackend):
                 ))
 
                 # add the id of the document
-                document_id = TERM_PREFIXES['id'] + get_identifier(obj)
+                document_id = TERM_PREFIXES[ID] + get_identifier(obj)
                 document.add_term(document_id)
 
                 # finally, replace or add the document to the database
@@ -500,7 +500,7 @@ class XapianSearchBackend(BaseSearchBackend):
         should be unique to this object.
         """
         database = self._database(writable=True)
-        database.delete_document(TERM_PREFIXES['id'] + get_identifier(obj))
+        database.delete_document(TERM_PREFIXES[ID] + get_identifier(obj))
         database.close()
 
     def clear(self, models=(), commit=True):
@@ -527,7 +527,7 @@ class XapianSearchBackend(BaseSearchBackend):
         else:
             database = self._database(writable=True)
             for model in models:
-                database.delete_document(TERM_PREFIXES['django_ct'] + get_model_ct(model))
+                database.delete_document(TERM_PREFIXES[DJANGO_CT] + get_model_ct(model))
             database.close()
 
     def document_count(self):
@@ -542,7 +542,7 @@ class XapianSearchBackend(BaseSearchBackend):
         """
         registered_models_ct = self.build_models_list()
         if registered_models_ct:
-            restrictions = [xapian.Query('%s%s' % (TERM_PREFIXES['django_ct'], model_ct))
+            restrictions = [xapian.Query('%s%s' % (TERM_PREFIXES[DJANGO_CT], model_ct))
                             for model_ct in registered_models_ct]
             limit_query = xapian.Query(xapian.Query.OP_OR, restrictions)
 
@@ -740,7 +740,7 @@ class XapianSearchBackend(BaseSearchBackend):
         if result_class is None:
             result_class = SearchResult
 
-        query = xapian.Query(TERM_PREFIXES['id'] + get_identifier(model_instance))
+        query = xapian.Query(TERM_PREFIXES[ID] + get_identifier(model_instance))
 
         enquire = xapian.Enquire(database)
         enquire.set_query(query)
@@ -768,7 +768,7 @@ class XapianSearchBackend(BaseSearchBackend):
             match.document.termlist_count()
         )
         query = xapian.Query(
-            xapian.Query.OP_AND_NOT, [query, TERM_PREFIXES['id'] + get_identifier(model_instance)]
+            xapian.Query.OP_AND_NOT, [query, TERM_PREFIXES[ID] + get_identifier(model_instance)]
         )
 
         if limit_to_registered_models:
@@ -820,12 +820,12 @@ class XapianSearchBackend(BaseSearchBackend):
         qp.set_stemmer(xapian.Stem(self.language))
         qp.set_stemming_strategy(self.stemming_strategy)
         qp.set_default_op(XAPIAN_OPTS[DEFAULT_OPERATOR])
-        qp.add_boolean_prefix('django_ct', TERM_PREFIXES['django_ct'])
+        qp.add_boolean_prefix(DJANGO_CT, TERM_PREFIXES[DJANGO_CT])
 
         for field_dict in self.schema:
             # since 'django_ct' has a boolean_prefix,
             # we ignore it here.
-            if field_dict['field_name'] == 'django_ct':
+            if field_dict['field_name'] == DJANGO_CT:
                 continue
 
             qp.add_prefix(
@@ -1248,7 +1248,7 @@ class XapianSearchQuery(BaseSearchQuery):
             subqueries = [
                 xapian.Query(
                     xapian.Query.OP_SCALE_WEIGHT,
-                    xapian.Query('%s%s' % (TERM_PREFIXES['django_ct'], get_model_ct(model))),
+                    xapian.Query('%s%s' % (TERM_PREFIXES[DJANGO_CT], get_model_ct(model))),
                     0  # Pure boolean sub-query
                 ) for model in self.models
             ]
@@ -1336,7 +1336,7 @@ class XapianSearchQuery(BaseSearchQuery):
 
         # private fields don't accept 'contains' or 'startswith'
         # since they have no meaning.
-        if filter_type in ('contains', 'startswith') and field_name in ('id', 'django_id', 'django_ct'):
+        if filter_type in ('contains', 'startswith') and field_name in (ID, DJANGO_ID, DJANGO_CT):
             filter_type = 'exact'
 
         if field_type == 'text':
@@ -1423,7 +1423,7 @@ class XapianSearchQuery(BaseSearchQuery):
 
         Assumes term is not a list.
         """
-        if field_type == 'text' and field_name not in ('django_ct',):
+        if field_type == 'text' and field_name not in (DJANGO_CT,):
             term = '^ %s $' % term
             query = self._phrase_query(term.split(), field_name, field_type)
         else:
@@ -1491,9 +1491,9 @@ class XapianSearchQuery(BaseSearchQuery):
             prefix = TERM_PREFIXES['field'] + field_name.upper()
             term = _to_xapian_term(term)
 
-        if field_name in ('id', 'django_id', 'django_ct'):
+        if field_name in (ID, DJANGO_ID, DJANGO_CT):
             # to ensure the value is serialized correctly.
-            if field_name == 'django_id':
+            if field_name == DJANGO_ID:
                 term = int(term)
             term = _term_to_xapian_value(term, field_type)
             return xapian.Query('%s%s' % (TERM_PREFIXES[field_name], term))
