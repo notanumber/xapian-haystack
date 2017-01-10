@@ -674,7 +674,7 @@ class XapianSearchBackend(BaseSearchBackend):
             for spy in facets_spies:
                 enquire.add_matchspy(spy)
 
-        print enquire.get_query()
+        # print enquire.get_query()
 
         matches = self._get_enquire_mset(database, enquire, start_offset, end_offset)
 
@@ -1433,7 +1433,7 @@ class XapianSearchQuery(BaseSearchQuery):
 
         Assumes term is not a list.
         """
-        if field_type == 'text':
+        if field_type == 'text' and field_name not in ('django_ct',):
             term = '^ %s $' % term
             query = self._phrase_query(term.split(), field_name, field_type)
         else:
