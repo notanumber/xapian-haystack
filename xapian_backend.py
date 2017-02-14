@@ -240,7 +240,7 @@ class XapianSearchBackend(BaseSearchBackend):
         self._update_cache()
         return self._columns
 
-    def update(self, index, iterable, commit=True):
+    def update(self, index, iterable):
         """
         Updates the `index` with any objects in `iterable` by adding/updating
         the database as needed.
@@ -248,8 +248,6 @@ class XapianSearchBackend(BaseSearchBackend):
         Required arguments:
             `index` -- The `SearchIndex` to process
             `iterable` -- An iterable of model instances to index
-        Optional arguments:
-            `commit` -- ignored (present for compatibility with django-haystack 1.4)
 
         For each object in `iterable`, a document is created containing all
         of the terms extracted from `index.full_prepare(obj)` with field prefixes,
@@ -499,15 +497,12 @@ class XapianSearchBackend(BaseSearchBackend):
         finally:
             database.close()
 
-    def remove(self, obj, commit=True):
+    def remove(self, obj):
         """
         Remove indexes for `obj` from the database.
 
         We delete all instances of `Q<app_name>.<model_name>.<pk>` which
         should be unique to this object.
-
-        Optional arguments:
-           `commit` -- ignored (present for compatibility with django-haystack 1.4)
         """
         database = self._database(writable=True)
         database.delete_document(TERM_PREFIXES['id'] + get_identifier(obj))
