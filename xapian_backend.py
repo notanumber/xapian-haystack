@@ -7,7 +7,6 @@ import re
 import shutil
 import sys
 
-import django
 from django.utils import six
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
@@ -474,12 +473,8 @@ class XapianSearchBackend(BaseSearchBackend):
                             add_non_text_to_document(prefix, term, weight)
 
                 # store data without indexing it
-                if django.VERSION < (1, 7):
-                    model_name = obj._meta.module_name
-                else:
-                    model_name = obj._meta.model_name
                 document.set_data(pickle.dumps(
-                    (obj._meta.app_label, model_name, obj.pk, data),
+                    (obj._meta.app_label, obj._meta.model_name, obj.pk, data),
                     pickle.HIGHEST_PROTOCOL
                 ))
 
