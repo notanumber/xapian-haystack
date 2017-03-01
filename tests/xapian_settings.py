@@ -2,6 +2,7 @@ import os
 from .settings import *
 
 INSTALLED_APPS = [
+    'django.contrib.contenttypes',
     'test_haystack.core',
     'test_haystack.xapian_tests',
 ]

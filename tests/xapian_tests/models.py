@@ -1,4 +1,5 @@
 from django.db import models
+from django.contrib.contenttypes.models import ContentType
 
 from ..core.models import MockTag, AnotherMockModel, MockModel, AFourthMockModel
 
@@ -34,3 +35,7 @@ class BlogEntry(models.Model):
     number = models.IntegerField()
     float_number = models.FloatField()
     decimal_number = models.DecimalField(max_digits=4, decimal_places=2)
+
+
+class DjangoContentType(models.Model):
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)

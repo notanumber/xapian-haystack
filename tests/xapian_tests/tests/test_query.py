@@ -244,6 +244,10 @@ class XapianSearchQueryTestCase(HaystackBackendTestCase, TestCase):
                                  '(XTITLE^ PHRASE 3 XTITLE2 PHRASE 3 XTITLE$) OR '
                                  '(XTITLE^ PHRASE 3 XTITLE3 PHRASE 3 XTITLE$)))')
 
+    def test_content_type(self):
+        self.sq.add_filter(SQ(django_ct='time'))
+        self.assertExpectedQuery(self.sq.build_query(), 'CONTENTTYPEtime')
+
 
 class SearchQueryTestCase(HaystackBackendTestCase, TestCase):
     """

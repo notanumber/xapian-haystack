@@ -8,6 +8,7 @@ import subprocess
 import os
 
 from django.apps import apps
+from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase
 from django.utils.encoding import force_text
 
@@ -17,8 +18,8 @@ from haystack.models import SearchResult
 from haystack.utils.loading import UnifiedIndex
 
 from ..search_indexes import XapianNGramIndex, XapianEdgeNGramIndex, \
-    CompleteBlogEntryIndex, BlogSearchIndex
-from ..models import BlogEntry, AnotherMockModel, MockTag
+    CompleteBlogEntryIndex, BlogSearchIndex, DjangoContentTypeIndex
+from ..models import BlogEntry, AnotherMockModel, MockTag, DjangoContentType
 
 
 XAPIAN_VERSION = [int(x) for x in xapian.__version__.split('.')]
@@ -772,3 +773,22 @@ class IndexationEdgeNGramTestCase(HaystackBackendTestCase, TestCase):
                 [1])
         self.assertEqual(pks(self.backend.search(xapian.Query('da1'))['results']),
                 [2])
+
+
+class IndexationDjangoContentTypeTestCase(HaystackBackendTestCase, TestCase):
+    def get_index(self):
+        return DjangoContentTypeIndex()
+
+    def setUp(self):
+        super(IndexationDjangoContentTypeTestCase, self).setUp()
+
+        entry1 = ContentType(model='DjangoContentType')
+        entry1.save()
+        entry2 = DjangoContentType(content_type=entry1)
+        entry2.save()
+
+        self.backend.update(self.index, [entry2])
+
+    def test_basic(self):
+        terms = get_terms(self.backend, '-a')
+        self.assertTrue('CONTENTTYPExapian_tests.djangocontenttype' in terms)
