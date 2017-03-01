@@ -348,6 +348,9 @@ class XapianSearchBackend(BaseSearchBackend):
                         yield item, ngram_length
 
             for obj in iterable:
+                if not index.should_update(obj):
+                    pass
+
                 document = xapian.Document()
                 term_generator.set_document(document)
 
