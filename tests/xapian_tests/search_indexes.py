@@ -122,6 +122,13 @@ class XapianEdgeNGramIndex(indexes.SearchIndex):
         return models.BlogEntry
 
 
+class DjangoContentTypeIndex(indexes.SearchIndex):
+    text = indexes.CharField(document=True)
+
+    def get_model(self):
+        return models.DjangoContentType
+
+
 class MockSearchIndex(indexes.SearchIndex):
     text = indexes.CharField(document=True, use_template=True)
     name = indexes.CharField(model_attr='author', faceted=True)

@@ -7,7 +7,6 @@ import re
 import shutil
 import sys
 
-import django
 from django.utils import six
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
@@ -240,7 +239,7 @@ class XapianSearchBackend(BaseSearchBackend):
         self._update_cache()
         return self._columns
 
-    def update(self, index, iterable, commit=True):
+    def update(self, index, iterable):
         """
         Updates the `index` with any objects in `iterable` by adding/updating
         the database as needed.
@@ -248,8 +247,6 @@ class XapianSearchBackend(BaseSearchBackend):
         Required arguments:
             `index` -- The `SearchIndex` to process
             `iterable` -- An iterable of model instances to index
-        Optional arguments:
-            `commit` -- ignored (present for compatibility with django-haystack 1.4)
 
         For each object in `iterable`, a document is created containing all
         of the terms extracted from `index.full_prepare(obj)` with field prefixes,
@@ -476,12 +473,8 @@ class XapianSearchBackend(BaseSearchBackend):
                             add_non_text_to_document(prefix, term, weight)
 
                 # store data without indexing it
-                if django.VERSION < (1, 7):
-                    model_name = obj._meta.module_name
-                else:
-                    model_name = obj._meta.model_name
                 document.set_data(pickle.dumps(
-                    (obj._meta.app_label, model_name, obj.pk, data),
+                    (obj._meta.app_label, obj._meta.model_name, obj.pk, data),
                     pickle.HIGHEST_PROTOCOL
                 ))
 
@@ -499,15 +492,12 @@ class XapianSearchBackend(BaseSearchBackend):
         finally:
             database.close()
 
-    def remove(self, obj, commit=True):
+    def remove(self, obj):
         """
         Remove indexes for `obj` from the database.
 
         We delete all instances of `Q<app_name>.<model_name>.<pk>` which
         should be unique to this object.
-
-        Optional arguments:
-           `commit` -- ignored (present for compatibility with django-haystack 1.4)
         """
         database = self._database(writable=True)
         database.delete_document(TERM_PREFIXES[ID] + get_identifier(obj))
