@@ -926,7 +926,7 @@ class XapianSearchBackend(BaseSearchBackend):
         for term in query:
             term = term.decode('utf-8')
             for match in re.findall('[^A-Z]+', term):  # Ignore field identifiers
-                match_re = re.compile(match, re.I)
+                match_re = re.compile(re.escape(match), re.I)
                 content = match_re.sub('<%s>%s</%s>' % (tag, term, tag), content)
 
         return content
