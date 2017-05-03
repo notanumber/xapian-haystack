@@ -44,11 +44,7 @@ class BlogEntry(AbstractBlogEntry):
     pass
 
 
-class UUIDBlogEntry(AbstractBlogEntry):
-    """
-    A blog entry with string based primary key instead of an integer.
-    Covers #138
-    """
+class UUIDModel(models.Model):
     uuid = models.CharField(primary_key=True, max_length=20)
 
 

@@ -9,8 +9,8 @@ from haystack import connections
 from haystack.inputs import AutoQuery
 from haystack.query import SearchQuerySet
 
-from ..models import Document
-from ..search_indexes import DocumentIndex
+from ..models import Document, UUIDModel
+from ..search_indexes import DocumentIndex, UUIDModelSearchIndex
 from ..tests.test_backend import pks
 
 
@@ -203,3 +203,29 @@ class InterfaceTestCase(TestCase):
         self.assertEqual(len(self.queryset.filter(tags__exact='tag')), 12)
         self.assertEqual(len(self.queryset.filter(tags__exact='tag-test')), 8)
         self.assertEqual(len(self.queryset.filter(tags__exact='tag-test-test')), 4)
+
+
+class UUIDInterfaceTestCase(TestCase):
+    def setUp(self):
+        super(UUIDInterfaceTestCase, self).setUp()
+
+        for i in range(1, 3):
+            doc = UUIDModel(uuid='uuid-%d' % i)
+            doc.save()
+
+        self.index = UUIDModelSearchIndex()
+        self.ui = connections['default'].get_unified_index()
+        self.ui.build(indexes=[self.index])
+
+        self.backend = connections['default'].get_backend()
+        self.backend.update(self.index, UUIDModel.objects.all())
+
+        self.queryset = SearchQuerySet()
+
+    def tearDown(self):
+        UUIDModel.objects.all().delete()
+        super(UUIDInterfaceTestCase, self).tearDown()
+
+    def test_search(self):
+        self.assertEqual(pks(self.queryset.filter(django_id='uuid-2')),
+                         pks(UUIDModel.objects.filter(uuid='uuid-2')))
