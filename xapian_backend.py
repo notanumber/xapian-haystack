@@ -193,8 +193,11 @@ class XapianSearchBackend(BaseSearchBackend):
 
         self.path = connection_options.get('PATH')
 
-        if self.path != MEMORY_DB_NAME and not os.path.exists(self.path):
-            os.makedirs(self.path)
+        if self.path != MEMORY_DB_NAME:
+            try:
+                os.makedirs(self.path)
+            except FileExistsError:
+                pass
 
         self.flags = connection_options.get('FLAGS', DEFAULT_XAPIAN_FLAGS)
         self.language = getattr(settings, 'HAYSTACK_XAPIAN_LANGUAGE', 'english')
