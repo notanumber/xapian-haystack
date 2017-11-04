@@ -1,9 +1,15 @@
 #!/usr/bin/env bash
 # first argument of the script is Xapian version (e.g. 1.2.19)
+
 VERSION=$1
 
+if [ -z "$VERSION" ]; then
+    echo "usage: $0 version_number" 1>&2
+    exit 1
+fi
+
 # prepare
-mkdir $VIRTUAL_ENV/packages && cd $VIRTUAL_ENV/packages
+mkdir -p $VIRTUAL_ENV/packages && cd $VIRTUAL_ENV/packages
 
 CORE=xapian-core-$VERSION
 BINDINGS=xapian-bindings-$VERSION
