@@ -193,8 +193,11 @@ class XapianSearchBackend(BaseSearchBackend):
 
         self.path = connection_options.get('PATH')
 
-        if self.path != MEMORY_DB_NAME and not os.path.exists(self.path):
-            os.makedirs(self.path)
+        if self.path != MEMORY_DB_NAME:
+            try:
+                os.makedirs(self.path)
+            except FileExistsError:
+                pass
 
         self.flags = connection_options.get('FLAGS', DEFAULT_XAPIAN_FLAGS)
         self.language = getattr(settings, 'HAYSTACK_XAPIAN_LANGUAGE', 'english')
@@ -248,7 +251,7 @@ class XapianSearchBackend(BaseSearchBackend):
             `index` -- The `SearchIndex` to process
             `iterable` -- An iterable of model instances to index
         Optional arguments:
-            `commit` -- ignored (present for compatibility with django-haystack 1.4)
+            `commit` -- ignored
 
         For each object in `iterable`, a document is created containing all
         of the terms extracted from `index.full_prepare(obj)` with field prefixes,
@@ -502,7 +505,7 @@ class XapianSearchBackend(BaseSearchBackend):
         should be unique to this object.
 
         Optional arguments:
-           `commit` -- ignored (present for compatibility with django-haystack 1.4)
+           `commit` -- ignored
         """
         database = self._database(writable=True)
         database.delete_document(TERM_PREFIXES[ID] + get_identifier(obj))
