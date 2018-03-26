@@ -29,6 +29,11 @@ except ImportError:
     raise MissingDependency("The 'xapian' backend requires the installation of 'Xapian'. "
                             "Please refer to the documentation.")
 
+if sys.version_info[0] == 2:
+    DirectoryExistsException = OSError
+elif sys.version_info[0] == 3:
+    DirectoryExistsException = FileExistsError
+
 
 class NotSupportedError(Exception):
     """
@@ -196,7 +201,7 @@ class XapianSearchBackend(BaseSearchBackend):
         if self.path != MEMORY_DB_NAME:
             try:
                 os.makedirs(self.path)
-            except FileExistsError:
+            except DirectoryExistsException:
                 pass
 
         self.flags = connection_options.get('FLAGS', DEFAULT_XAPIAN_FLAGS)
