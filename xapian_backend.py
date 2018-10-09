@@ -1436,7 +1436,7 @@ class XapianSearchQuery(BaseSearchQuery):
 
         Assumes term is not a list.
         """
-        if field_type == 'text' and field_name not in (DJANGO_CT,):
+        if field_type == 'text' and field_name not in (DJANGO_CT, ID):
             term = '^ %s $' % term
             query = self._phrase_query(term.split(), field_name, field_type)
         else:
