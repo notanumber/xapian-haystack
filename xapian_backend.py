@@ -23,6 +23,10 @@ from haystack.utils import get_identifier, get_model_ct
 NGRAM_MIN_LENGTH = 2
 NGRAM_MAX_LENGTH = 15
 
+LONG_TERM = re.compile(b'[^\s]{239,}')
+LONG_TERM_METHOD = getattr(settings, 'XAPIAN_LONG_TERM_METHOD', 'truncate')
+LONG_TERM_LENGTH = getattr(settings, 'XAPIAN_LONG_TERM_LENGTH', 240)
+
 try:
     import xapian
 except ImportError:
@@ -1627,8 +1631,33 @@ def _to_xapian_term(term):
     Converts a Python type to a
     Xapian term that can be indexed.
     """
-    return force_text(term).lower()
+    value = force_text(term).lower()
+    if LONG_TERM_METHOD:
+        value = _ensure_term_length(value)
+    return value
 
+def _ensure_term_length(text):
+    """
+    Ensures that terms are not too long, this helps protect against long urls
+    and CJK terms which are not tokenised by Xapian (and so are unsupported)
+    """
+    # Text must operate on bytes, not unicode, because xapian's term limit is
+    # a byte restriction length, not a char limit length.
+    text = text.encode('utf8')
+
+    for match in reversed(list(LONG_TERM.finditer(text))):
+        hole = text[match.start():match.end()]
+        # There are two options available in xapian's omega project. We re-create
+        # these two options here using python code.
+        if LONG_TERM_METHOD == 'truncate':
+            hole = hole[:LONG_TERM_LENGTH]
+        elif LONG_TERM_METHOD == 'hash':
+            from hashlib import sha224
+            hole = sha224(hole.encode('utf8')).hexdigest()
+        text = text[:match.start()] + hole + text[match.end():]
+
+    # We ignore any errors because truncate may have chopped a unicode in half.
+    return text.decode('utf8', 'ignore')
 
 def _from_xapian_value(value, field_type):
     """
