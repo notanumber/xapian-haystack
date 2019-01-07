@@ -1314,10 +1314,9 @@ class XapianSearchQuery(BaseSearchQuery):
         # It it is an AutoQuery, it has no filters
         # or others, thus we short-circuit the procedure.
         if isinstance(term, AutoQuery):
-            if field_name != 'content':
-                query = '%s:%s' % (field_name, term.prepare(self))
-            else:
-                query = term.prepare(self)
+            if field_name == 'content':
+                field_name = self.backend.content_field_name
+            query = '%s:%s' % (field_name, term.prepare(self))
             return [self.backend.parse_query(query)]
         query_list = []
 
@@ -1326,10 +1325,10 @@ class XapianSearchQuery(BaseSearchQuery):
             term = list(term)
 
         if field_name == 'content':
-            # content is the generic search:
-            # force no field_name search
+            # content is the document search:
+            # adjust field_name to point to the document field
             # and the field_type to be 'text'.
-            field_name = None
+            field_name = self.backend.content_field_name
             field_type = 'text'
 
             # we don't know what is the type(term), so we parse it.
