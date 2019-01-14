@@ -618,7 +618,10 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
             # todo: why `SYNONYM WILDCARD OR XNAMEda`?
             self.assertExpectedQuery(
                 self.backend.parse_query('name:da*'),
-                '(SYNONYM WILDCARD OR XNAMEda)',
+                [
+                    '(SYNONYM WILDCARD OR XNAMEda)',
+                    'WILDCARD SYNONYM XNAMEda',
+                ],
                 xapian12string='(XNAMEdavid1:(pos=1) SYNONYM '
                 'XNAMEdavid2:(pos=1) SYNONYM '
                 'XNAMEdavid3:(pos=1))')
@@ -631,16 +634,28 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
 
     def test_parse_query_range(self):
         self.assertExpectedQuery(self.backend.parse_query('name:david1..david2'),
-                                 '0 * VALUE_RANGE 9 david1 david2',
+                                 [
+                                     '0 * VALUE_RANGE 9 david1 david2',
+                                     'VALUE_RANGE 9 david1 david2',
+                                 ],
                                  xapian12string='VALUE_RANGE 9 david1 david2')
         self.assertExpectedQuery(self.backend.parse_query('number:0..10'),
-                                 '0 * VALUE_RANGE 11 000000000000 000000000010',
+                                 [
+                                     '0 * VALUE_RANGE 11 000000000000 000000000010',
+                                     'VALUE_RANGE 11 000000000000 000000000010',
+                                 ],
                                  xapian12string='VALUE_RANGE 11 000000000000 000000000010')
         self.assertExpectedQuery(self.backend.parse_query('number:..10'),
-                                 '0 * VALUE_RANGE 11 %012d 000000000010' % (-sys.maxsize - 1),
+                                 [
+                                     '0 * VALUE_RANGE 11 %012d 000000000010' % (-sys.maxsize - 1),
+                                     'VALUE_RANGE 11 %012d 000000000010' % (-sys.maxsize - 1),
+                                 ],
                                  xapian12string='VALUE_RANGE 11 %012d 000000000010' % (-sys.maxsize - 1))
         self.assertExpectedQuery(self.backend.parse_query('number:10..*'),
-                                 '0 * VALUE_RANGE 11 000000000010 %012d' % sys.maxsize,
+                                 [
+                                     '0 * VALUE_RANGE 11 000000000010 %012d' % sys.maxsize,
+                                     'VALUE_RANGE 11 000000000010 %012d' % sys.maxsize,
+                                 ],
                                  xapian12string='VALUE_RANGE 11 000000000010 %012d' % sys.maxsize)
 
     def test_order_by_django_id(self):
