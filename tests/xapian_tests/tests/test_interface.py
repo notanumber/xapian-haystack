@@ -73,6 +73,12 @@ class InterfaceTestCase(TestCase):
         # documents with "medium" AND "this" have higher score
         self.assertEqual(pks(result)[:4], [1, 4, 7, 10])
 
+    def test_content_search2(self):
+        # content should only search the document, not all fields.
+        result = self.queryset.filter(content='summary')
+        self.assertEqual(pks(result), [])
+
+
     def test_field_search(self):
         self.assertEqual(pks(self.queryset.filter(name__contains='8')), [4])
         self.assertEqual(pks(self.queryset.filter(type_name='book')),
