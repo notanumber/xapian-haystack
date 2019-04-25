@@ -106,13 +106,21 @@ class XHValueRangeProcessor(xapian.ValueRangeProcessor):
         """
         Construct a tuple for value range processing.
         `begin` -- a string in the format '<field_name>:[low_range]'
+        If 'field_name' starts with an exclamation mark (!), assume that
+        'low_range' and 'high_range' are already in xapian format and don't
+        perform any conversions on them.
         If 'low_range' is omitted, assume the smallest possible value.
         `end` -- a string in the the format '[high_range|*]'. If '*', assume
         the highest possible value.
         Return a tuple of three strings: (column, low, high)
         """
         colon = begin.find(':')
+
         field_name = begin[:colon]
+        convert_begin = convert_end = not field_name.startswith('!')
+        if field_name.startswith('!'):
+            field_name = field_name[1:]
+
         begin = begin[colon + 1:len(begin)]
         for field_dict in self.backend.schema:
             if field_dict['field_name'] == field_name:
@@ -123,8 +131,10 @@ class XHValueRangeProcessor(xapian.ValueRangeProcessor):
                         begin = 'a'  # TODO: A better way of getting a min text value?
                     elif field_type == 'integer':
                         begin = -sys.maxsize - 1
+                        convert_begin = True
                     elif field_type == 'float':
                         begin = float('-inf')
+                        convert_begin = True
                     elif field_type == 'date' or field_type == 'datetime':
                         begin = '00010101000000'
                 elif end == '*':
@@ -132,17 +142,23 @@ class XHValueRangeProcessor(xapian.ValueRangeProcessor):
                         end = 'z' * 100  # TODO: A better way of getting a max text value?
                     elif field_type == 'integer':
                         end = sys.maxsize
+                        convert_end = True
                     elif field_type == 'float':
                         end = float('inf')
+                        convert_end = True
                     elif field_type == 'date' or field_type == 'datetime':
                         end = '99990101000000'
 
                 if field_type == 'float':
-                    begin = _term_to_xapian_value(float(begin), field_type)
-                    end = _term_to_xapian_value(float(end), field_type)
+                    if convert_begin:
+                        begin = _term_to_xapian_value(float(begin), field_type)
+                    if convert_end:
+                        end = _term_to_xapian_value(float(end), field_type)
                 elif field_type == 'integer':
-                    begin = _term_to_xapian_value(int(begin), field_type)
-                    end = _term_to_xapian_value(int(end), field_type)
+                    if convert_begin:
+                        begin = _term_to_xapian_value(int(begin), field_type)
+                    if convert_end:
+                        end = _term_to_xapian_value(int(end), field_type)
                 return field_dict['column'], str(begin), str(end)
 
 
@@ -295,7 +311,7 @@ class XapianSearchBackend(BaseSearchBackend):
             term_generator.set_stemmer(xapian.Stem(self.language))
             try:
                 term_generator.set_stemming_strategy(self.stemming_strategy)
-            except AttributeError:  
+            except AttributeError:
                 # Versions before Xapian 1.2.11 do not support stemming strategies for TermGenerator
                 pass
             if self.include_spelling is True:
@@ -1547,7 +1563,7 @@ class XapianSearchQuery(BaseSearchQuery):
         that is greater than `term` in a specified `field`.
         """
         vrp = XHValueRangeProcessor(self.backend)
-        pos, begin, end = vrp('%s:%s' % (field_name, _term_to_xapian_value(term, field_type)), '*')
+        pos, begin, end = vrp('!%s:%s' % (field_name, _term_to_xapian_value(term, field_type)), '*')
         if is_not:
             return xapian.Query(xapian.Query.OP_AND_NOT,
                                 self._all_query(),
@@ -1561,7 +1577,7 @@ class XapianSearchQuery(BaseSearchQuery):
         that is less than `term` in a specified `field`.
         """
         vrp = XHValueRangeProcessor(self.backend)
-        pos, begin, end = vrp('%s:' % field_name, '%s' % _term_to_xapian_value(term, field_type))
+        pos, begin, end = vrp('!%s:' % field_name, '%s' % _term_to_xapian_value(term, field_type))
         if is_not:
             return xapian.Query(xapian.Query.OP_AND_NOT,
                                 self._all_query(),
@@ -1575,7 +1591,7 @@ class XapianSearchQuery(BaseSearchQuery):
         that is between the values from the `term` list.
         """
         vrp = XHValueRangeProcessor(self.backend)
-        pos, begin, end = vrp('%s:%s' % (field_name, _term_to_xapian_value(term[0], field_type)),
+        pos, begin, end = vrp('!%s:%s' % (field_name, _term_to_xapian_value(term[0], field_type)),
                               '%s' % _term_to_xapian_value(term[1], field_type))
         if is_not:
             return xapian.Query(xapian.Query.OP_AND_NOT,

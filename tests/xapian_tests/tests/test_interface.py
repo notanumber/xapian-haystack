@@ -41,6 +41,7 @@ class InterfaceTestCase(TestCase):
             doc = Document()
             doc.type_name = types_names[i % 3]
             doc.number = i * 2
+            doc.float_number = (i - 6.5) * 2
             doc.name = "%s %d" % (doc.type_name, doc.number)
             doc.date = dates[i % 3]
 
@@ -159,6 +160,11 @@ class InterfaceTestCase(TestCase):
     def test_value_range(self):
         self.assertEqual(set(pks(self.queryset.filter(number__lt=3))),
                          set(pks(Document.objects.filter(number__lt=3))))
+
+        self.assertEqual(set(pks(self.queryset.filter(float_number__lt=4))),
+                         set(pks(self.queryset.filter(float_number__lt=4))))
+        self.assertEqual(set(pks(self.queryset.filter(float_number__lt=4.5))),
+                         set(pks(self.queryset.filter(float_number__lt=4.5))))
 
         self.assertEqual(set(pks(self.queryset.filter(django_id__gte=6))),
                          set(pks(Document.objects.filter(id__gte=6))))

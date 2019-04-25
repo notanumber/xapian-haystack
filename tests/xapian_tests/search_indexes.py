@@ -12,6 +12,7 @@ class DocumentIndex(indexes.SearchIndex, indexes.Indexable):
     type_name = indexes.CharField(model_attr='type_name')
 
     number = indexes.IntegerField(model_attr='number')
+    float_number = indexes.FloatField(model_attr='float_number')
 
     name = indexes.CharField(model_attr='name')
     date = indexes.DateField(model_attr='date')
