@@ -561,7 +561,7 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
         self.assertEqual(_term_to_xapian_value('abc', 'text'), 'abc')
         self.assertEqual(_term_to_xapian_value(1, 'integer'), '000000000001')
         self.assertEqual(_term_to_xapian_value(2653, 'integer'), '000000002653')
-        self.assertEqual(_term_to_xapian_value(25.5, 'float'), b'\xb2`')
+        self.assertEqual(_term_to_xapian_value(25.5, 'float'), 'b260')
         self.assertEqual(_term_to_xapian_value([1, 2, 3], 'text'), '[1, 2, 3]')
         self.assertEqual(_term_to_xapian_value((1, 2, 3), 'text'), '(1, 2, 3)')
         self.assertEqual(_term_to_xapian_value({'a': 1, 'c': 3, 'b': 2}, 'text'),
