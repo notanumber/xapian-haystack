@@ -38,9 +38,9 @@ class InterfaceTestCase(TestCase):
         for i in range(1, 13):
             doc = Document()
             doc.type_name = types_names[i % 3]
-            doc.number = i * 2
+            doc.number = (i - 7) * 100
             doc.float_number = (i - 6.5) * 2
-            doc.name = "%s %d" % (doc.type_name, doc.number)
+            doc.name = "%s %d" % (doc.type_name, i * 2)
             doc.date = dates[i % 3]
 
             doc.summary = summaries[i % 3]
@@ -159,10 +159,14 @@ class InterfaceTestCase(TestCase):
         self.assertEqual(set(pks(self.queryset.filter(number__lt=3))),
                          set(pks(Document.objects.filter(number__lt=3))))
 
+        self.assertEqual(set(pks(self.queryset.filter(float_number__lte=float('inf')))),
+                         set(pks(Document.objects.filter(float_number__lte=float('inf')))))
         self.assertEqual(set(pks(self.queryset.filter(float_number__lt=3.5))),
                          set(pks(Document.objects.filter(float_number__lt=3.5))))
         self.assertEqual(set(pks(self.queryset.filter(float_number__gt=3.5))),
                          set(pks(Document.objects.filter(float_number__gt=3.5))))
+        self.assertEqual(set(pks(self.queryset.filter(float_number__gte=float('-inf')))),
+                         set(pks(Document.objects.filter(float_number__gte=float('-inf')))))
 
         self.assertEqual(set(pks(self.queryset.filter(django_id__gte=6))),
                          set(pks(Document.objects.filter(id__gte=6))))
@@ -184,6 +188,8 @@ class InterfaceTestCase(TestCase):
         # value order
         self.assertEqual(pks(self.queryset.order_by("number")),
                          pks(Document.objects.order_by("number")))
+        self.assertEqual(pks(self.queryset.order_by("float_number")),
+                         pks(Document.objects.order_by("float_number")))
 
         # text order
         self.assertEqual(pks(self.queryset.order_by("summary")),

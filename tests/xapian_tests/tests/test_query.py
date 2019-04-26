@@ -296,11 +296,11 @@ class SearchQueryTestCase(HaystackBackendTestCase, TestCase):
 
     def test_range(self):
         self.sq.add_filter(SQ(django_id__range=[2, 4]))
-        self.assertExpectedQuery(self.sq.build_query(), 'VALUE_RANGE 1 000000000002 000000000004')
+        self.assertExpectedQuery(self.sq.build_query(), 'VALUE_RANGE 1 a4 a8')
         self.sq.add_filter(~SQ(django_id__range=[0, 2]))
         self.assertExpectedQuery(self.sq.build_query(),
-                                 '(VALUE_RANGE 1 000000000002 000000000004 AND '
-                                 '(<alldocuments> AND_NOT VALUE_RANGE 1 000000000000 000000000002))')
+                                 '(VALUE_RANGE 1 a4 a8 AND '
+                                 '(<alldocuments> AND_NOT VALUE_RANGE 1 80 a4))')
         self.assertEqual([result.pk for result in self.sq.get_results()], [3])
 
     def test_multiple_filter_types(self):
@@ -314,7 +314,7 @@ class SearchQueryTestCase(HaystackBackendTestCase, TestCase):
                                  'VALUE_LE 5 20090210015900 AND '
                                  '(<alldocuments> AND_NOT VALUE_LE 3 david) AND '
                                  'VALUE_GE 7 b AND '
-                                 '(QQ000000000001 OR QQ000000000002 OR QQ000000000003))')
+                                 '(QQa0 OR QQa4 OR QQa6))')
 
     def test_log_query(self):
         reset_search_queries()
