@@ -20,6 +20,7 @@ class BlogEntry(models.Model):
     Same as tests.core.MockModel with a few extra fields for testing various
     sorting and ordering criteria.
     """
+
     datetime = models.DateTimeField()
     date = models.DateField()
 

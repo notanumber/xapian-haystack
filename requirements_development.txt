@@ -1,0 +1,9 @@
+bpython
+pre-commit
+flake8
+flake8-quotes
+pylint
+isort[pyproject]
+black
+ipdb
+pip-tools

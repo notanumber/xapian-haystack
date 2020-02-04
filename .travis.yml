@@ -2,75 +2,73 @@ sudo: false
 language: python
 
 matrix:
-    include:
-        - python: 3.7
-          env: DJANGO_VERSION=">=2.1,<2.2" XAPIAN_VERSION=1.4.9
-          dist: xenial
-          sudo: true
-        - python: 3.7
-          env: DJANGO_VERSION=">=2.0,<2.1" XAPIAN_VERSION=1.4.9
-          dist: xenial
-          sudo: true
-        - python: 3.7
-          env: DJANGO_VERSION=">=1.11,<2.0" XAPIAN_VERSION=1.4.9
-          dist: xenial
-          sudo: true
-        - python: 3.6
-          env: DJANGO_VERSION=">=2.1,<2.2" XAPIAN_VERSION=1.4.9
-        - python: 3.6
-          env: DJANGO_VERSION=">=2.0,<2.1" XAPIAN_VERSION=1.4.9
-        - python: 3.6
-          env: DJANGO_VERSION=">=1.11,<2.0" XAPIAN_VERSION=1.4.9
-        - python: 3.5
-          env: DJANGO_VERSION=">=2.1,<2.2" XAPIAN_VERSION=1.4.9
-        - python: 3.5
-          env: DJANGO_VERSION=">=2.0,<2.1" XAPIAN_VERSION=1.4.9
-        - python: 3.5
-          env: DJANGO_VERSION=">=1.11,<2.0" XAPIAN_VERSION=1.4.9
-        - python: 3.4
-          env: DJANGO_VERSION=">=2.0,<2.1" XAPIAN_VERSION=1.4.9
-        - python: 3.4
-          env: DJANGO_VERSION=">=1.11,<2.0" XAPIAN_VERSION=1.4.9
-        - python: 3.4
-          env: DJANGO_VERSION=">=2.0,<2.1" XAPIAN_VERSION=1.3.6
-        - python: 3.4
-          env: DJANGO_VERSION=">=1.11,<2.0" XAPIAN_VERSION=1.3.6
-        - python: 2.7
-          env: DJANGO_VERSION=">=1.11,<2.0" XAPIAN_VERSION=1.4.9
-        - python: 2.7
-          env: DJANGO_VERSION=">=1.11,<2.0" XAPIAN_VERSION=1.3.6
-        - python: 2.7
-          env: DJANGO_VERSION=">=1.11,<2.0" XAPIAN_VERSION=1.2.25
+  include:
+    - language: python
+      python: 3.8
+      install:
+        - pip install -U pip setuptools
+        - pip install -r requirements_ci.txt
+      script:
+        - flake8 xapian_backend.py
+        - pylint xapian_backend.py
+    - python: 3.8
+      env: DJANGO_VERSION=">=3.0" XAPIAN_VERSION=1.4.14
+      dist: xenial
+      sudo: true
+    - python: 3.7
+      env: DJANGO_VERSION=">=3.0" XAPIAN_VERSION=1.4.14
+      dist: xenial
+      sudo: true
+    - python: 3.7
+      env: DJANGO_VERSION=">=2.1,<2.2" XAPIAN_VERSION=1.4.9
+      dist: xenial
+      sudo: true
+    - python: 3.7
+      env: DJANGO_VERSION=">=2.0,<2.1" XAPIAN_VERSION=1.4.9
+      dist: xenial
+      sudo: true
+    - python: 3.6
+      env: DJANGO_VERSION=">=2.1,<2.2" XAPIAN_VERSION=1.4.9
+    - python: 3.6
+      env: DJANGO_VERSION=">=2.0,<2.1" XAPIAN_VERSION=1.4.9
+    - python: 3.5
+      env: DJANGO_VERSION=">=2.1,<2.2" XAPIAN_VERSION=1.4.9
+    - python: 3.5
+      env: DJANGO_VERSION=">=2.0,<2.1" XAPIAN_VERSION=1.4.9
 
 addons:
   apt:
     sources:
-    - ubuntu-toolchain-r-test
+      - ubuntu-toolchain-r-test
     packages:
-    # Xapian requires uuid-dev, Xapian ==1.3.3 requires compilers with c++11.
-    - uuid-dev
-    - gcc-4.8
-    - g++-4.8
+      # Xapian requires uuid-dev, Xapian ==1.3.3 requires compilers with c++11.
+      - uuid-dev
+      - gcc-4.8
+      - g++-4.8
 
 install:
   # install Xapian
   - CXX=g++-4.8 ./install_xapian.sh $XAPIAN_VERSION
 
-  - pip install "Django${DJANGO_VERSION}"
-  - pip install coveralls
+  - pip install -U pip setuptools
+  - pip install -U "Django${DJANGO_VERSION}" six coverage coveralls
 
   # install Django haystack
   - cd ..  # move from xapian-haystack
   - git clone https://github.com/toastdriven/django-haystack.git
 
   # cp xapian-haystack to django-haystack
-  - cp xapian-haystack/xapian_backend.py django-haystack/haystack/backends
-  - cp -r xapian-haystack/tests/* django-haystack/test_haystack/
-  - cp xapian-haystack/tests/xapian_tests/__init__.py django-haystack/test_haystack/
-  - cp xapian-haystack/.coveragerc django-haystack/
+  - cp -rf xapian-haystack/xapian_backend.py django-haystack/haystack/backends
+  - cp -rf xapian-haystack/tests/* django-haystack/test_haystack/
+  - cp -rf xapian-haystack/tests/xapian_tests/__init__.py django-haystack/test_haystack/
+  - cp -rf xapian-haystack/.coveragerc django-haystack/
 
 script:
   - cd django-haystack/
+  - PYTHONPATH=`pwd` `which django-admin.py` makemigrations haystack --settings=test_haystack.xapian_settings
+  - PYTHONPATH=`pwd` `which django-admin.py` makemigrations core --settings=test_haystack.xapian_settings
+  - PYTHONPATH=`pwd` `which django-admin.py` makemigrations xapian_tests --settings=test_haystack.xapian_settings
+  - PYTHONPATH=`pwd` `which django-admin.py` migrate --settings=test_haystack.xapian_settings
   - PYTHONPATH=`pwd` coverage run `which django-admin.py` test test_haystack.xapian_tests --settings=test_haystack.xapian_settings
 
 after_success: coveralls
