@@ -35,17 +35,17 @@ The `endswith` search operation is not supported by Xapian-Haystack.
 Requirements
 ------------
 
-- Python 2.7 or 3+
-- Django 1.8+
+- Python 3.5+
+- Django 2.0+
 - Django-Haystack 2.5.1
-- Xapian 1.2.19+
+- Xapian 1.4.0+
 
 In particular, we build-test this backend in `Travis`_ using:
 
-- Python 2.7 and 3.4
-- Django 1.8, 1.9 and 1.10
+- Python 3.5+
+- Django 2.0+ and 3.0+
 - Django-Haystack (master)
-- Xapian 1.2.19 (Python 2 only), 1.3.3 (both), and 1.4.1 (both)
+- Xapian 1.4.9 and 1.4.14
 
 
 Installation
