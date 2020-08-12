@@ -7,7 +7,7 @@ import re
 import shutil
 import sys
 
-from django.utils import six
+import six
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.utils.encoding import force_text
