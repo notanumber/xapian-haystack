@@ -7,10 +7,11 @@ import re
 import shutil
 import sys
 
-from django.utils import six
+import six
+
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
-from django.utils.encoding import force_text
+from django.utils.encoding import force_str
 
 from haystack import connections
 from haystack.backends import BaseEngine, BaseSearchBackend, BaseSearchQuery, SearchNode, log_query
@@ -1627,7 +1628,7 @@ def _to_xapian_term(term):
     Converts a Python type to a
     Xapian term that can be indexed.
     """
-    return force_text(term).lower()
+    return force_str(term).lower()
 
 
 def _from_xapian_value(value, field_type):

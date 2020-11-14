@@ -1,11 +1,22 @@
 [report]
+fail_under = 1
+ignore_errors = True
+skip_covered = True
 exclude_lines =
+    pragma: no cover
     def __repr__
+    if self.debug:
+    if settings.DEBUG
+    raise AssertionError
     raise NotImplementedError
-    raise MissingDependency
-    except xapian.DatabaseModifiedError
+    if 0:
+    if __name__ == .__main__.:
 
 [run]
+branch = True
 source =
     haystack/backends/xapian_backend.py
     test_haystack/xapian_tests
+omit =
+    *migrations*
+    test_haystack/xapian_tests/tests/*
