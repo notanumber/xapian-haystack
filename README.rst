@@ -1,5 +1,47 @@
-Xapian backend for Django-Haystack
+Fork of Xapian backend for Django-Haystack maintained by somebody
 ==================================
+
+Initial package requirements:
+--------
+
+# Ubuntu 18.04/20.04 and probably future versions:
+
+```bash
+sudo apt install curl gcc g++ python3-dev make libxapian30
+```
+
+After that you need to install Xapian cloned outside of project repository using:
+`./install_xapian __libxapian30_version__`
+
+You will find version of libxapian30 just using `apt search`.
+
+# macOS with Intel/AMD chip:
+
+To be continued... I remember there is some clang/gcc quirk.
+
+# macOS with M1:
+
+You need to use python3.6 using `pythonM1` hack described here:
+https://youtrack.jetbrains.com/issue/PY-46290
+
+Or just use my implementation made out of ...:
+```
+#!/usr/bin/env zsh
+mydir=${0:a:h}
+/usr/bin/arch -x86_64 $mydir/python3.6 $*
+```
+
+Also use `runx86` implementation from here:
+https://github.com/HoshiYamazaki/apple-arm-utils
+
+Use it ALWAYS when you run python commands, especially when installing pip packages,
+because when you will not use it, it will try to use ARM packages.
+
+Tested on:
+--------
+
+* r5 3600 based-Hackintosh
+* Mac Mini 2020 with M1 cpu
 
 .. _Travis: https://travis-ci.org/notanumber/xapian-haystack
 
@@ -127,13 +169,3 @@ License
 Xapian-haystack is free software licenced under GNU General Public Licence v2 and
 Copyright (c) 2009, 2010, 2011, 2012 David Sauve, 2009, 2010 Trapeze, 2014 Jorge C. Leitão.
 It may be redistributed under the terms specified in the LICENSE file.
-
-
-Questions, Comments, Concerns:
-------------------------------
-
-Feel free to open an issue `here <http://github.com/notanumber/xapian-haystack/issues>`__
-or pull request your work.
-
-You can ask questions on the django-haystack `mailing list <http://groups.google.com/group/django-haystack/>`_:
-or in the irc ``#haystack``.
