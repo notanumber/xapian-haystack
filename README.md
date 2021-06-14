@@ -41,7 +41,8 @@ You will find version of libxapian30 just using `apt search`.
 
 ## macOS with Intel/AMD chip:
 
-To be continued... I remember there is some clang/gcc quirk.
+You must define CXXFLAGS before/during compilation time:
+```CXXFLAGS=“-mmacosx-version-min=10.7 -stdlib=libc++”```
 
 ## macOS with M1:
 
