@@ -28,7 +28,7 @@ Xapian-Haystack.
 
 # Initial package requirements:
 
-### Ubuntu 18.04/20.04 and probably future versions:
+## Ubuntu 18.04/20.04 and probably future versions:
 
 ```bash
 sudo apt install curl gcc g++ python3-dev make libxapian30
@@ -39,11 +39,11 @@ After that you need to install Xapian cloned outside of project repository using
 
 You will find version of libxapian30 just using `apt search`.
 
-### macOS with Intel/AMD chip:
+## macOS with Intel/AMD chip:
 
 To be continued... I remember there is some clang/gcc quirk.
 
-### macOS with M1:
+## macOS with M1:
 
 You need to use python3.6 using `pythonM1` hack described here:
 https://youtrack.jetbrains.com/issue/PY-46290
@@ -61,7 +61,7 @@ https://github.com/HoshiYamazaki/apple-arm-utils
 Use it ALWAYS when you run python commands, especially when installing pip packages,
 because when you will not use it, it will try to use ARM packages.
 
-# Tested on:
+## Tested on:
 
 * r5 3600 based-Hackintosh
 * Mac Mini 2020 with M1 cpu
