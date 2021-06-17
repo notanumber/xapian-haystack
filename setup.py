@@ -12,7 +12,7 @@ setup(
     name='xapian-haystack',
     version='2.1.0',
     description='A Xapian backend for Haystack',
-    long_description=read('README.rst'),
+    long_description=read('README.md'),
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Developers',
