@@ -31,7 +31,7 @@ Xapian-Haystack.
 ## Ubuntu 18.04/20.04 and probably future versions:
 
 ```bash
-sudo apt install curl gcc g++ python3-dev make libxapian30
+sudo apt install curl gcc g++ python3-dev make libxapian30 libxapian-dev
 ```
 
 After that you need to install Xapian cloned outside of project repository using:
