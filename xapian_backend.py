@@ -20,8 +20,8 @@ from haystack.inputs import AutoQuery
 from haystack.models import SearchResult
 from haystack.utils import get_identifier, get_model_ct
 
-NGRAM_MIN_LENGTH = 2
-NGRAM_MAX_LENGTH = 15
+NGRAM_MIN_LENGTH = getattr(settings, 'XAPIAN_NGRAM_MIN_LENGTH', 2)
+NGRAM_MAX_LENGTH = getattr(settings, 'XAPIAN_NGRAM_MAX_LENGTH', 15)
 
 try:
     import xapian
