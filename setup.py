@@ -10,7 +10,7 @@ def read(fname):
 
 setup(
     name='xapian-haystack',
-    version='2.2.2',
+    version='2.2.3',
     description='A Xapian backend for Haystack',
     long_description=read('README.md'),
     classifiers=[
@@ -23,7 +23,7 @@ setup(
     author='Jorge C. Leitão',
     author_email='jorgecarleitao@gmail.com',
     url='http://github.com/notanumber/xapian-haystack',
-    download_url='https://github.com/PSzczepanski996/tarball/2.2.2',
+    download_url='https://github.com/PSzczepanski996/tarball/2.2.3',
     license='GPL2',
     py_modules=['xapian_backend'],
     install_requires=[
