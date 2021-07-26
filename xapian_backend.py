@@ -7,6 +7,7 @@ import re
 import shutil
 import sys
 
+import django
 import six
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
@@ -1627,6 +1628,9 @@ def _to_xapian_term(term):
     Converts a Python type to a
     Xapian term that can be indexed.
     """
+    if django.VERSION[0] == 3:
+        from django.utils.encoding import force_str
+        return force_str(term).lower()
     return force_text(term).lower()
 
 
