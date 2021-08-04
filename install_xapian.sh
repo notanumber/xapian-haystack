@@ -9,7 +9,6 @@ if [ -z "$VERSION" ]; then
 fi
 
 JFLAG=1
-echo $2
 if [ "$2" = "--use-all-cores" ]; then
   JFLAG=$(($(getconf _NPROCESSORS_ONLN) + 1))
 fi
