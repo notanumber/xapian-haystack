@@ -1563,7 +1563,7 @@ class XapianSearchQuery(BaseSearchQuery):
         that is less than `term` in a specified `field`.
         """
         vrp = XHValueRangeProcessor(self.backend)
-        pos, begin, end = vrp(f'{field_name}:' % field_name, f'{_term_to_xapian_value(term, field_type)}')
+        pos, begin, end = vrp(f'{field_name}:', f'{_term_to_xapian_value(term, field_type)}')
         if is_not:
             return xapian.Query(xapian.Query.OP_AND_NOT,
                                 self._all_query(),
