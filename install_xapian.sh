@@ -8,6 +8,12 @@ if [ -z "$VERSION" ]; then
     exit 1
 fi
 
+JFLAG=1
+echo $2
+if [ "$2" = "--use-all-cores" ]; then
+  JFLAG=$(($(getconf _NPROCESSORS_ONLN) + 1))
+fi
+
 # prepare
 mkdir -p $VIRTUAL_ENV/packages && cd $VIRTUAL_ENV/packages
 
@@ -27,7 +33,7 @@ tar xf ${BINDINGS}.tar.xz
 # install
 echo "Installing Xapian-core..."
 cd $VIRTUAL_ENV/packages/${CORE}
-./configure --prefix=$VIRTUAL_ENV && make -j$(($(getconf _NPROCESSORS_ONLN) + 1)) && make install
+./configure --prefix=$VIRTUAL_ENV && make -j$JFLAG && make install
 
 PYV=`python -c "import sys;t='{v[0]}'.format(v=list(sys.version_info[:1]));sys.stdout.write(t)";`
 
