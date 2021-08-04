@@ -1439,7 +1439,7 @@ class XapianSearchQuery(BaseSearchQuery):
         Assumes term is not a list.
         """
         if field_type == 'text' and field_name not in (DJANGO_CT,):
-            term = f'^ {term} $' % term
+            term = f'^ {term} $'
             query = self._phrase_query(term.split(), field_name, field_type)
         else:
             query = self._term_query(term, field_name, field_type, stemmed=False)
