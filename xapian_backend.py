@@ -1,5 +1,3 @@
-from __future__ import unicode_literals
-
 import datetime
 import pickle
 import os
@@ -7,7 +5,6 @@ import re
 import shutil
 import sys
 
-from django.utils import six
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.utils.encoding import force_text
@@ -28,11 +25,6 @@ try:
 except ImportError:
     raise MissingDependency("The 'xapian' backend requires the installation of 'Xapian'. "
                             "Please refer to the documentation.")
-
-if sys.version_info[0] == 2:
-    DirectoryExistsException = OSError
-elif sys.version_info[0] == 3:
-    DirectoryExistsException = FileExistsError
 
 
 class NotSupportedError(Exception):
@@ -201,7 +193,7 @@ class XapianSearchBackend(BaseSearchBackend):
         if self.path != MEMORY_DB_NAME:
             try:
                 os.makedirs(self.path)
-            except DirectoryExistsException:
+            except FileExistsError:
                 pass
 
         self.flags = connection_options.get('FLAGS', DEFAULT_XAPIAN_FLAGS)
@@ -354,7 +346,7 @@ class XapianSearchBackend(BaseSearchBackend):
             def _get_ngram_lengths(value):
                 values = value.split()
                 for item in values:
-                    for ngram_length in six.moves.range(NGRAM_MIN_LENGTH, NGRAM_MAX_LENGTH + 1):
+                    for ngram_length in range(NGRAM_MIN_LENGTH, NGRAM_MAX_LENGTH + 1):
                         yield item, ngram_length
 
             for obj in iterable:
@@ -364,8 +356,8 @@ class XapianSearchBackend(BaseSearchBackend):
                 def ngram_terms(value):
                     for item, length in _get_ngram_lengths(value):
                         item_length = len(item)
-                        for start in six.moves.range(0, item_length - length + 1):
-                            for size in six.moves.range(length, length + 1):
+                        for start in range(0, item_length - length + 1):
+                            for size in range(length, length + 1):
                                 end = start + size
                                 if end > item_length:
                                     continue
