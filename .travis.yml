@@ -3,18 +3,18 @@ language: python
 
 matrix:
     include:
+        - python: 3.8
+          env: DJANGO_VERSION=">=3.1,<3.2" XAPIAN_VERSION=1.4.9
+        - python: 3.8
+          env: DJANGO_VERSION=">=3.0,<3.1" XAPIAN_VERSION=1.4.9
+        - python: 3.7
+          env: DJANGO_VERSION=">=2.2,<3.0" XAPIAN_VERSION=1.4.9
         - python: 3.7
           env: DJANGO_VERSION=">=2.1,<2.2" XAPIAN_VERSION=1.4.9
-          dist: xenial
-          sudo: true
         - python: 3.7
           env: DJANGO_VERSION=">=2.0,<2.1" XAPIAN_VERSION=1.4.9
-          dist: xenial
-          sudo: true
         - python: 3.7
           env: DJANGO_VERSION=">=1.11,<2.0" XAPIAN_VERSION=1.4.9
-          dist: xenial
-          sudo: true
         - python: 3.6
           env: DJANGO_VERSION=">=2.1,<2.2" XAPIAN_VERSION=1.4.9
         - python: 3.6
@@ -26,10 +26,6 @@ matrix:
         - python: 3.5
           env: DJANGO_VERSION=">=2.0,<2.1" XAPIAN_VERSION=1.4.9
         - python: 3.5
-          env: DJANGO_VERSION=">=1.11,<2.0" XAPIAN_VERSION=1.4.9
-        - python: 3.4
-          env: DJANGO_VERSION=">=2.0,<2.1" XAPIAN_VERSION=1.4.9
-        - python: 3.4
           env: DJANGO_VERSION=">=1.11,<2.0" XAPIAN_VERSION=1.4.9
         - python: 3.4
           env: DJANGO_VERSION=">=2.0,<2.1" XAPIAN_VERSION=1.3.6
@@ -65,6 +61,7 @@ install:
 
 script:
   - cd django-haystack/
+  - PYTHONPATH=`pwd` `which django-admin.py` makemigrations --settings=test_haystack.xapian_settings
   - PYTHONPATH=`pwd` coverage run `which django-admin.py` test test_haystack.xapian_tests --settings=test_haystack.xapian_settings
 
 after_success: coveralls
