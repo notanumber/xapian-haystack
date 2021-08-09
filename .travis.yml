@@ -61,7 +61,7 @@ install:
 
   # install Django haystack
   - cd ..  # move from xapian-haystack
-  - git clone https://github.com/toastdriven/django-haystack.git
+  - git clone https://github.com/django-haystack/django-haystack.git
 
   # cp xapian-haystack to django-haystack
   - cp xapian-haystack/xapian_backend.py django-haystack/haystack/backends
