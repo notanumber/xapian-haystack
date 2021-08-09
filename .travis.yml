@@ -35,12 +35,6 @@ matrix:
           env: DJANGO_VERSION=">=2.0,<2.1" XAPIAN_VERSION=1.3.6
         - python: 3.4
           env: DJANGO_VERSION=">=1.11,<2.0" XAPIAN_VERSION=1.3.6
-        - python: 2.7
-          env: DJANGO_VERSION=">=1.11,<2.0" XAPIAN_VERSION=1.4.9
-        - python: 2.7
-          env: DJANGO_VERSION=">=1.11,<2.0" XAPIAN_VERSION=1.3.6
-        - python: 2.7
-          env: DJANGO_VERSION=">=1.11,<2.0" XAPIAN_VERSION=1.2.25
 
 addons:
   apt:

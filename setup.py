@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-from __future__ import unicode_literals
-
 import os
 from distutils.core import setup
 
@@ -27,7 +24,7 @@ setup(
     license='GPL2',
     py_modules=['xapian_backend'],
     install_requires=[
-        'django>=1.8',
+        'django>=1.11',
         'django-haystack>=2.5.1',
     ]
 )

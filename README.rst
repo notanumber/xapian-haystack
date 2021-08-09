@@ -35,17 +35,17 @@ The `endswith` search operation is not supported by Xapian-Haystack.
 Requirements
 ------------
 
-- Python 2.7 or 3+
-- Django 1.8+
+- Python 3+
+- Django 1.11+
 - Django-Haystack 2.5.1
-- Xapian 1.2.19+
+- Xapian 1.3.3+
 
 In particular, we build-test this backend in `Travis`_ using:
 
-- Python 2.7 and 3.4
-- Django 1.8, 1.9 and 1.10
+- Python 3.4
+- Django 1.11, 2.0, 2.1, 2.2
 - Django-Haystack (master)
-- Xapian 1.2.19 (Python 2 only), 1.3.3 (both), and 1.4.1 (both)
+- Xapian 1.3.6 and 1.4.1
 
 
 Installation
@@ -57,7 +57,7 @@ First, install Xapian in your machine e.g. with the script provided,
     source <path>/bin/activate
     ./install_xapian.sh <version>
 
-`<version>` must be >=1.3.0 for Python 3 envs. This takes around 10 minutes.
+`<version>` must be >=1.3.0. This takes around 10 minutes.
 
 Finally, install Xapian-Haystack by running::
 
@@ -117,7 +117,7 @@ Credits
 Xapian-Haystack is maintained by `Jorge C. Leitão <http://jorgecarleitao.net>`__;
 `David Sauve <mailto:david.sauve@bag-of-holding.com>`__ was the main contributor of Xapian-Haystack and
 Xapian-Haystack was originally funded by `Trapeze <http://www.trapeze.com>`__.
-`Claudep <http://www.2xlibre.net>`__ is a frequent contributor.
+`Claude Paroz <http://www.2xlibre.net>`__ is a frequent contributor.
 `ANtlord <https://github.com/ANtlord>`__ implemented support for EdgeNgram and Ngram.
 
 
