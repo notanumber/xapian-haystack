@@ -25,7 +25,7 @@ XAPIAN_VERSION = [int(x) for x in xapian.__version__.split('.')]
 
 class XapianSearchResult(SearchResult):
     def __init__(self, app_label, model_name, pk, score, **kwargs):
-        super(XapianSearchResult, self).__init__(app_label, model_name, pk, score, **kwargs)
+        super().__init__(app_label, model_name, pk, score, **kwargs)
         self._model = apps.get_model('xapian_tests', model_name)
 
 
@@ -106,7 +106,7 @@ class BackendIndexationTestCase(HaystackBackendTestCase, TestCase):
         return CompleteBlogEntryIndex()
 
     def setUp(self):
-        super(BackendIndexationTestCase, self).setUp()
+        super().setUp()
 
         tag1 = MockTag.objects.create(name='tag')
         tag2 = MockTag.objects.create(name='tag-tag')
@@ -303,7 +303,7 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
         return entry
 
     def setUp(self):
-        super(BackendFeaturesTestCase, self).setUp()
+        super().setUp()
 
         self.sample_objs = []
 
@@ -700,7 +700,7 @@ class IndexationNGramTestCase(HaystackBackendTestCase, TestCase):
         return XapianNGramIndex()
 
     def setUp(self):
-        super(IndexationNGramTestCase, self).setUp()
+        super().setUp()
         mock = BlogEntry()
         mock.id = 1
         mock.author = 'david'
@@ -747,7 +747,7 @@ class IndexationEdgeNGramTestCase(HaystackBackendTestCase, TestCase):
         return XapianEdgeNGramIndex()
 
     def setUp(self):
-        super(IndexationEdgeNGramTestCase, self).setUp()
+        super().setUp()
         mock = BlogEntry()
         mock.id = 1
         mock.author = 'david'
@@ -793,7 +793,7 @@ class IndexationDjangoContentTypeTestCase(HaystackBackendTestCase, TestCase):
         return DjangoContentTypeIndex()
 
     def setUp(self):
-        super(IndexationDjangoContentTypeTestCase, self).setUp()
+        super().setUp()
 
         entry1 = ContentType(model='DjangoContentType')
         entry1.save()

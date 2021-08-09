@@ -25,7 +25,7 @@ class XapianSearchQueryTestCase(HaystackBackendTestCase, TestCase):
         return MockQueryIndex()
 
     def setUp(self):
-        super(XapianSearchQueryTestCase, self).setUp()
+        super().setUp()
         self.sq = connections['default'].get_query()
 
     def test_all(self):
@@ -258,7 +258,7 @@ class SearchQueryTestCase(HaystackBackendTestCase, TestCase):
         return MockSearchIndex()
 
     def setUp(self):
-        super(SearchQueryTestCase, self).setUp()
+        super().setUp()
 
         self.backend.update(self.index, MockModel.objects.all())
 
@@ -379,7 +379,7 @@ class LiveSearchQuerySetTestCase(HaystackBackendTestCase, TestCase):
         return MockSearchIndex()
 
     def setUp(self):
-        super(LiveSearchQuerySetTestCase, self).setUp()
+        super().setUp()
 
         self.backend.update(self.index, MockModel.objects.all())
         self.sq = connections['default'].get_query()
@@ -411,7 +411,7 @@ class BoostFieldTestCase(HaystackBackendTestCase, TestCase):
         return BoostMockSearchIndex()
 
     def setUp(self):
-        super(BoostFieldTestCase, self).setUp()
+        super().setUp()
 
         self.sample_objs = []
         for i in range(1, 5):
