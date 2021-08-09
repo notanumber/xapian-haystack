@@ -29,13 +29,7 @@ echo "Installing Xapian-core..."
 cd $VIRTUAL_ENV/packages/${CORE}
 ./configure --prefix=$VIRTUAL_ENV && make && make install
 
-PYV=`python -c "import sys;t='{v[0]}'.format(v=list(sys.version_info[:1]));sys.stdout.write(t)";`
-
-if [ $PYV = "2" ]; then
-    PYTHON_FLAG=--with-python
-else
-    PYTHON_FLAG=--with-python3
-fi
+PYTHON_FLAG=--with-python3
 
 if [ $VERSION = "1.3.3" ]; then
     XAPIAN_CONFIG=$VIRTUAL_ENV/bin/xapian-config-1.3

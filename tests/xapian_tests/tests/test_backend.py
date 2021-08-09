@@ -1,5 +1,3 @@
-from __future__ import unicode_literals
-
 from decimal import Decimal
 import datetime
 import sys
@@ -56,7 +54,7 @@ def pks(results):
     return [result.pk for result in results]
 
 
-class HaystackBackendTestCase(object):
+class HaystackBackendTestCase:
     """
     Abstract TestCase that implements an hack to ensure `connections`
     has the right index
