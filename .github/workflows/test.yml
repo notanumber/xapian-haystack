@@ -1,0 +1,104 @@
+name: Test
+
+on: [push, pull_request]
+
+env:
+  FORCE_COLOR: 1
+
+jobs:
+  prebuild_xapian_wheel:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.6]
+        xapian-version: [1.4.18]
+
+    steps:
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Checkout xapian-haystack
+        uses: actions/checkout@v2
+
+      - name: Check for cached xapian wheel
+        # https://github.com/actions/cache#cache-limits
+        # says this cached wheel will be evicted after a week unused.
+        id: xapian-cache
+        uses: actions/cache@v2
+        with:
+          path: xapian*.whl
+          key: xapian-${{ matrix.xapian-version }}-${{ runner.os }}-${{ env.pythonLocation }}-${{ hashFiles('xapian_wheel_builder.sh') }}
+
+      - name: Build xapian wheel
+        if: steps.xapian-cache.outputs.cache-hit != 'true'
+        run: |
+          ./xapian_wheel_builder.sh ${{ matrix.xapian-version }}
+
+  test:
+    needs: prebuild_xapian_wheel
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.6]
+        django-version: [2.2]
+        xapian-version: [1.4.18]
+
+    steps:
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Checkout xapian-haystack
+        uses: actions/checkout@v2
+
+      - name: Check for cached xapian wheel
+        # This will always succeed since the previous job just ran.
+        id: xapian-cache
+        uses: actions/cache@v2
+        with:
+          path: xapian*.whl
+          key: xapian-${{ matrix.xapian-version }}-${{ runner.os }}-${{ env.pythonLocation }}-${{ hashFiles('xapian_wheel_builder.sh') }}
+
+      - name: Install Django and other Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install django~=${{ matrix.django-version }} coveralls xapian*.whl
+
+      - name: Checkout django-haystack
+        uses: actions/checkout@v2
+        with:
+          repository: 'django-haystack/django-haystack'
+          path: django-haystack
+
+      - name: Copy some test files to django-haystack
+        run: |
+          cp xapian_backend.py django-haystack/haystack/backends/
+          cp -r tests/* django-haystack/test_haystack/
+          cp tests/xapian_tests/__init__.py django-haystack/test_haystack/
+          cp .coveragerc django-haystack/
+
+      - name: Set PYTHONPATH
+        run: |
+          echo "PYTHONPATH=/usr/lib/python3/dist-packages:." >> $GITHUB_ENV
+
+      - name: Ensure all apps have migrations
+        run: |
+          cd django-haystack
+          django-admin makemigrations --settings=test_haystack.xapian_settings
+
+      - name: Running tests
+        run: |
+          cd django-haystack
+          coverage run $(command -v django-admin) test test_haystack.xapian_tests --settings=test_haystack.xapian_settings
+        env:
+          PYTHONPATH: "/usr/lib/python3/dist-packages:."
+
+      - name: Coveralls
+        run: |
+          cd django-haystack
+          coveralls --service=github
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
