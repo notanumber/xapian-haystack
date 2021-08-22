@@ -7,7 +7,7 @@ def read(fname):
 
 setup(
     name='xapian-haystack',
-    version='2.1.0',
+    version='3.0.0',
     description='A Xapian backend for Haystack',
     long_description=read('README.rst'),
     classifiers=[
@@ -24,7 +24,7 @@ setup(
     license='GPL2',
     py_modules=['xapian_backend'],
     install_requires=[
-        'django>=1.11',
-        'django-haystack>=2.5.1',
+        'django>=2.2',
+        'django-haystack>=2.8.0',
     ]
 )
