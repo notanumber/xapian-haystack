@@ -1,0 +1,23 @@
+name: Temporary Test
+
+on: [push, pull_request]
+
+env:
+  FORCE_COLOR: 1
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.7]
+
+    steps:
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install libxapian30 python3-xapian
+
+      - name: Show install path
+        run: |
+          python -c "import imp; print(imp.find_module('xapian'))"
