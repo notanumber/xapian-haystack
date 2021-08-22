@@ -483,7 +483,7 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
 
         results = self.backend.search(xapian.Query('indexed'), highlight=True)['results']
         self.assertEqual([result.highlighted['text'] for result in results],
-                         ['<em>indexed</em>!\n1', '<em>indexed</em>!\n2', '<em>indexed</em>!\n3'])
+                         ['<em>indexed</em>!\n1\n', '<em>indexed</em>!\n2\n', '<em>indexed</em>!\n3\n'])
 
     def test_spelling_suggestion(self):
         self.assertEqual(self.backend.search(xapian.Query('indxe'))['hits'], 0)
