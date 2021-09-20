@@ -33,7 +33,14 @@ echo "Preparing build virtualenv..."
 VE="${WORKSPACE}/ve"
 python3 -m venv ${VE}
 ${VE}/bin/pip install --upgrade pip wheel setuptools
-${VE}/bin/pip install "sphinx<2"
+
+# xapian before 1.4.12 had issues building with sphinx>=2
+SPHINX2_FIXED_VERSION=1.4.12
+if [ $(printf "${VERSION}\n${SPHINX2_FIXED_VERSION}" | sort -V | head -n1) = "${SPHINX2_FIXED_VERSION}" ]; then
+    ${VE}/bin/pip install sphinx
+else
+    ${VE}/bin/pip install "sphinx<2"
+fi
 
 CORE="xapian-core-${VERSION}"
 BINDINGS="xapian-bindings-${VERSION}"
