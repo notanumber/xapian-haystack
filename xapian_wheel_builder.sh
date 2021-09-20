@@ -11,9 +11,20 @@ case "${uname_sysname}" in
         exit 1
 esac
 
+PYTHON=$(which python3)
+set -- `getopt p: "$@"`
+for opt; do
+    case "$opt" in
+        -p)
+            PYTHON="$2"; shift 2 ;;
+        --)
+            shift ; break ;;
+    esac
+done
+
 VERSION=${1-${XAPIAN_VERSION}}
-if [ -z "$VERSION" ]; then
-    echo "usage: $0 version_number" 1>&2
+if [ -z "${VERSION}" ]; then
+    echo "usage: $0 [-p <path-to-python3>] version_number" 1>&2
     exit 1
 fi
 
@@ -31,7 +42,7 @@ pushd ${WORKSPACE}
 
 echo "Preparing build virtualenv..."
 VE="${WORKSPACE}/ve"
-python3 -m venv ${VE}
+${PYTHON} -m venv ${VE}
 ${VE}/bin/python -m pip install --upgrade pip wheel setuptools
 
 # xapian before 1.4.12 had issues building with sphinx>=2
