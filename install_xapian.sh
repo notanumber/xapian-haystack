@@ -39,7 +39,12 @@ fi
 
 # The bindings for Python require python-sphinx
 echo "Installing Python-Sphinx..."
-pip install "sphinx<2"
+SPHINX2_FIXED_VERSION=1.4.12
+if [ $(printf "${VERSION}\n${SPHINX2_FIXED_VERSION}" | sort -V | head -n1) = "${SPHINX2_FIXED_VERSION}" ]; then
+    pip install sphinx
+else
+    pip install "sphinx<2"
+fi
 
 echo "Installing Xapian-bindings..."
 cd $VIRTUAL_ENV/packages/${BINDINGS}
