@@ -11,6 +11,12 @@ case "${uname_sysname}" in
         exit 1
 esac
 
+VERSION=${1-${XAPIAN_VERSION}}
+if [ -z "$VERSION" ]; then
+    echo "usage: $0 version_number" 1>&2
+    exit 1
+fi
+
 exittrap() { :; }
 for sig in 1 2 13 15; do trap "exit $(($sig + 128))" $sig; done
 trap 'exittrap' EXIT
@@ -29,13 +35,12 @@ python3 -m venv ${VE}
 ${VE}/bin/pip install --upgrade pip wheel setuptools
 ${VE}/bin/pip install "sphinx<2"
 
-VERS=${XAPIAN_VERSION-1.4.9}
-CORE="xapian-core-${VERS}"
-BINDINGS="xapian-bindings-${VERS}"
+CORE="xapian-core-${VERSION}"
+BINDINGS="xapian-bindings-${VERSION}"
 
 echo "Downloading source..."
-curl -O https://oligarchy.co.uk/xapian/${VERS}/${CORE}.tar.xz
-curl -O https://oligarchy.co.uk/xapian/${VERS}/${BINDINGS}.tar.xz
+curl -O https://oligarchy.co.uk/xapian/${VERSION}/${CORE}.tar.xz
+curl -O https://oligarchy.co.uk/xapian/${VERSION}/${BINDINGS}.tar.xz
 
 echo "Extracting source..."
 mkdir src
@@ -120,7 +125,7 @@ except ImportError:
     bdist_wheel = None
 
 setup(name='xapian',
-      version='${VERS}',
+      version='${VERSION}',
       description='Xapian Bindings for Python3',
       packages=['xapian'],
       cmdclass={'bdist_wheel': bdist_wheel},
