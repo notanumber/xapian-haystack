@@ -32,7 +32,7 @@ pushd ${WORKSPACE}
 echo "Preparing build virtualenv..."
 VE="${WORKSPACE}/ve"
 python3 -m venv ${VE}
-${VE}/bin/pip install --upgrade pip wheel setuptools
+${VE}/bin/python -m pip install --upgrade pip wheel setuptools
 
 # xapian before 1.4.12 had issues building with sphinx>=2
 SPHINX2_FIXED_VERSION=1.4.12
