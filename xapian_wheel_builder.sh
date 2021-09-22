@@ -22,9 +22,19 @@ for opt; do
     esac
 done
 
+usage() {
+    echo "usage: $0 [-p <path-to-python3>] version_number" 1>&2
+}
+
 VERSION=${1-${XAPIAN_VERSION}}
 if [ -z "${VERSION}" ]; then
-    echo "usage: $0 [-p <path-to-python3>] version_number" 1>&2
+    usage
+    exit 1
+fi
+
+if [ -z "${PYTHON}" -o ! -x "${PYTHON}" ]; then
+    usage
+    echo "error: could not find python3, please specify with -p" 1>&2
     exit 1
 fi
 
