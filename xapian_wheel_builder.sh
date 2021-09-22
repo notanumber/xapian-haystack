@@ -88,7 +88,7 @@ mkdir target
 prefix=${TMPDIR}/target
 pprefix=${prefix}
 case "${uname_sysname}" in
-    Linux)
+    Linux|FreeBSD)
     while [ ${#pprefix} -lt 7 ]; do
         # add padding as needed
         pprefix=${pprefix}/.
