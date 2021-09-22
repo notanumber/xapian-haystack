@@ -6,6 +6,8 @@ case "${uname_sysname}" in
         ;;
     Darwin)
         ;;
+    FreeBSD)
+        ;;
     *)
         echo "Platform ${uname_sysname} is not supported"
         exit 1
@@ -108,6 +110,11 @@ echo "Building xapian python3 bindings..."
     # We want the sphinx we just put in a virtualenv because the xapian bindings insist on making their docs.
     # We use the python3 from that same virtualenv, because the xapian bindings don't use the shebang line of sphinx-build.
     # We override PYTHON3_LIB because if we don't then the bindings will be installed in the virutalenv, despite what we set prefix to.
+    case "${uname_sysname}" in
+	FreeBSD)
+	    sed -i '' -e 's|-lstdc++||' configure
+	    ;;
+    esac
     ./configure --prefix=$prefix --with-python3 XAPIAN_CONFIG=${XAPIAN_CONFIG} SPHINX_BUILD=${VE}/bin/sphinx-build PYTHON3=${VE}/bin/python3 PYTHON3_LIB=${prefix}
     make
     make install
@@ -116,7 +123,7 @@ echo "Building xapian python3 bindings..."
 echo "preparing xapian wheel..."
 for file in $(find ${prefix}/xapian -name '*.so'); do
     case "${uname_sysname}" in
-        Linux)
+        Linux|FreeBSD)
             # Binary patch rpath to be '$ORIGIN' as needed.
             rpath_offset=$(strings -t d ${file} | grep "${pprefix}/lib" | awk '{ printf $1; }')
             printf "\$ORIGIN\000" | dd of=${file} obs=1 seek=${rpath_offset} conv=notrunc 2>/dev/null
