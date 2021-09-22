@@ -28,6 +28,11 @@ usage() {
     echo "usage: $0 [-p <path-to-python3>] version_number" 1>&2
 }
 
+version_at_least() {
+    test $(printf "${VERSION}\n${1}" | sort -V | head -n1) = "${1}"
+    return $?
+}
+
 VERSION=${1-${XAPIAN_VERSION}}
 if [ -z "${VERSION}" ]; then
     usage
@@ -59,8 +64,7 @@ ${PYTHON} -m venv ${VE}
 ${VE}/bin/python -m pip install --upgrade pip wheel setuptools
 
 # xapian before 1.4.12 had issues building with sphinx>=2
-SPHINX2_FIXED_VERSION=1.4.12
-if [ $(printf "${VERSION}\n${SPHINX2_FIXED_VERSION}" | sort -V | head -n1) = "${SPHINX2_FIXED_VERSION}" ]; then
+if version_at_least "1.4.12"; then
     ${VE}/bin/pip install sphinx
 else
     ${VE}/bin/pip install "sphinx<2"
