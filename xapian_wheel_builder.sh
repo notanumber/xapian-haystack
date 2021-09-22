@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 uname_sysname="$(uname -s)"
 case "${uname_sysname}" in
@@ -36,7 +36,7 @@ WHL_DEST=$(pwd)
 TMPDIR=$(mktemp -d -t "xapian-builder-XXXXXX") || die "Unable to mktemp"
 exittrap() { rm -rf "${TMPDIR}"; }
 echo "Building in ${TMPDIR}."
-pushd ${TMPDIR}
+cd "${TMPDIR}"
 
 echo "Preparing build virtualenv..."
 VE="${TMPDIR}/ve"
@@ -106,7 +106,7 @@ for file in $(find ${prefix}/xapian -name '*.so'); do
         Linux)
             # Binary patch rpath to be '$ORIGIN' as needed.
             rpath_offset=$(strings -t d ${file} | grep "${pprefix}/lib" | awk '{ printf $1; }')
-            printf "\$ORIGIN\x00" | dd of=${file} obs=1 seek=${rpath_offset} conv=notrunc 2>/dev/null
+            printf "\$ORIGIN\000" | dd of=${file} obs=1 seek=${rpath_offset} conv=notrunc 2>/dev/null
             # Verify
             readelf -d ${file} | grep RPATH | grep -q ORIGIN
             libxapian_name=$(ldd $file | grep libxapian | awk '{ printf $1; }')
@@ -158,6 +158,6 @@ EOF
     ${VE}/bin/python setup.py bdist_wheel
     cp dist/*.whl ${WHL_DEST}
 )
-popd
+cd "${WHL_DEST}"
 rm -rf "${TMPDIR}"
 exittrap() { :; }
