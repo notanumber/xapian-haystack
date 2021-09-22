@@ -13,8 +13,9 @@ case "${uname_sysname}" in
         exit 1
 esac
 
-PYTHON=$(which python3)
-set -- `getopt p: "$@"`
+PYTHON=$(command -v python3)
+# shellcheck disable=SC2046
+set -- $(getopt p: "$@")
 for opt; do
     case "$opt" in
         -p)
@@ -29,7 +30,7 @@ usage() {
 }
 
 version_at_least() {
-    test $(printf "${VERSION}\n${1}" | sort -V | head -n1) = "${1}"
+    test "$(printf "%s\\n%s" "${VERSION}" "${1}" | sort -V | head -n1)" = "${1}"
     return $?
 }
 
@@ -39,14 +40,24 @@ if [ -z "${VERSION}" ]; then
     exit 1
 fi
 
-if [ -z "${PYTHON}" -o ! -x "${PYTHON}" ]; then
+if [ -z "${PYTHON}" ] || [ ! -x "${PYTHON}" ]; then
     usage
     echo "error: could not find python3, please specify with -p" 1>&2
     exit 1
 fi
 
 exittrap() { :; }
-for sig in 1 2 13 15; do trap "exit $(($sig + 128))" $sig; done
+sigtrap() {
+    # Whether or not exittrap runs on EXIT due to a signal is not defined.
+    # We use it for cleanup, and cleaning up twice is not a problem,
+    # so let's do that.
+    exittrap
+    exit $(($1 + 128))
+}
+for sig in 1 2 13 15; do
+    # shellcheck disable=SC2064
+    trap "sigtrap $sig" $sig
+done
 trap 'exittrap' EXIT
 
 WHL_DEST=$(pwd)
@@ -60,22 +71,22 @@ cd "${TMPDIR}"
 
 echo "Preparing build virtualenv..."
 VE="${TMPDIR}/ve"
-${PYTHON} -m venv ${VE}
-${VE}/bin/python -m pip install --upgrade pip wheel setuptools
+"${PYTHON}" -m venv "${VE}"
+"${VE}/bin/python" -m pip install --upgrade pip wheel setuptools
 
 # xapian before 1.4.12 had issues building with sphinx>=2
 if version_at_least "1.4.12"; then
-    ${VE}/bin/pip install sphinx
+    "${VE}/bin/pip" install sphinx
 else
-    ${VE}/bin/pip install "sphinx<2"
+    "${VE}/bin/pip" install "sphinx<2"
 fi
 
 CORE="xapian-core-${VERSION}"
 BINDINGS="xapian-bindings-${VERSION}"
 
 echo "Downloading source..."
-curl -O https://oligarchy.co.uk/xapian/${VERSION}/${CORE}.tar.xz
-curl -O https://oligarchy.co.uk/xapian/${VERSION}/${BINDINGS}.tar.xz
+curl -O "https://oligarchy.co.uk/xapian/${VERSION}/${CORE}.tar.xz"
+curl -O "https://oligarchy.co.uk/xapian/${VERSION}/${BINDINGS}.tar.xz"
 
 echo "Extracting source..."
 mkdir src
@@ -98,45 +109,45 @@ esac
 
 echo "Building xapian core..."
 (
-    cd src/${CORE}
-    ./configure --prefix=${pprefix}
+    cd "src/${CORE}"
+    ./configure --prefix="${pprefix}"
     make
     make install
 )
 
-XAPIAN_CONFIG=${prefix}/bin/xapian-config*
+XAPIAN_CONFIG="${prefix}/bin/xapian-config*"
 
 echo "Building xapian python3 bindings..."
 (
-    cd src/${BINDINGS}
+    cd "src/${BINDINGS}"
     # We're building python3 bindings here, and we need to contort things to make it work.
     # We want the xapian-config we just built.
     # We want the sphinx we just put in a virtualenv because the xapian bindings insist on making their docs.
     # We use the python3 from that same virtualenv, because the xapian bindings don't use the shebang line of sphinx-build.
     # We override PYTHON3_LIB because if we don't then the bindings will be installed in the virutalenv, despite what we set prefix to.
     case "${uname_sysname}" in
-	FreeBSD)
-	    sed -i '' -e 's|-lstdc++||' configure
-	    ;;
+        FreeBSD)
+            sed -i '' -e 's|-lstdc++||' configure
+            ;;
     esac
-    ./configure --prefix=$prefix --with-python3 XAPIAN_CONFIG=${XAPIAN_CONFIG} SPHINX_BUILD=${VE}/bin/sphinx-build PYTHON3=${VE}/bin/python3 PYTHON3_LIB=${prefix}
+    ./configure --prefix="$prefix" --with-python3 XAPIAN_CONFIG="${XAPIAN_CONFIG}" SPHINX_BUILD="${VE}/bin/sphinx-build" PYTHON3="${VE}/bin/python3" PYTHON3_LIB="${prefix}"
     make
     make install
 )
 
 echo "preparing xapian wheel..."
-for file in $(find ${prefix}/xapian -name '*.so'); do
+for file in "${prefix}"/xapian/*.so; do
     case "${uname_sysname}" in
         Linux|FreeBSD)
             # Binary patch rpath to be '$ORIGIN' as needed.
-            rpath_offset=$(strings -t d ${file} | grep "${pprefix}/lib" | awk '{ printf $1; }')
-            printf "\$ORIGIN\000" | dd of=${file} obs=1 seek=${rpath_offset} conv=notrunc 2>/dev/null
+            rpath_offset=$(strings -t d "${file}" | grep "${pprefix}/lib" | awk '{ printf $1; }')
+            printf "\$ORIGIN\\000" | dd of="${file}" obs=1 seek="${rpath_offset}" conv=notrunc 2>/dev/null
             # Verify
-            readelf -d ${file} | grep RUNPATH | grep -q ORIGIN
-            libxapian_name=$(ldd $file | grep libxapian | awk '{ printf $1; }')
+            readelf -d "${file}" | grep RUNPATH | grep -q ORIGIN
+            libxapian_name=$(ldd "${file}" | grep libxapian | awk '{ printf $1; }')
             ;;
         Darwin)
-            libxapian_name=$(otool -L $file | grep -o libxapian.* | awk '{ printf $1; }')
+            libxapian_name=$(otool -L "${file}" | grep -o 'libxapian.*' | awk '{ printf $1; }')
             install_name_tool -change "${prefix}/lib/${libxapian_name}" "@loader_path/${libxapian_name}" "${file}"
             ;;
     esac
@@ -151,7 +162,7 @@ case "${uname_sysname}" in
 esac
 
 # Prepare the scaffolding for the wheel
-cat > $prefix/setup.py <<EOF
+cat > "$prefix/setup.py" <<EOF
 from setuptools import setup
 
 try:
@@ -173,14 +184,14 @@ setup(name='xapian',
       zip_safe=False)
 EOF
 
-cat >$prefix/MANIFEST.in <<EOF
+cat > "$prefix/MANIFEST.in" <<EOF
 include xapian/*
 EOF
 
 (
     cd target
-    ${VE}/bin/python setup.py bdist_wheel
-    cp dist/*.whl ${WHL_DEST}
+    "${VE}/bin/python" setup.py bdist_wheel
+    cp dist/*.whl "${WHL_DEST}"
 )
 cd "${WHL_DEST}"
 rm -rf "${TMPDIR}"
