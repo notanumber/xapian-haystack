@@ -35,6 +35,9 @@ trap 'exittrap' EXIT
 WHL_DEST=$(pwd)
 TMPDIR=$(mktemp -d -t "xapian-builder-XXXXXX") || die "Unable to mktemp"
 exittrap() { rm -rf "${TMPDIR}"; }
+
+set -e
+
 echo "Building in ${TMPDIR}."
 cd "${TMPDIR}"
 
@@ -108,7 +111,7 @@ for file in $(find ${prefix}/xapian -name '*.so'); do
             rpath_offset=$(strings -t d ${file} | grep "${pprefix}/lib" | awk '{ printf $1; }')
             printf "\$ORIGIN\000" | dd of=${file} obs=1 seek=${rpath_offset} conv=notrunc 2>/dev/null
             # Verify
-            readelf -d ${file} | grep RPATH | grep -q ORIGIN
+            readelf -d ${file} | grep RUNPATH | grep -q ORIGIN
             libxapian_name=$(ldd $file | grep libxapian | awk '{ printf $1; }')
             ;;
         Darwin)
