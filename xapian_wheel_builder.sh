@@ -33,15 +33,13 @@ for sig in 1 2 13 15; do trap "exit $(($sig + 128))" $sig; done
 trap 'exittrap' EXIT
 
 WHL_DEST=$(pwd)
-if [ "x${WORKSPACE}" = "x" ]; then
-    WORKSPACE=$(mktemp -d -t "xapian-builder-XXXXXX") || die "Unable to mktemp"
-    exittrap() { rm -rf "${WORKSPACE}"; }
-fi
-echo "Building in ${WORKSPACE}."
-pushd ${WORKSPACE}
+TMPDIR=$(mktemp -d -t "xapian-builder-XXXXXX") || die "Unable to mktemp"
+exittrap() { rm -rf "${TMPDIR}"; }
+echo "Building in ${TMPDIR}."
+pushd ${TMPDIR}
 
 echo "Preparing build virtualenv..."
-VE="${WORKSPACE}/ve"
+VE="${TMPDIR}/ve"
 ${PYTHON} -m venv ${VE}
 ${VE}/bin/python -m pip install --upgrade pip wheel setuptools
 
@@ -68,7 +66,7 @@ tar -C src -xf "${BINDINGS}.tar.xz"
 # building xapian-core
 mkdir target
 
-prefix=${WORKSPACE}/target
+prefix=${TMPDIR}/target
 pprefix=${prefix}
 case "${uname_sysname}" in
     Linux)
@@ -161,5 +159,5 @@ EOF
     cp dist/*.whl ${WHL_DEST}
 )
 popd
-rm -rf "${WORKSPACE}"
+rm -rf "${TMPDIR}"
 exittrap() { :; }
