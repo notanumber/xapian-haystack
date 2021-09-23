@@ -135,8 +135,8 @@ echo "Building xapian python3 bindings..."
     make install
 )
 
-echo "preparing xapian wheel..."
-for file in "${prefix}"/xapian/*.so; do
+binary_patch_rpath() {
+    file="${1}"
     case "${uname_sysname}" in
         Linux|FreeBSD)
             # Binary patch rpath to be '$ORIGIN' as needed.
@@ -151,6 +151,11 @@ for file in "${prefix}"/xapian/*.so; do
             install_name_tool -change "${prefix}/lib/${libxapian_name}" "@loader_path/${libxapian_name}" "${file}"
             ;;
     esac
+}
+
+echo "preparing xapian wheel..."
+for file in "${prefix}"/xapian/*.so; do
+    binary_patch_rpath "${file}"
 done
 
 # Copy libxapian into place alongside the python bindings.
@@ -160,6 +165,11 @@ case "${uname_sysname}" in
         install_name_tool -id "@loader_path/${libxapian_name}" "${prefix}/xapian/${libxapian_name}"
         ;;
 esac
+
+for file in "${prefix}"/bin/xapian-delve*; do
+    binary_patch_rpath "${file}"
+    cp "${file}" "${prefix}/xapian"
+done
 
 # Prepare the scaffolding for the wheel
 cat > "$prefix/setup.py" <<EOF
