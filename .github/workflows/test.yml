@@ -98,7 +98,8 @@ jobs:
 
       - name: Coveralls
         run: |
-          cd django-haystack
+          coverage combine django-haystack/.coverage
+          coverage report
           coveralls --service=github
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
