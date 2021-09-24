@@ -194,12 +194,13 @@ readme = (cwd / 'README').read_text()
 
 setup(name='xapian',
       version='${VERSION}',
-      description='Xapian Library and Bindings for Python3 as packaged for local use by xapian-haystack',
+      description='Xapian Library and Bindings for Python as packaged for local use by xapian-haystack',
       long_description=readme,
       long_description_content_type='text/plain',
       license='GPL2',
       classifiers=[
         'License :: OSI Approved :: GNU General Public License v2 or later (GPLv2+)',
+        'Programming Language :: Python :: 3 :: Only',
       ],
       packages=['xapian'],
       cmdclass={'bdist_wheel': bdist_wheel},
@@ -211,7 +212,7 @@ cat > "${prefix}/MANIFEST.in" <<EOF
 include xapian/*
 EOF
 cat > "${prefix}/README" <<EOF
-This wheel contains the xapian library and python3 bindings.
+This wheel contains the xapian library and python bindings.
 It was built using \`xapian_wheel_builder.sh\` from the Xapian Haystack project.
 
 Xapian Haystack is a Xapian backend for Django-Haystack.
