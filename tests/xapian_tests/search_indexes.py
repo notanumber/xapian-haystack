@@ -80,6 +80,13 @@ class BlogSearchIndex(indexes.SearchIndex):
         return ''
 
 
+class UUIDModelSearchIndex(indexes.SearchIndex):
+    text = indexes.CharField(document=True)
+
+    def get_model(self):
+        return models.UUIDModel
+
+
 class CompleteBlogEntryIndex(indexes.SearchIndex):
     text = indexes.CharField(model_attr='text', document=True)
     author = indexes.CharField(model_attr='author')

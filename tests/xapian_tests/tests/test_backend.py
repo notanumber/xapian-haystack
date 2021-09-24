@@ -17,8 +17,8 @@ from haystack.models import SearchResult
 from haystack.utils.loading import UnifiedIndex
 
 from ..search_indexes import XapianNGramIndex, XapianEdgeNGramIndex, \
-    CompleteBlogEntryIndex, BlogSearchIndex, DjangoContentTypeIndex
-from ..models import BlogEntry, AnotherMockModel, MockTag, DjangoContentType
+    CompleteBlogEntryIndex, BlogSearchIndex, DjangoContentTypeIndex, UUIDModelSearchIndex
+from ..models import BlogEntry, AnotherMockModel, MockTag, DjangoContentType, UUIDModel
 
 
 XAPIAN_VERSION = [int(x) for x in xapian.__version__.split('.')]
@@ -694,6 +694,54 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
 
         self.backend.silently_fail = False
         self.assertRaises(InvalidIndexError, self.backend.more_like_this, mock)
+
+
+class StringBasedPKModelBackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
+    """
+    Covers #138, Must not assume django_id is an int
+    """
+
+    def get_index(self):
+        return UUIDModelSearchIndex()
+
+    @staticmethod
+    def get_entry(i):
+        entry = UUIDModel(uuid='uuid-%s' % i)
+        return entry
+
+    def setUp(self):
+        super(StringBasedPKModelBackendFeaturesTestCase, self).setUp()
+
+        for i in range(1, 4):
+            entry = self.get_entry(i)
+            entry.save()
+
+        self.backend.update(self.index, UUIDModel.objects.all())
+
+    def test_update(self):
+        self.assertEqual(pks(self.backend.search(xapian.Query(''))['results']),
+                         ['uuid-1', 'uuid-2', 'uuid-3'])
+
+    def test_order_by_django_id(self):
+        """
+        We need this test because ordering on more than
+        10 entries was not correct at some point.
+        """
+        sample_objs = []
+        pk_list = []
+        for i in range(101, 200):
+            entry = self.get_entry(i)
+            sample_objs.append(entry)
+            pk_list.append('uuid-%03d' % i)
+
+        for obj in sample_objs:
+            obj.save()
+
+        self.backend.clear()
+        self.backend.update(self.index, sample_objs)
+
+        results = self.backend.search(xapian.Query(''), sort_by=['-django_id'])
+        self.assertEqual(pks(results['results']), list(reversed(pk_list)))
 
 
 class IndexationNGramTestCase(HaystackBackendTestCase, TestCase):

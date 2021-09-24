@@ -333,6 +333,10 @@ class SearchQueryTestCase(HaystackBackendTestCase, TestCase):
                                  'zzzzzzzzzzzzzzzzzzzzzzzzz AND'
                                  ' (QQ000000000001 OR QQ000000000002 OR QQ000000000003))')
 
+    def test_filter_string_based_django_pk(self):
+        self.sq.add_filter(SQ(django_id='uuid-1'))
+        self.assertExpectedQuery(self.sq.build_query(), 'QQuuid-1')
+
     def test_log_query(self):
         reset_search_queries()
         self.assertEqual(len(connections['default'].queries), 0)
