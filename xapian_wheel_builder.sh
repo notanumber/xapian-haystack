@@ -81,12 +81,15 @@ else
     "${VE}/bin/pip" install "sphinx<2"
 fi
 
+BASE_URI="https://oligarchy.co.uk/xapian/"
 CORE="xapian-core-${VERSION}"
 BINDINGS="xapian-bindings-${VERSION}"
+CORE_URI="${BASE_URI}${VERSION}/${CORE}.tar.xz"
+BINDINGS_URI="${BASE_URI}${VERSION}/${BINDINGS}.tar.xz"
 
 echo "Downloading source..."
-curl -O "https://oligarchy.co.uk/xapian/${VERSION}/${CORE}.tar.xz"
-curl -O "https://oligarchy.co.uk/xapian/${VERSION}/${BINDINGS}.tar.xz"
+curl -O "${CORE_URI}"
+curl -O "${BINDINGS_URI}"
 
 echo "Extracting source..."
 mkdir src
@@ -172,7 +175,8 @@ for file in "${prefix}"/bin/xapian-delve*; do
 done
 
 # Prepare the scaffolding for the wheel
-cat > "$prefix/setup.py" <<EOF
+cat > "${prefix}/setup.py" <<EOF
+from pathlib import Path
 from setuptools import setup
 
 try:
@@ -185,18 +189,47 @@ try:
 except ImportError:
     bdist_wheel = None
 
+cwd = Path(__file__).parent
+readme = (cwd / 'README').read_text()
+
 setup(name='xapian',
       version='${VERSION}',
-      description='Xapian Bindings for Python3',
+      description='Xapian Library and Bindings for Python3 as packaged for local use by xapian-haystack',
+      long_description=readme,
+      long_description_content_type='text/plain',
+      license='GPL2',
+      classifiers=[
+        'License :: OSI Approved :: GNU General Public License v2 or later (GPLv2+)',
+      ],
       packages=['xapian'],
       cmdclass={'bdist_wheel': bdist_wheel},
       include_package_data=True,
       zip_safe=False)
 EOF
 
-cat > "$prefix/MANIFEST.in" <<EOF
+cat > "${prefix}/MANIFEST.in" <<EOF
 include xapian/*
 EOF
+cat > "${prefix}/README" <<EOF
+This wheel contains the xapian library and python3 bindings.
+It was built using \`xapian_wheel_builder.sh\` from the Xapian Haystack project.
+
+Xapian Haystack is a Xapian backend for Django-Haystack.
+https://github.com/notanumber/xapian-haystack
+
+The Xapian version used in this wheel is: ${VERSION}
+The sources were downloaded from the xapian upstream:
+- ${CORE_URI}
+- ${BINDINGS_URI}
+
+Xapian's homepage can be found at https://xapian.org/
+
+You can find the script used to build this specific wheel inside of itself.
+EOF
+
+(cd "${WHL_DEST}"; cp "$0" "${prefix}/xapian/xapian_wheel_builder.sh")
+
+cp "src/${CORE}/COPYING" "${prefix}/LICENSE.txt"
 
 (
     cd target
