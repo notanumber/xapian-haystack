@@ -1,12 +1,14 @@
 Xapian backend for Django-Haystack
 ==================================
 
-.. _Travis: https://travis-ci.org/notanumber/xapian-haystack
-
-.. image:: https://travis-ci.org/notanumber/xapian-haystack.svg?branch=master
-   :target: https://travis-ci.org/notanumber/xapian-haystack
+.. image:: https://github.com/notanumber/xapian-haystack/actions/workflows/test.yml/badge.svg
+   :target: https://github.com/notanumber/xapian-haystack/actions
+   :alt: GitHub Actions
 .. image:: https://coveralls.io/repos/notanumber/xapian-haystack/badge.svg?branch=master&service=github
    :target: https://coveralls.io/github/notanumber/xapian-haystack?branch=master
+.. image:: https://img.shields.io/pypi/v/xapian-haystack.svg
+   :target: https://pypi.org/project/xapian-haystack/
+   :alt: PyPI version
 
 Xapian-haystack is a backend of `Django-Haystack <http://haystacksearch.org/>`__
 for the `Xapian <https://xapian.org>`__ search engine.
@@ -94,8 +96,8 @@ The backend has the following optional settings:
 Testing
 -------
 
-Xapian-Haystack has a test suite in continuous deployment in `Travis`_. The script
-``.travis.yml`` contains the steps required to run the test suite.
+Xapian-Haystack has a test suite in continuous deployment with GitHub Actions. The file
+``.github/workflows/test.yml`` contains the steps required to run the test suite.
 
 
 Source
