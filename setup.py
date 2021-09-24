@@ -1,15 +1,17 @@
-import os
 from distutils.core import setup
+from pathlib import Path
 
 
 def read(fname):
-    return open(os.path.join(os.path.dirname(__file__), fname)).read()
+    return (Path(__file__).parent / fname).read_text(encoding='utf-8')
+
 
 setup(
     name='xapian-haystack',
     version='3.0.0',
     description='A Xapian backend for Haystack',
     long_description=read('README.rst'),
+    long_description_content_type='text/x-rst',
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Developers',
