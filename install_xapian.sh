@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# first argument of the script is Xapian version (e.g. 1.2.19)
+# first argument of the script is Xapian version (e.g. 1.4.18)
 
 VERSION=$1
 
@@ -31,12 +31,6 @@ cd $VIRTUAL_ENV/packages/${CORE}
 
 PYTHON_FLAG=--with-python3
 
-if [ $VERSION = "1.3.3" ]; then
-    XAPIAN_CONFIG=$VIRTUAL_ENV/bin/xapian-config-1.3
-else
-    XAPIAN_CONFIG=
-fi
-
 # The bindings for Python require python-sphinx
 echo "Installing Python-Sphinx..."
 SPHINX2_FIXED_VERSION=1.4.12
@@ -48,7 +42,7 @@ fi
 
 echo "Installing Xapian-bindings..."
 cd $VIRTUAL_ENV/packages/${BINDINGS}
-./configure --prefix=$VIRTUAL_ENV $PYTHON_FLAG XAPIAN_CONFIG=$XAPIAN_CONFIG && make && make install
+./configure --prefix=$VIRTUAL_ENV $PYTHON_FLAG && make && make install
 
 # clean
 cd $VIRTUAL_ENV

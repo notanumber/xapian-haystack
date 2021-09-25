@@ -70,17 +70,12 @@ class XapianSearchQueryTestCase(HaystackBackendTestCase, TestCase):
         self.sq.add_filter(SQ(content=datetime.datetime(2009, 5, 8, 11, 28)))
         self.assertExpectedQuery(self.sq.build_query(),
                                  '((Z2009-05-08 OR 2009-05-08) OR'
-                                 ' (Z11:28:00 OR 11:28:00))',
-                                 xapian12string='(Z2009-05-08 OR 2009-05-08 OR'
-                                                ' Z11:28:00 OR 11:28:00)')
+                                 ' (Z11:28:00 OR 11:28:00))')
 
     def test_datetime_not(self):
         self.sq.add_filter(~SQ(content=datetime.datetime(2009, 5, 8, 11, 28)))
         self.assertExpectedQuery(self.sq.build_query(),
-                                 '(<alldocuments> AND_NOT ((Z2009-05-08 OR 2009-05-08) OR (Z11:28:00 OR 11:28:00)))',
-                                 xapian12string='(<alldocuments> AND_NOT '
-                                                '(Z2009-05-08 OR 2009-05-08 OR'
-                                                ' Z11:28:00 OR 11:28:00))')
+                                 '(<alldocuments> AND_NOT ((Z2009-05-08 OR 2009-05-08) OR (Z11:28:00 OR 11:28:00)))')
 
     def test_float(self):
         self.sq.add_filter(SQ(content=25.52))
@@ -103,8 +98,7 @@ class XapianSearchQueryTestCase(HaystackBackendTestCase, TestCase):
         self.sq.add_filter(SQ(content='hello') | SQ(content='world'))
         self.assertExpectedQuery(
             self.sq.build_query(),
-            '((Zhello OR hello) OR (Zworld OR world))',
-            xapian12string='(Zhello OR hello OR Zworld OR world)')
+            '((Zhello OR hello) OR (Zworld OR world))')
 
     def test_multiple_words_or_not(self):
         self.sq.add_filter(~SQ(content='hello') | ~SQ(content='world'))
@@ -118,9 +112,7 @@ class XapianSearchQueryTestCase(HaystackBackendTestCase, TestCase):
         self.assertExpectedQuery(
             self.sq.build_query(),
             '(((Zwhi OR why) OR (Zhello OR hello)) AND '
-            '(<alldocuments> AND_NOT (Zworld OR world)))',
-            xapian12string='((Zwhi OR why OR Zhello OR hello) AND'
-                           ' (<alldocuments> AND_NOT (Zworld OR world)))',)
+            '(<alldocuments> AND_NOT (Zworld OR world)))')
 
     def test_multiple_word_field_exact(self):
         self.sq.add_filter(SQ(foo='hello'))
@@ -139,15 +131,13 @@ class XapianSearchQueryTestCase(HaystackBackendTestCase, TestCase):
     def test_or(self):
         self.sq.add_filter(SQ(content='hello world'))
         self.assertExpectedQuery(
-            self.sq.build_query(), '((Zhello OR hello) OR (Zworld OR world))',
-            xapian12string='(Zhello OR hello OR Zworld OR world)')
+            self.sq.build_query(), '((Zhello OR hello) OR (Zworld OR world))')
 
     def test_not_or(self):
         self.sq.add_filter(~SQ(content='hello world'))
         self.assertExpectedQuery(
             self.sq.build_query(),
-            '(<alldocuments> AND_NOT ((Zhello OR hello) OR (Zworld OR world)))',
-            xapian12string='(<alldocuments> AND_NOT (Zhello OR hello OR Zworld OR world))')
+            '(<alldocuments> AND_NOT ((Zhello OR hello) OR (Zworld OR world)))')
 
     def test_boost(self):
         self.sq.add_filter(SQ(content='hello'))

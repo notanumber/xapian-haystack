@@ -78,19 +78,13 @@ class HaystackBackendTestCase:
         self.backend.clear()
         connections['default']._index = self.old_ui
 
-    def assertExpectedQuery(self, query, string_or_list, xapian12string=''):
+    def assertExpectedQuery(self, query, string_or_list):
         if isinstance(string_or_list, list):
             strings = string_or_list
         else:
             strings = [string_or_list]
 
         expected = ['Query(%s)' % string for string in strings]
-
-        if XAPIAN_VERSION[1] <= 2:
-            if xapian12string:
-                expected = ['Xapian::Query(%s)' % xapian12string]
-            else:
-                expected = ['Xapian::Query(%s)' % string for string in strings]
 
         self.assertIn(str(query), expected)
 
@@ -607,11 +601,9 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
         ])
 
     def test_parse_query(self):
-        self.assertExpectedQuery(self.backend.parse_query('indexed'), 'Zindex@1',
-                                 xapian12string='Zindex:(pos=1)')
+        self.assertExpectedQuery(self.backend.parse_query('indexed'), 'Zindex@1')
 
-        self.assertExpectedQuery(self.backend.parse_query('name:david'),
-                                 'ZXNAMEdavid@1', xapian12string='ZXNAMEdavid:(pos=1)')
+        self.assertExpectedQuery(self.backend.parse_query('name:david'), 'ZXNAMEdavid@1')
 
         if xapian.minor_version() >= 2:
             # todo: why `SYNONYM WILDCARD OR XNAMEda`?
@@ -620,10 +612,7 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
                 [
                     '(SYNONYM WILDCARD OR XNAMEda)',
                     'WILDCARD SYNONYM XNAMEda',
-                ],
-                xapian12string='(XNAMEdavid1:(pos=1) SYNONYM '
-                'XNAMEdavid2:(pos=1) SYNONYM '
-                'XNAMEdavid3:(pos=1))')
+                ])
         else:
             self.assertEqual(str(self.backend.parse_query('name:da*')),
                              'Xapian::Query(('
@@ -636,26 +625,22 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
                                  [
                                      '0 * VALUE_RANGE 9 david1 david2',
                                      'VALUE_RANGE 9 david1 david2',
-                                 ],
-                                 xapian12string='VALUE_RANGE 9 david1 david2')
+                                 ])
         self.assertExpectedQuery(self.backend.parse_query('number:0..10'),
                                  [
                                      '0 * VALUE_RANGE 11 000000000000 000000000010',
                                      'VALUE_RANGE 11 000000000000 000000000010',
-                                 ],
-                                 xapian12string='VALUE_RANGE 11 000000000000 000000000010')
+                                 ])
         self.assertExpectedQuery(self.backend.parse_query('number:..10'),
                                  [
                                      '0 * VALUE_RANGE 11 %012d 000000000010' % (-sys.maxsize - 1),
                                      'VALUE_RANGE 11 %012d 000000000010' % (-sys.maxsize - 1),
-                                 ],
-                                 xapian12string='VALUE_RANGE 11 %012d 000000000010' % (-sys.maxsize - 1))
+                                 ])
         self.assertExpectedQuery(self.backend.parse_query('number:10..*'),
                                  [
                                      '0 * VALUE_RANGE 11 000000000010 %012d' % sys.maxsize,
                                      'VALUE_RANGE 11 000000000010 %012d' % sys.maxsize,
-                                 ],
-                                 xapian12string='VALUE_RANGE 11 000000000010 %012d' % sys.maxsize)
+                                 ])
 
     def test_order_by_django_id(self):
         """

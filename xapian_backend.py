@@ -285,11 +285,7 @@ class XapianSearchBackend(BaseSearchBackend):
             term_generator = xapian.TermGenerator()
             term_generator.set_database(database)
             term_generator.set_stemmer(xapian.Stem(self.language))
-            try:
-                term_generator.set_stemming_strategy(self.stemming_strategy)
-            except AttributeError:  
-                # Versions before Xapian 1.2.11 do not support stemming strategies for TermGenerator
-                pass
+            term_generator.set_stemming_strategy(self.stemming_strategy)
             if self.include_spelling is True:
                 term_generator.set_flags(xapian.TermGenerator.FLAG_SPELLING)
 
