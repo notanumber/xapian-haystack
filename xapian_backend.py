@@ -27,13 +27,6 @@ except ImportError:
                             "Please refer to the documentation.")
 
 
-class NotSupportedError(Exception):
-    """
-    When the installed version of Xapian doesn't support something and we have
-    the old implementation.
-    """
-    pass
-
 # this maps the different reserved fields to prefixes used to
 # create the database:
 # id str: unique document id.
@@ -644,10 +637,7 @@ class XapianSearchBackend(BaseSearchBackend):
         enquire.set_query(query)
 
         if sort_by:
-            try:
-                _xapian_sort(enquire, sort_by, self.column)
-            except NotSupportedError:
-                _old_xapian_sort(enquire, sort_by, self.column)
+            _xapian_sort(enquire, sort_by, self.column)
 
         results = []
         facets_dict = {
@@ -1647,25 +1637,8 @@ def _from_xapian_value(value, field_type):
         return value
 
 
-def _old_xapian_sort(enquire, sort_by, column):
-    sorter = xapian.MultiValueSorter()
-
-    for sort_field in sort_by:
-        if sort_field.startswith('-'):
-            reverse = True
-            sort_field = sort_field[1:]  # Strip the '-'
-        else:
-            reverse = False  # Reverse is inverted in Xapian -- http://trac.xapian.org/ticket/311
-        sorter.add(column[sort_field], reverse)
-
-    enquire.set_sort_by_key_then_relevance(sorter, True)
-
-
 def _xapian_sort(enquire, sort_by, column):
-    try:
-        sorter = xapian.MultiValueKeyMaker()
-    except AttributeError:
-        raise NotSupportedError
+    sorter = xapian.MultiValueKeyMaker()
 
     for sort_field in sort_by:
         if sort_field.startswith('-'):
