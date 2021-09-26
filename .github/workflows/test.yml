@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.6]
+        python-version: [3.6, 3.9]
         xapian-version: [1.4.18]
 
     steps:
@@ -41,8 +41,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.6]
-        django-version: [2.2]
+        python-version: [3.6, 3.9]
+        django-version: [2.2, 3.1, 3.2]
         xapian-version: [1.4.18]
 
     steps:
@@ -101,5 +101,18 @@ jobs:
           coverage combine django-haystack/.coverage
           coverage report
           coveralls --service=github
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COVERALLS_FLAG_NAME: python-${{ matrix.python-version }}-django-${{ matrix.django-version }}-xapian-${{ matrix.xapian-version }}
+          COVERALLS_PARALLEL: true
+
+  coveralls:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inform Coveralls of Completion
+        run: |
+          pip3 install --upgrade coveralls
+          coveralls --service=github --finish
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
