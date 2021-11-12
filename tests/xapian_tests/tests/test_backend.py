@@ -9,7 +9,6 @@ import os
 from django.apps import apps
 from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase
-from django.utils.encoding import force_text
 
 from haystack import connections
 from haystack.backends.xapian_backend import InvalidIndexError, _term_to_xapian_value
@@ -566,7 +565,7 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
         self.assertEqual(_term_to_xapian_value([1, 2, 3], 'text'), '[1, 2, 3]')
         self.assertEqual(_term_to_xapian_value((1, 2, 3), 'text'), '(1, 2, 3)')
         self.assertEqual(_term_to_xapian_value({'a': 1, 'c': 3, 'b': 2}, 'text'),
-                         force_text({'a': 1, 'c': 3, 'b': 2}))
+                         str({'a': 1, 'c': 3, 'b': 2}))
         self.assertEqual(_term_to_xapian_value(datetime.datetime(2009, 5, 9, 16, 14), 'datetime'),
                          '20090509161400')
         self.assertEqual(_term_to_xapian_value(datetime.datetime(2009, 5, 9, 0, 0), 'date'),
