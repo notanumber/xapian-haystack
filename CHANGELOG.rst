@@ -2,6 +2,13 @@
 xapian-haystack Changelog
 =========================
 
+v3.0.1 (2021-11-12)
+-------------------
+
+- Removed deprecated ``force_text`` usage, which will stop emitting
+  RemovedInDjango40Warning's.
+- Test files are now included in release tarball.
+
 v3.0.0 (2021-10-26)
 -------------------
 
