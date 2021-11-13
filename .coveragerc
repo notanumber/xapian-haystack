@@ -6,9 +6,9 @@ exclude_lines =
     except xapian.DatabaseModifiedError
 
 [run]
-source =
-    haystack.backends.xapian_backend
-    test_haystack/xapian_tests
+include =
+    haystack/backends/xapian_backend.py
+    test_haystack/xapian_tests/*
 
 [paths]
 # Merge coverage data from running tests in a django-haystack
