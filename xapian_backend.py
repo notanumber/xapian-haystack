@@ -1,4 +1,5 @@
 import datetime
+from fcntl import LOCK_EX, LOCK_UN, flock
 import pickle
 import os
 import re
@@ -72,6 +73,26 @@ INTEGER_FORMAT = '%012d'
 # defines the distance given between
 # texts with positional information
 TERMPOS_DISTANCE = 100
+
+class FileLock(object):
+    """A basic flock file lock."""
+
+    def __init__(self, path):
+        """Store the lockfile path."""
+        self.path = path
+
+    def __enter__(self):
+        """Enter the lock."""
+        with open(self.path, "a"):
+            # Create the lockfile if it doesn't exist.
+            os.utime(self.path)
+        self.file = os.open(self.path, os.O_RDONLY)
+        flock(self.file, LOCK_EX)
+
+    def __exit__(self, _exc_type, _exc_value, _traceback):
+        """Exit the lock."""
+        flock(self.file, LOCK_UN)
+        os.close(self.file)
 
 class InvalidIndexError(HaystackError):
     """Raised when an index can not be opened."""
@@ -188,6 +209,8 @@ class XapianSearchBackend(BaseSearchBackend):
             except FileExistsError:
                 pass
 
+        self.lockfile = os.path.join(self.path,  "lockfile")
+
         self.flags = connection_options.get('FLAGS', DEFAULT_XAPIAN_FLAGS)
         self.language = getattr(settings, 'HAYSTACK_XAPIAN_LANGUAGE', 'english')
 
@@ -271,6 +294,8 @@ class XapianSearchBackend(BaseSearchBackend):
         conversion of float, int, double, values being done by Xapian itself
         through the use of the :method:xapian.sortable_serialise method.
         """
+        file_lock = FileLock(path=self.lockfile)
+        file_lock.__enter__()
         database = self._database(writable=True)
 
         try:
@@ -481,6 +506,7 @@ class XapianSearchBackend(BaseSearchBackend):
 
         finally:
             database.close()
+        file_lock.__exit__()
 
     def remove(self, obj, commit=True):
         """
@@ -492,9 +518,10 @@ class XapianSearchBackend(BaseSearchBackend):
         Optional arguments:
            `commit` -- ignored
         """
-        database = self._database(writable=True)
-        database.delete_document(TERM_PREFIXES[ID] + get_identifier(obj))
-        database.close()
+        with FileLock(path=self.lockfile):
+            database = self._database(writable=True)
+            database.delete_document(TERM_PREFIXES[ID] + get_identifier(obj))
+            database.close()
 
     def clear(self, models=(), commit=True):
         """
