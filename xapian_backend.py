@@ -254,7 +254,7 @@ class XapianSearchBackend(BaseSearchBackend):
         self._update_cache()
         return self._columns
 
-    def update(self, index, iterable, commit=True):
+    def _update(self, index, iterable, commit=True):
         """
         Updates the `index` with any objects in `iterable` by adding/updating
         the database as needed.
@@ -294,8 +294,6 @@ class XapianSearchBackend(BaseSearchBackend):
         conversion of float, int, double, values being done by Xapian itself
         through the use of the :method:xapian.sortable_serialise method.
         """
-        file_lock = FileLock(path=self.lockfile)
-        file_lock.__enter__()
         database = self._database(writable=True)
 
         try:
@@ -506,9 +504,13 @@ class XapianSearchBackend(BaseSearchBackend):
 
         finally:
             database.close()
-        file_lock.__exit__()
 
-    def remove(self, obj, commit=True):
+    def update(self, index, iterable, commit=True):
+        """Locking update."""
+        with FileLock(path=self.lockfile):
+            self._update(index, iterable, commit)
+
+    def _remove(self, obj, commit=True):
         """
         Remove indexes for `obj` from the database.
 
@@ -518,10 +520,14 @@ class XapianSearchBackend(BaseSearchBackend):
         Optional arguments:
            `commit` -- ignored
         """
+        database = self._database(writable=True)
+        database.delete_document(TERM_PREFIXES[ID] + get_identifier(obj))
+        database.close()
+
+    def remove(self, obj, commit=True):
+        """Locking remove."""
         with FileLock(path=self.lockfile):
-            database = self._database(writable=True)
-            database.delete_document(TERM_PREFIXES[ID] + get_identifier(obj))
-            database.close()
+            self._remove(obj, commit)
 
     def clear(self, models=(), commit=True):
         """
