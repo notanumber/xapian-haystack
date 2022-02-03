@@ -75,6 +75,18 @@ INTEGER_FORMAT = '%012d'
 # texts with positional information
 TERMPOS_DISTANCE = 100
 
+
+def filelocked(func):
+    """Decorator to wrap a method in a filelock."""
+    def wrapper(self, *args, **kwargs):
+        with open(self.lockfile, "w"):
+            # recreate the lockfile just in case.
+            # useful for tests.
+            os.utime(self.lockfile, None)
+        with self.filelock:
+            func(self, *args, **kwargs)
+    return wrapper
+
 class InvalidIndexError(HaystackError):
     """Raised when an index can not be opened."""
     pass
@@ -235,17 +247,6 @@ class XapianSearchBackend(BaseSearchBackend):
         """
         self._update_cache()
         return self._columns
-
-    def filelocked(func):
-        """Decorator to wrap a method in a filelock."""
-        def wrapper(self, *args, **kwargs):
-            with open(self.lockfile, "a"):
-                # recreate the lockfile just in case.
-                # useful for tests.
-                os.utime(self.lockfile, None)
-            with self.filelock:
-                func(self, *args, **kwargs)
-        return wrapper
 
     @filelocked
     def update(self, index, iterable, commit=True):
