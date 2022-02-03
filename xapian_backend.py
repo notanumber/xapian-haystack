@@ -190,11 +190,8 @@ class XapianSearchBackend(BaseSearchBackend):
             except FileExistsError:
                 pass
 
-        # create the lockfile before using it.
-        lockfile_path = os.path.join(self.path,  "lockfile")
-        with open(lockfile_path, "a"):
-            os.utime(lockfile_path, None)
-        self.filelock = FileLock(lockfile_path)
+        self.lockfile = os.path.join(self.path,  "lockfile")
+        self.filelock = FileLock(self.lockfile)
 
         self.flags = connection_options.get('FLAGS', DEFAULT_XAPIAN_FLAGS)
         self.language = getattr(settings, 'HAYSTACK_XAPIAN_LANGUAGE', 'english')
@@ -239,7 +236,19 @@ class XapianSearchBackend(BaseSearchBackend):
         self._update_cache()
         return self._columns
 
-    def _update(self, index, iterable, commit=True):
+    def filelocked(func):
+        """Decorator to wrap a method in a filelock."""
+        def wrapper(self, *args, **kwargs):
+            with open(self.lockfile, "a"):
+                # recreate the lockfile just in case.
+                # useful for tests.
+                os.utime(self.lockfile, None)
+            with self.filelock:
+                func(self, *args, **kwargs)
+        return wrapper
+
+    @filelocked
+    def update(self, index, iterable, commit=True):
         """
         Updates the `index` with any objects in `iterable` by adding/updating
         the database as needed.
@@ -490,12 +499,8 @@ class XapianSearchBackend(BaseSearchBackend):
         finally:
             database.close()
 
-    def update(self, index, iterable, commit=True):
-        """Locking update."""
-        with self.filelock:
-            self._update(index, iterable, commit)
-
-    def _remove(self, obj, commit=True):
+    @filelocked
+    def remove(self, obj, commit=True):
         """
         Remove indexes for `obj` from the database.
 
@@ -508,11 +513,6 @@ class XapianSearchBackend(BaseSearchBackend):
         database = self._database(writable=True)
         database.delete_document(TERM_PREFIXES[ID] + get_identifier(obj))
         database.close()
-
-    def remove(self, obj, commit=True):
-        """Locking remove."""
-        with self.filelock:
-            self._remove(obj, commit)
 
     def clear(self, models=(), commit=True):
         """
