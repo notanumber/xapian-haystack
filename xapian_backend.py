@@ -1,5 +1,6 @@
 import datetime
 import pickle
+from pathlib import Path
 import os
 import re
 import shutil
@@ -78,13 +79,12 @@ TERMPOS_DISTANCE = 100
 
 def filelocked(func):
     """Decorator to wrap a method in a filelock."""
+
     def wrapper(self, *args, **kwargs):
-        with open(self.lockfile, "w"):
-            # recreate the lockfile just in case.
-            # useful for tests.
-            os.utime(self.lockfile, None)
+        self.lockfile.touch()
         with self.filelock:
             func(self, *args, **kwargs)
+
     return wrapper
 
 class InvalidIndexError(HaystackError):
@@ -202,7 +202,7 @@ class XapianSearchBackend(BaseSearchBackend):
             except FileExistsError:
                 pass
 
-        self.lockfile = os.path.join(self.path,  "lockfile")
+        self.lockfile = Path(self.path) / "lockfile"
         self.filelock = FileLock(self.lockfile)
 
         self.flags = connection_options.get('FLAGS', DEFAULT_XAPIAN_FLAGS)
