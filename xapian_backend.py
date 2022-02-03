@@ -1,5 +1,4 @@
 import datetime
-from fcntl import LOCK_EX, LOCK_UN, flock
 import pickle
 import os
 import re
@@ -8,6 +7,8 @@ import sys
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
+
+from filelock import FileLock
 
 from haystack import connections
 from haystack.backends import BaseEngine, BaseSearchBackend, BaseSearchQuery, SearchNode, log_query
@@ -73,26 +74,6 @@ INTEGER_FORMAT = '%012d'
 # defines the distance given between
 # texts with positional information
 TERMPOS_DISTANCE = 100
-
-class FileLock(object):
-    """A basic flock file lock."""
-
-    def __init__(self, path):
-        """Store the lockfile path."""
-        self.path = path
-
-    def __enter__(self):
-        """Enter the lock."""
-        with open(self.path, "a"):
-            # Create the lockfile if it doesn't exist.
-            os.utime(self.path)
-        self.file = os.open(self.path, os.O_RDONLY)
-        flock(self.file, LOCK_EX)
-
-    def __exit__(self, _exc_type, _exc_value, _traceback):
-        """Exit the lock."""
-        flock(self.file, LOCK_UN)
-        os.close(self.file)
 
 class InvalidIndexError(HaystackError):
     """Raised when an index can not be opened."""
@@ -209,7 +190,7 @@ class XapianSearchBackend(BaseSearchBackend):
             except FileExistsError:
                 pass
 
-        self.lockfile = os.path.join(self.path,  "lockfile")
+        self.filelock = FileLock(os.path.join(self.path,  "lockfile"))
 
         self.flags = connection_options.get('FLAGS', DEFAULT_XAPIAN_FLAGS)
         self.language = getattr(settings, 'HAYSTACK_XAPIAN_LANGUAGE', 'english')
@@ -507,7 +488,7 @@ class XapianSearchBackend(BaseSearchBackend):
 
     def update(self, index, iterable, commit=True):
         """Locking update."""
-        with FileLock(path=self.lockfile):
+        with self.filelock:
             self._update(index, iterable, commit)
 
     def _remove(self, obj, commit=True):
@@ -526,7 +507,7 @@ class XapianSearchBackend(BaseSearchBackend):
 
     def remove(self, obj, commit=True):
         """Locking remove."""
-        with FileLock(path=self.lockfile):
+        with self.filelock:
             self._remove(obj, commit)
 
     def clear(self, models=(), commit=True):
