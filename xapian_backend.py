@@ -190,7 +190,11 @@ class XapianSearchBackend(BaseSearchBackend):
             except FileExistsError:
                 pass
 
-        self.filelock = FileLock(os.path.join(self.path,  "lockfile"))
+        # create the lockfile before using it.
+        lockfile_path = os.path.join(self.path,  "lockfile")
+        with open(lockfile_path, "a"):
+            os.utime(lockfile_path, None)
+        self.filelock = FileLock(lockfile_path)
 
         self.flags = connection_options.get('FLAGS', DEFAULT_XAPIAN_FLAGS)
         self.language = getattr(settings, 'HAYSTACK_XAPIAN_LANGUAGE', 'english')
