@@ -78,14 +78,18 @@ TERMPOS_DISTANCE = 100
 
 
 def filelocked(func):
-    """Decorator to wrap a method in a filelock."""
+    """Decorator to wrap a XapianSearchBackend method in a filelock."""
 
     def wrapper(self, *args, **kwargs):
+         
+        # Ensure the lockfile exists
         try:
-            self.lockfile.parent.mkdir()
+            self.lockfile.parent.mkdir(parents=True)
         except FileExistsError:
             pass
         self.lockfile.touch()
+
+        # run the function inside a lock
         with self.filelock:
             func(self, *args, **kwargs)
 
