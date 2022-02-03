@@ -81,6 +81,10 @@ def filelocked(func):
     """Decorator to wrap a method in a filelock."""
 
     def wrapper(self, *args, **kwargs):
+        try:
+            self.lockfile.parent.mkdir()
+        except FileExistsError:
+            pass
         self.lockfile.touch()
         with self.filelock:
             func(self, *args, **kwargs)

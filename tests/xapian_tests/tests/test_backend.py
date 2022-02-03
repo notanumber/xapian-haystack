@@ -1,6 +1,5 @@
 from decimal import Decimal
 import datetime
-import errno
 import inspect
 import sys
 import xapian
@@ -73,12 +72,6 @@ class HaystackBackendTestCase:
         self.ui.build(indexes=[self.index])
         self.backend = connections['default'].get_backend()
         connections['default']._index = self.ui
-        try:
-            os.mkdir(self.backend.path)
-        except OSError as exc:
-            if exc.errno != errno.EEXIST:
-                raise
-
 
     def tearDown(self):
         self.backend.clear()
