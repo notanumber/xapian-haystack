@@ -28,5 +28,6 @@ setup(
     install_requires=[
         'django>=2.2',
         'django-haystack>=2.8.0',
+        'filelock~=3.4.1',
     ]
 )
