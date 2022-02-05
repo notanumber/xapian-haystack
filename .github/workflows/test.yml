@@ -71,12 +71,12 @@ jobs:
       - name: Install Django and other Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install django~=${{ matrix.django-version }} filelock~=${{ matrix.filelock-version }} coveralls xapian*.whl
+          pip install django~=${{ matrix.django-version }} coveralls xapian*.whl
 
       - name: Checkout django-haystack
         uses: actions/checkout@v2
         with:
-          repository: "django-haystack/django-haystack"
+          repository: 'django-haystack/django-haystack'
           path: django-haystack
 
       - name: Copy some test files to django-haystack
