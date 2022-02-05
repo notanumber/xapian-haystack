@@ -89,5 +89,5 @@ class ManagementCommandTestCase(HaystackBackendTestCase, TestCase):
         call_command("clear_index", interactive=False, verbosity=0)
         self.verify_indexed_document_count(0)
 
-        call_command("update_index", verbosity=2, workers=2, batchsize=5)
+        call_command("update_index", verbosity=2, workers=5, batchsize=10)
         self.verify_indexed_documents()
