@@ -24,6 +24,8 @@ class ManagementCommandTestCase(HaystackBackendTestCase, TestCase):
             self.sample_objs.append(entry)
             entry.save()
 
+        self.backend.update(self.index, BlogEntry.objects.all())
+
     def verify_indexed_document_count(self, expected):
         count = self.backend.document_count()
         self.assertEqual(count, expected)
