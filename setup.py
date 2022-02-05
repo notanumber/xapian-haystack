@@ -18,11 +18,11 @@ setup(
         'License :: OSI Approved :: GNU General Public License (GPL)',
         'Topic :: Internet :: WWW/HTTP :: Indexing/Search',
         'Framework :: Django',
+        'Programming Language :: Python :: 3 :: Only',
     ],
     author='Jorge C. Leitão',
     author_email='jorgecarleitao@gmail.com',
-    url='http://github.com/notanumber/xapian-haystack',
-    download_url='http://github.com/notanumber/xapian-haystack/tarball/2.1.0',
+    url='https://github.com/notanumber/xapian-haystack',
     license='GPL2',
     py_modules=['xapian_backend'],
     install_requires=[
