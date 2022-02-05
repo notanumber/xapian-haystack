@@ -148,13 +148,7 @@ class XapianSearchBackend(BaseSearchBackend):
     `SearchBackend` defines the Xapian search backend for use with the Haystack
     API for Django search.
 
-    It uses the Xapian Python bindings to interface with Xapian, and as
-    such is subject to this bug: <http://trac.xapian.org/ticket/364> when
-    Django is running with mod_python or mod_wsgi under Apache.
-
-    Until this issue has been fixed by Xapian, it is neccessary to set
-    `WSGIApplicationGroup to %{GLOBAL}` when using mod_wsgi, or
-    `PythonInterpreter main_interpreter` when using mod_python.
+    It uses the Xapian Python bindings to interface with Xapian.
 
     In order to use this backend, `PATH` must be included in the
     `connection_options`.  This should point to a location where you would your
