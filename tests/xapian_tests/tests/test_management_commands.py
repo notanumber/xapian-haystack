@@ -1,3 +1,4 @@
+from io import StringIO
 from unittest import TestCase
 
 from django.core.management import call_command
@@ -89,5 +90,16 @@ class ManagementCommandTestCase(HaystackBackendTestCase, TestCase):
         call_command("clear_index", interactive=False, verbosity=0)
         self.verify_indexed_document_count(0)
 
-        call_command("update_index", verbosity=2, workers=5, batchsize=5)
+        out = StringIO()
+        err = StringIO()
+        call_command(
+            "update_index",
+            verbosity=2,
+            workers=10,
+            batchsize=10,
+            stdout=out,
+            stderr=err,
+        )
+        self.assertNotIn("xapian.DatabaseLockError", err.getvalue())
+        self.assertNotIn("xapian.DatabaseLockError", out.getvalue())
         self.verify_indexed_documents()
