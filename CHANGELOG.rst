@@ -2,6 +2,11 @@
 xapian-haystack Changelog
 =========================
 
+Unreleased
+----------
+
+- Dropped support for Python 3.6.
+
 v3.0.1 (2021-11-12)
 -------------------
 

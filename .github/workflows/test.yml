@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.6', '3.9', '3.10']
+        python-version: ['3.7', '3.9', '3.10']
         xapian-version: ['1.4.18']
 
     steps:
@@ -41,7 +41,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.6', '3.9']
+        python-version: ['3.7', '3.9']
         django-version: ['2.2', '3.1', '3.2']
         xapian-version: ['1.4.18']
         include:
