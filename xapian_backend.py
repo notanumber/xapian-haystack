@@ -81,19 +81,20 @@ def filelocked(func):
     """Decorator to wrap a XapianSearchBackend method in a filelock."""
 
     def wrapper(self, *args, **kwargs):
-         
-        # Ensure the lockfile exists
-        try:
-            self.lockfile.parent.mkdir(parents=True)
-        except FileExistsError:
-            pass
-        self.lockfile.touch()
-
-        # run the function inside a lock
-        with self.filelock:
+        """Run the function inside a lock."""
+        if self.path == MEMORY_DB_NAME:
             func(self, *args, **kwargs)
+        else:
+            try:
+                Path(self.path).mkdir(parents=True)
+            except FileExistsError:
+                pass
+            Path(self.filelock.lock_file).touch()
+            with self.filelock:
+                func(self, *args, **kwargs)
 
     return wrapper
+
 
 class InvalidIndexError(HaystackError):
     """Raised when an index can not be opened."""
@@ -204,8 +205,8 @@ class XapianSearchBackend(BaseSearchBackend):
             except FileExistsError:
                 pass
 
-        self.lockfile = Path(self.path) / "lockfile"
-        self.filelock = FileLock(self.lockfile)
+            lockfile = Path(self.path) / "lockfile"
+            self.filelock = FileLock(lockfile)
 
         self.flags = connection_options.get('FLAGS', DEFAULT_XAPIAN_FLAGS)
         self.language = getattr(settings, 'HAYSTACK_XAPIAN_LANGUAGE', 'english')

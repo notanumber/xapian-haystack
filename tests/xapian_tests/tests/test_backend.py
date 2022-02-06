@@ -1,6 +1,7 @@
 from decimal import Decimal
 import datetime
 import inspect
+from pathlib import Path
 import sys
 import xapian
 import subprocess

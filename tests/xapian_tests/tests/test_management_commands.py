@@ -1,3 +1,4 @@
+import sys
 from io import StringIO
 from unittest import TestCase
 
@@ -90,16 +91,16 @@ class ManagementCommandTestCase(HaystackBackendTestCase, TestCase):
         call_command("clear_index", interactive=False, verbosity=0)
         self.verify_indexed_document_count(0)
 
-        out = StringIO()
-        err = StringIO()
+        old_stderr = sys.stderr
+        sys.stderr = StringIO()
         call_command(
             "update_index",
             verbosity=2,
             workers=10,
-            batchsize=10,
-            stdout=out,
-            stderr=err,
+            batchsize=2,
         )
-        self.assertNotIn("xapian.DatabaseLockError", err.getvalue())
-        self.assertNotIn("xapian.DatabaseLockError", out.getvalue())
+        err = sys.stderr.getvalue()
+        sys.stderr = old_stderr
+        print(err)
+        self.assertNotIn("xapian.DatabaseLockError", err)
         self.verify_indexed_documents()
