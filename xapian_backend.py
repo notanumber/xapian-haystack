@@ -85,10 +85,7 @@ def filelocked(func):
         if self.path == MEMORY_DB_NAME:
             func(self, *args, **kwargs)
         else:
-            try:
-                Path(self.path).mkdir(parents=True)
-            except FileExistsError:
-                pass
+            Path(self.path).mkdir(parents=True, exist_ok=True)
             Path(self.filelock.lock_file).touch()
             with self.filelock:
                 func(self, *args, **kwargs)
