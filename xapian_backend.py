@@ -188,6 +188,7 @@ class XapianSearchBackend(BaseSearchBackend):
 
         Also sets the stemming language to be used to `language`.
         """
+        self.use_lockfile = bool(connection_options.get('HAYSTACK_XAPIAN_USE_LOCKFILE', True))
         super().__init__(connection_alias, **connection_options)
 
         if not 'PATH' in connection_options:
@@ -195,7 +196,6 @@ class XapianSearchBackend(BaseSearchBackend):
                                        % connection_alias)
 
         self.path = connection_options.get('PATH')
-        self.use_lockfile = connection_options.get('USE_LOCKFILE', True)
 
         if self.path != MEMORY_DB_NAME:
             try:
