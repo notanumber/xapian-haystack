@@ -188,7 +188,9 @@ class XapianSearchBackend(BaseSearchBackend):
 
         Also sets the stemming language to be used to `language`.
         """
-        self.use_lockfile = bool(connection_options.get('HAYSTACK_XAPIAN_USE_LOCKFILE', True))
+        self.use_lockfile = bool(
+            getattr(settings, 'HAYSTACK_XAPIAN_USE_LOCKFILE', True)
+        )
         super().__init__(connection_alias, **connection_options)
 
         if not 'PATH' in connection_options:
