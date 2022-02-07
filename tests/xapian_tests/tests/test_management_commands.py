@@ -26,8 +26,6 @@ class ManagementCommandTestCase(HaystackBackendTestCase, TestCase):
             self.sample_objs.append(entry)
             entry.save()
 
-        self.backend.update(self.index, BlogEntry.objects.all())
-
     def verify_indexed_document_count(self, expected):
         count = self.backend.document_count()
         self.assertEqual(count, expected)
@@ -49,30 +47,34 @@ class ManagementCommandTestCase(HaystackBackendTestCase, TestCase):
 
         self.assertSetEqual(pks, doc_ids)
 
-    def test_basic_commands(self):
+    def test_clear(self):
+        self.backend.update(self.index, BlogEntry.objects.all())
+        self.verify_indexed_documents()
+
         call_command("clear_index", interactive=False, verbosity=0)
+        self.verify_indexed_document_count(0)
+
+    def test_update(self):
         self.verify_indexed_document_count(0)
 
         call_command("update_index", verbosity=0)
         self.verify_indexed_documents()
 
-        call_command("clear_index", interactive=False, verbosity=0)
+    def test_rebuild(self):
         self.verify_indexed_document_count(0)
 
         call_command("rebuild_index", interactive=False, verbosity=0)
         self.verify_indexed_documents()
 
     def test_remove(self):
-        call_command("clear_index", interactive=False, verbosity=0)
         self.verify_indexed_document_count(0)
 
         call_command("update_index", verbosity=0)
         self.verify_indexed_documents()
 
-        # Remove several instances.
-        BlogEntry.objects.get(pk=1).delete()
-        BlogEntry.objects.get(pk=2).delete()
-        BlogEntry.objects.get(pk=8).delete()
+        # Remove three instances.
+        three_pks = BlogEntry.objects.all()[:3].values_list("pk", flat=True)
+        BlogEntry.objects.filter(pk__in=three_pks).delete()
         self.verify_indexed_document_count(self.NUM_BLOG_ENTRIES)
 
         # Plain ``update_index`` doesn't fix it.
