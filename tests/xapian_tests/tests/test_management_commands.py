@@ -1,4 +1,3 @@
-import random
 from unittest import TestCase
 
 from django.core.management import call_command
@@ -22,7 +21,6 @@ class ManagementCommandTestCase(HaystackBackendTestCase, TestCase):
 
         for i in range(1, self.NUM_BLOG_ENTRIES + 1):
             entry = BackendFeaturesTestCase.get_entry(i)
-            entry.float_number = random.uniform(0.0, 1000.0)
             self.sample_objs.append(entry)
             entry.save()
 
