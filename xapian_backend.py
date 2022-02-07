@@ -82,7 +82,7 @@ def filelocked(func):
 
     def wrapper(self, *args, **kwargs):
         """Run the function inside a lock."""
-        if self.path == MEMORY_DB_NAME:
+        if self.path == MEMORY_DB_NAME or not self.use_lockfile:
             func(self, *args, **kwargs)
         else:
             Path(self.path).mkdir(parents=True, exist_ok=True)
@@ -195,6 +195,7 @@ class XapianSearchBackend(BaseSearchBackend):
                                        % connection_alias)
 
         self.path = connection_options.get('PATH')
+        self.use_lockfile = connection_options.get('USE_LOCKFILE', True)
 
         if self.path != MEMORY_DB_NAME:
             try:
@@ -202,8 +203,9 @@ class XapianSearchBackend(BaseSearchBackend):
             except FileExistsError:
                 pass
 
-            lockfile = Path(self.path) / "lockfile"
-            self.filelock = FileLock(lockfile)
+            if self.use_lockfile:
+                lockfile = Path(self.path) / "lockfile"
+                self.filelock = FileLock(lockfile)
 
         self.flags = connection_options.get('FLAGS', DEFAULT_XAPIAN_FLAGS)
         self.language = getattr(settings, 'HAYSTACK_XAPIAN_LANGUAGE', 'english')
