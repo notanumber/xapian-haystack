@@ -85,8 +85,9 @@ def filelocked(func):
         if self.path == MEMORY_DB_NAME or not self.use_lockfile:
             func(self, *args, **kwargs)
         else:
-            Path(self.path).mkdir(parents=True, exist_ok=True)
-            Path(self.filelock.lock_file).touch()
+            lockfile = Path(self.filelock.lock_file)
+            lockfile.parent.mkdir(parents=True, exist_ok=True)
+            lockfile.touch()
             with self.filelock:
                 func(self, *args, **kwargs)
 
