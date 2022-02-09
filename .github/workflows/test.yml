@@ -52,6 +52,7 @@ jobs:
           # Django dropped python 3.7 support in 4.0
           - python-version: '3.7'
             django-version: '4.0'
+
     steps:
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v2
