@@ -26,8 +26,6 @@ class ManagementCommandTestCase(HaystackBackendTestCase, TestCase):
             self.sample_objs.append(entry)
             entry.save()
 
-        self.backend.update(self.index, BlogEntry.objects.all())
-
     def verify_indexed_document_count(self, expected):
         count = self.backend.document_count()
         self.assertEqual(count, expected)
@@ -88,7 +86,6 @@ class ManagementCommandTestCase(HaystackBackendTestCase, TestCase):
         self.verify_indexed_document_count(self.NUM_BLOG_ENTRIES - 3)
 
     def test_multiprocessing(self):
-        call_command("clear_index", interactive=False, verbosity=0)
         self.verify_indexed_document_count(0)
 
         old_stderr = sys.stderr
