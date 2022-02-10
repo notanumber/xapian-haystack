@@ -6,6 +6,8 @@ Unreleased
 ----------
 
 - Dropped support for Python 3.6.
+- Fixed DatabaseLocked errors when running management commands with
+  multiple workers.
 
 v3.0.1 (2021-11-12)
 -------------------
