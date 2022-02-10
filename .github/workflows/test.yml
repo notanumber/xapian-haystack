@@ -44,15 +44,14 @@ jobs:
         python-version: ['3.7', '3.8', '3.9', '3.10']
         django-version: ['2.2', '3.2', '4.0']
         xapian-version: ['1.4.18']
+        filelock-version: ['3.4.2']
         exclude:
           # Django added python 3.10 support in 3.2.9
           - python-version: '3.10'
             django-version: '2.2'
-            xapian-version: '1.4.18'
           # Django dropped python 3.7 support in 4.0
           - python-version: '3.7'
             django-version: '4.0'
-            xapian-version: '1.4.18'
 
     steps:
       - name: Set up Python ${{ matrix.python-version }}
@@ -74,7 +73,7 @@ jobs:
       - name: Install Django and other Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install django~=${{ matrix.django-version }} coveralls xapian*.whl
+          pip install django~=${{ matrix.django-version }} filelock~=${{ matrix.filelock-version }} coveralls xapian*.whl
 
       - name: Checkout django-haystack
         uses: actions/checkout@v2

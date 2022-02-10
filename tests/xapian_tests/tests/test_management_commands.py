@@ -1,3 +1,5 @@
+import sys
+from io import StringIO
 from unittest import TestCase
 
 from django.core.management import call_command
@@ -82,3 +84,20 @@ class ManagementCommandTestCase(HaystackBackendTestCase, TestCase):
         # … but remove does:
         call_command("update_index", remove=True, verbosity=0)
         self.verify_indexed_document_count(self.NUM_BLOG_ENTRIES - 3)
+
+    def test_multiprocessing(self):
+        self.verify_indexed_document_count(0)
+
+        old_stderr = sys.stderr
+        sys.stderr = StringIO()
+        call_command(
+            "update_index",
+            verbosity=2,
+            workers=10,
+            batchsize=2,
+        )
+        err = sys.stderr.getvalue()
+        sys.stderr = old_stderr
+        print(err)
+        self.assertNotIn("xapian.DatabaseLockError", err)
+        self.verify_indexed_documents()

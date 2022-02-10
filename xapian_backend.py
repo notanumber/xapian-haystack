@@ -1,5 +1,6 @@
 import datetime
 import pickle
+from pathlib import Path
 import os
 import re
 import shutil
@@ -7,6 +8,8 @@ import sys
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
+
+from filelock import FileLock
 
 from haystack import connections
 from haystack.backends import BaseEngine, BaseSearchBackend, BaseSearchQuery, SearchNode, log_query
@@ -72,6 +75,24 @@ INTEGER_FORMAT = '%012d'
 # defines the distance given between
 # texts with positional information
 TERMPOS_DISTANCE = 100
+
+
+def filelocked(func):
+    """Decorator to wrap a XapianSearchBackend method in a filelock."""
+
+    def wrapper(self, *args, **kwargs):
+        """Run the function inside a lock."""
+        if self.path == MEMORY_DB_NAME or not self.use_lockfile:
+            func(self, *args, **kwargs)
+        else:
+            lockfile = Path(self.filelock.lock_file)
+            lockfile.parent.mkdir(parents=True, exist_ok=True)
+            lockfile.touch()
+            with self.filelock:
+                func(self, *args, **kwargs)
+
+    return wrapper
+
 
 class InvalidIndexError(HaystackError):
     """Raised when an index can not be opened."""
@@ -168,6 +189,9 @@ class XapianSearchBackend(BaseSearchBackend):
 
         Also sets the stemming language to be used to `language`.
         """
+        self.use_lockfile = bool(
+            getattr(settings, 'HAYSTACK_XAPIAN_USE_LOCKFILE', True)
+        )
         super().__init__(connection_alias, **connection_options)
 
         if not 'PATH' in connection_options:
@@ -181,6 +205,10 @@ class XapianSearchBackend(BaseSearchBackend):
                 os.makedirs(self.path)
             except FileExistsError:
                 pass
+
+            if self.use_lockfile:
+                lockfile = Path(self.path) / "lockfile"
+                self.filelock = FileLock(lockfile)
 
         self.flags = connection_options.get('FLAGS', DEFAULT_XAPIAN_FLAGS)
         self.language = getattr(settings, 'HAYSTACK_XAPIAN_LANGUAGE', 'english')
@@ -225,6 +253,7 @@ class XapianSearchBackend(BaseSearchBackend):
         self._update_cache()
         return self._columns
 
+    @filelocked
     def update(self, index, iterable, commit=True):
         """
         Updates the `index` with any objects in `iterable` by adding/updating
@@ -476,6 +505,7 @@ class XapianSearchBackend(BaseSearchBackend):
         finally:
             database.close()
 
+    @filelocked
     def remove(self, obj, commit=True):
         """
         Remove indexes for `obj` from the database.
