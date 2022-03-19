@@ -11,7 +11,7 @@ jobs:
     strategy:
       matrix:
         python-version: ['3.7', '3.8', '3.9', '3.10']
-        xapian-version: ['1.4.18']
+        xapian-version: ['1.4.19']
 
     steps:
       - name: Set up Python ${{ matrix.python-version }}
@@ -43,7 +43,7 @@ jobs:
       matrix:
         python-version: ['3.7', '3.8', '3.9', '3.10']
         django-version: ['2.2', '3.2', '4.0']
-        xapian-version: ['1.4.18']
+        xapian-version: ['1.4.19']
         filelock-version: ['3.4.2']
         exclude:
           # Django added python 3.10 support in 3.2.9

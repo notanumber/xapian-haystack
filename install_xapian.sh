@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# first argument of the script is Xapian version (e.g. 1.4.18)
+# first argument of the script is Xapian version (e.g. 1.4.19)
 
 VERSION=$1
 
