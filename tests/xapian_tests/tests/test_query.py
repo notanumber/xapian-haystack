@@ -278,34 +278,29 @@ class SearchQueryTestCase(HaystackBackendTestCase, TestCase):
     def test_gt(self):
         self.sq.add_filter(SQ(name__gt='m'))
         self.assertExpectedQuery(self.sq.build_query(),
-                                 '(<alldocuments> AND_NOT VALUE_RANGE 3 a m)')
+                                 '(<alldocuments> AND_NOT VALUE_LE 3 m)')
 
     def test_gte(self):
         self.sq.add_filter(SQ(name__gte='m'))
         self.assertExpectedQuery(self.sq.build_query(),
-                                 'VALUE_RANGE 3 m zzzzzzzzzzzzzzzzzzzzzzzzzzzz'
-                                 'zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz'
-                                 'zzzzzzzzzzzzzzzzzzzzzzzzzzzz')
+                                 'VALUE_GE 3 m')
 
     def test_lt(self):
         self.sq.add_filter(SQ(name__lt='m'))
         self.assertExpectedQuery(self.sq.build_query(),
-                                 '(<alldocuments> AND_NOT VALUE_RANGE 3 m '
-                                 'zzzzzzzzzzzzzzzzzzzzzzzzzzzz'
-                                 'zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz'
-                                 'zzzzzzzzzzzzzzzzzzzzzzzzzzzz)')
+                                 '(<alldocuments> AND_NOT VALUE_GE 3 m)')
 
     def test_lte(self):
         self.sq.add_filter(SQ(name__lte='m'))
-        self.assertExpectedQuery(self.sq.build_query(), 'VALUE_RANGE 3 a m')
+        self.assertExpectedQuery(self.sq.build_query(), 'VALUE_LE 3 m')
 
     def test_range(self):
         self.sq.add_filter(SQ(django_id__range=[2, 4]))
-        self.assertExpectedQuery(self.sq.build_query(), 'VALUE_RANGE 1 000000000002 000000000004')
+        self.assertExpectedQuery(self.sq.build_query(), 'VALUE_RANGE 1 a4 a8')
         self.sq.add_filter(~SQ(django_id__range=[0, 2]))
         self.assertExpectedQuery(self.sq.build_query(),
-                                 '(VALUE_RANGE 1 000000000002 000000000004 AND '
-                                 '(<alldocuments> AND_NOT VALUE_RANGE 1 000000000000 000000000002))')
+                                 '(VALUE_RANGE 1 a4 a8 AND '
+                                 '(<alldocuments> AND_NOT VALUE_RANGE 1 80 a4))')
         self.assertEqual([result.pk for result in self.sq.get_results()], [3])
 
     def test_multiple_filter_types(self):
@@ -315,13 +310,11 @@ class SearchQueryTestCase(HaystackBackendTestCase, TestCase):
         self.sq.add_filter(SQ(title__gte='B'))
         self.sq.add_filter(SQ(django_id__in=[1, 2, 3]))
         self.assertExpectedQuery(self.sq.build_query(),
-                                 '((Zwhi OR why) AND'
-                                 ' VALUE_RANGE 5 00010101000000 20090210015900 AND'
-                                 ' (<alldocuments> AND_NOT VALUE_RANGE 3 a david)'
-                                 ' AND VALUE_RANGE 7 b zzzzzzzzzzzzzzzzzzzzzzzzzzz'
-                                 'zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz'
-                                 'zzzzzzzzzzzzzzzzzzzzzzzzz AND'
-                                 ' (QQ000000000001 OR QQ000000000002 OR QQ000000000003))')
+                                 '((Zwhi OR why) AND '
+                                 'VALUE_LE 5 20090210015900 AND '
+                                 '(<alldocuments> AND_NOT VALUE_LE 3 david) AND '
+                                 'VALUE_GE 7 b AND '
+                                 '(QQa0 OR QQa4 OR QQa6))')
 
     def test_log_query(self):
         reset_search_queries()

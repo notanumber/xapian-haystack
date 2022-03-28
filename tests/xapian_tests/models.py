@@ -7,6 +7,7 @@ from ..core.models import MockTag, AnotherMockModel, MockModel, AFourthMockModel
 class Document(models.Model):
     type_name = models.CharField(max_length=50)
     number = models.IntegerField()
+    float_number = models.FloatField()
     name = models.CharField(max_length=200)
 
     date = models.DateField()

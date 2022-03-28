@@ -18,6 +18,7 @@ class Migration(migrations.Migration):
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('type_name', models.CharField(max_length=50)),
                 ('number', models.IntegerField()),
+                ('float_number', models.FloatField()),
                 ('name', models.CharField(max_length=200)),
                 ('date', models.DateField()),
                 ('summary', models.TextField()),

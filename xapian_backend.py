@@ -70,7 +70,6 @@ FIELD_TYPES = {'text', 'integer', 'date', 'datetime', 'float', 'boolean',
 # defines the format used to store types in Xapian
 # this format ensures datetimes are sorted correctly
 DATETIME_FORMAT = '%Y%m%d%H%M%S'
-INTEGER_FORMAT = '%012d'
 
 # defines the distance given between
 # texts with positional information
@@ -123,31 +122,36 @@ class XHValueRangeProcessor(xapian.ValueRangeProcessor):
             if field_dict['field_name'] == field_name:
                 field_type = field_dict['type']
 
-                if not begin:
+                if begin:
+                    if field_type == 'float':
+                        begin = _term_to_xapian_value(float(begin), field_type)
+                    elif field_type == 'integer':
+                        begin = _term_to_xapian_value(int(begin), field_type)
+                else:
                     if field_type == 'text':
                         begin = 'a'  # TODO: A better way of getting a min text value?
-                    elif field_type == 'integer':
-                        begin = -sys.maxsize - 1
-                    elif field_type == 'float':
-                        begin = float('-inf')
+                    elif field_type in ('float', 'integer'):
+                        # floats and ints are both serialised using xapian.sortable_serialise
+                        # so we can use -Infinity as the lower bound for both of them.
+                        begin = _term_to_xapian_value(float('-inf'), field_type)
                     elif field_type == 'date' or field_type == 'datetime':
                         begin = '00010101000000'
-                elif end == '*':
+
+                if end == '*':
                     if field_type == 'text':
                         end = 'z' * 100  # TODO: A better way of getting a max text value?
-                    elif field_type == 'integer':
-                        end = sys.maxsize
-                    elif field_type == 'float':
-                        end = float('inf')
+                    elif field_type in ('float', 'integer'):
+                        # floats and ints are both serialised using xapian.sortable_serialise
+                        # so we can use +Infinity as the upper bound for both of them.
+                        end = _term_to_xapian_value(float('inf'), field_type)
                     elif field_type == 'date' or field_type == 'datetime':
                         end = '99990101000000'
+                else:
+                    if field_type == 'float':
+                        end = _term_to_xapian_value(float(end), field_type)
+                    elif field_type == 'integer':
+                        end = _term_to_xapian_value(int(end), field_type)
 
-                if field_type == 'float':
-                    begin = _term_to_xapian_value(float(begin), field_type)
-                    end = _term_to_xapian_value(float(end), field_type)
-                elif field_type == 'integer':
-                    begin = _term_to_xapian_value(int(begin), field_type)
-                    end = _term_to_xapian_value(int(end), field_type)
                 return field_dict['column'], str(begin), str(end)
 
 
@@ -972,13 +976,7 @@ class XapianSearchBackend(BaseSearchBackend):
 
             facet_dict[field_name] = []
             for facet in list(spy.values()):
-                if field_type == 'float':
-                    # the float term is a Xapian serialized object, which is
-                    # in bytes.
-                    term = facet.term
-                else:
-                    term = facet.term.decode('utf-8')
-
+                term = facet.term.decode('utf-8')
                 facet_dict[field_name].append((_from_xapian_value(term, field_type),
                                                facet.termfreq))
         return facet_dict
@@ -1547,43 +1545,37 @@ class XapianSearchQuery(BaseSearchQuery):
         Private method that returns a xapian.Query that searches for any term
         that is greater than `term` in a specified `field`.
         """
-        vrp = XHValueRangeProcessor(self.backend)
-        pos, begin, end = vrp('%s:%s' % (field_name, _term_to_xapian_value(term, field_type)), '*')
+        pos = self.backend.column[field_name]
+        range_limit = _term_to_xapian_value(term, field_type)
+        result = xapian.Query(xapian.Query.OP_VALUE_GE, pos, range_limit)
         if is_not:
-            return xapian.Query(xapian.Query.OP_AND_NOT,
-                                self._all_query(),
-                                xapian.Query(xapian.Query.OP_VALUE_RANGE, pos, begin, end)
-                                )
-        return xapian.Query(xapian.Query.OP_VALUE_RANGE, pos, begin, end)
+            result = xapian.Query(xapian.Query.OP_AND_NOT, self._all_query(), result)
+        return result
 
     def _filter_lte(self, term, field_name, field_type, is_not):
         """
         Private method that returns a xapian.Query that searches for any term
         that is less than `term` in a specified `field`.
         """
-        vrp = XHValueRangeProcessor(self.backend)
-        pos, begin, end = vrp('%s:' % field_name, '%s' % _term_to_xapian_value(term, field_type))
+        pos = self.backend.column[field_name]
+        range_limit = _term_to_xapian_value(term, field_type)
+        result = xapian.Query(xapian.Query.OP_VALUE_LE, pos, range_limit)
         if is_not:
-            return xapian.Query(xapian.Query.OP_AND_NOT,
-                                self._all_query(),
-                                xapian.Query(xapian.Query.OP_VALUE_RANGE, pos, begin, end)
-                                )
-        return xapian.Query(xapian.Query.OP_VALUE_RANGE, pos, begin, end)
+            result = xapian.Query(xapian.Query.OP_AND_NOT, self._all_query(), result)
+        return result
 
     def _filter_range(self, term, field_name, field_type, is_not):
         """
         Private method that returns a xapian.Query that searches for any term
         that is between the values from the `term` list.
         """
-        vrp = XHValueRangeProcessor(self.backend)
-        pos, begin, end = vrp('%s:%s' % (field_name, _term_to_xapian_value(term[0], field_type)),
-                              '%s' % _term_to_xapian_value(term[1], field_type))
+        pos = self.backend.column[field_name]
+        range_lower = _term_to_xapian_value(term[0], field_type)
+        range_upper = _term_to_xapian_value(term[1], field_type)
+        result = xapian.Query(xapian.Query.OP_VALUE_RANGE, pos, range_lower, range_upper)
         if is_not:
-            return xapian.Query(xapian.Query.OP_AND_NOT,
-                                self._all_query(),
-                                xapian.Query(xapian.Query.OP_VALUE_RANGE, pos, begin, end)
-                                )
-        return xapian.Query(xapian.Query.OP_VALUE_RANGE, pos, begin, end)
+            result = xapian.Query(xapian.Query.OP_AND_NOT, self._all_query(), result)
+        return result
 
 
 def _term_to_xapian_value(term, field_type):
@@ -1608,10 +1600,13 @@ def _term_to_xapian_value(term, field_type):
         else:
             value = 'f'
 
-    elif field_type == 'integer':
-        value = INTEGER_FORMAT % term
-    elif field_type == 'float':
-        value = xapian.sortable_serialise(term)
+    elif field_type in ('float', 'integer'):
+        # up until 2**53 integers can be safely represented as doubles which
+        # is what sortable_serialise() deals with.
+        # sortable_serialise() returns bytes but we can only pass str to Query
+        # and others. So we encode the byte string as hex characters instead
+        # which have the same sort order as the actual bytes.
+        value = xapian.sortable_serialise(term).hex().lower()
     elif field_type == 'date' or field_type == 'datetime':
         if field_type == 'date':
             # http://stackoverflow.com/a/1937636/931303 and comments
@@ -1646,10 +1641,9 @@ def _from_xapian_value(value, field_type):
             return False
         else:
             InvalidIndexError('Field type "%d" does not accept value "%s"' % (field_type, value))
-    elif field_type == 'integer':
-        return int(value)
-    elif field_type == 'float':
-        return xapian.sortable_unserialise(value)
+    elif field_type in ('float', 'integer'):
+        result = xapian.sortable_unserialise(bytes.fromhex(value))
+        return int(result) if field_type == 'integer' else result
     elif field_type == 'date' or field_type == 'datetime':
         datetime_value = datetime.datetime.strptime(value, DATETIME_FORMAT)
         if field_type == 'datetime':

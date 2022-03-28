@@ -559,9 +559,10 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
 
     def test_term_to_xapian_value(self):
         self.assertEqual(_term_to_xapian_value('abc', 'text'), 'abc')
-        self.assertEqual(_term_to_xapian_value(1, 'integer'), '000000000001')
-        self.assertEqual(_term_to_xapian_value(2653, 'integer'), '000000002653')
-        self.assertEqual(_term_to_xapian_value(25.5, 'float'), b'\xb2`')
+        self.assertEqual(_term_to_xapian_value(-1337, 'integer'), '316380')
+        self.assertEqual(_term_to_xapian_value(1, 'integer'), 'a0')
+        self.assertEqual(_term_to_xapian_value(2653, 'integer'), 'd12e80')
+        self.assertEqual(_term_to_xapian_value(25.5, 'float'), 'b260')
         self.assertEqual(_term_to_xapian_value([1, 2, 3], 'text'), '[1, 2, 3]')
         self.assertEqual(_term_to_xapian_value((1, 2, 3), 'text'), '(1, 2, 3)')
         self.assertEqual(_term_to_xapian_value({'a': 1, 'c': 3, 'b': 2}, 'text'),
@@ -627,18 +628,18 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
                                  ])
         self.assertExpectedQuery(self.backend.parse_query('number:0..10'),
                                  [
-                                     '0 * VALUE_RANGE 11 000000000000 000000000010',
-                                     'VALUE_RANGE 11 000000000000 000000000010',
+                                     '0 * VALUE_RANGE 11 80 ad',
+                                     'VALUE_RANGE 11 80 ad',
                                  ])
         self.assertExpectedQuery(self.backend.parse_query('number:..10'),
                                  [
-                                     '0 * VALUE_RANGE 11 %012d 000000000010' % (-sys.maxsize - 1),
-                                     'VALUE_RANGE 11 %012d 000000000010' % (-sys.maxsize - 1),
+                                     '0 * VALUE_LE 11 ad',
+                                     'VALUE_LE 11 ad',
                                  ])
         self.assertExpectedQuery(self.backend.parse_query('number:10..*'),
                                  [
-                                     '0 * VALUE_RANGE 11 000000000010 %012d' % sys.maxsize,
-                                     'VALUE_RANGE 11 000000000010 %012d' % sys.maxsize,
+                                     '0 * VALUE_RANGE 11 ad ffffffffffffffffff',
+                                     'VALUE_RANGE 11 ad ffffffffffffffffff',
                                  ])
 
     def test_order_by_django_id(self):
