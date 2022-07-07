@@ -1,5 +1,3 @@
-from __future__ import unicode_literals
-
 import datetime
 
 from django.db.models import Q
@@ -23,7 +21,7 @@ class InterfaceTestCase(TestCase):
     """
 
     def setUp(self):
-        super(InterfaceTestCase, self).setUp()
+        super().setUp()
 
         types_names = ['book', 'magazine', 'article']
         texts = ['This is a huge text',
@@ -60,7 +58,7 @@ class InterfaceTestCase(TestCase):
     def tearDown(self):
         Document.objects.all().delete()
         #self.backend.clear()
-        super(InterfaceTestCase, self).tearDown()
+        super().tearDown()
 
     def test_count(self):
         self.assertEqual(self.queryset.count(), Document.objects.count())
