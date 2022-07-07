@@ -7,8 +7,7 @@ import re
 import shutil
 import sys
 
-import django
-import six
+from django.utils import six
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.utils.encoding import force_text
@@ -30,18 +29,6 @@ except ImportError:
     raise MissingDependency("The 'xapian' backend requires the installation of 'Xapian'. "
                             "Please refer to the documentation.")
 
-if sys.version_info[0] == 2:
-    DirectoryExistsException = OSError
-elif sys.version_info[0] == 3:
-    DirectoryExistsException = FileExistsError
-
-
-class NotSupportedError(Exception):
-    """
-    When the installed version of Xapian doesn't support something and we have
-    the old implementation.
-    """
-    pass
 
 # this maps the different reserved fields to prefixes used to
 # create the database:
@@ -89,6 +76,24 @@ INTEGER_FORMAT = '%012d'
 # defines the distance given between
 # texts with positional information
 TERMPOS_DISTANCE = 100
+
+
+def filelocked(func):
+    """Decorator to wrap a XapianSearchBackend method in a filelock."""
+
+    def wrapper(self, *args, **kwargs):
+        """Run the function inside a lock."""
+        if self.path == MEMORY_DB_NAME or not self.use_lockfile:
+            func(self, *args, **kwargs)
+        else:
+            lockfile = Path(self.filelock.lock_file)
+            lockfile.parent.mkdir(parents=True, exist_ok=True)
+            lockfile.touch()
+            with self.filelock:
+                func(self, *args, **kwargs)
+
+    return wrapper
+
 
 class InvalidIndexError(HaystackError):
     """Raised when an index can not be opened."""
@@ -165,13 +170,7 @@ class XapianSearchBackend(BaseSearchBackend):
     `SearchBackend` defines the Xapian search backend for use with the Haystack
     API for Django search.
 
-    It uses the Xapian Python bindings to interface with Xapian, and as
-    such is subject to this bug: <http://trac.xapian.org/ticket/364> when
-    Django is running with mod_python or mod_wsgi under Apache.
-
-    Until this issue has been fixed by Xapian, it is neccessary to set
-    `WSGIApplicationGroup to %{GLOBAL}` when using mod_wsgi, or
-    `PythonInterpreter main_interpreter` when using mod_python.
+    It uses the Xapian Python bindings to interface with Xapian.
 
     In order to use this backend, `PATH` must be included in the
     `connection_options`.  This should point to a location where you would your
@@ -191,7 +190,10 @@ class XapianSearchBackend(BaseSearchBackend):
 
         Also sets the stemming language to be used to `language`.
         """
-        super(XapianSearchBackend, self).__init__(connection_alias, **connection_options)
+        self.use_lockfile = bool(
+            getattr(settings, 'HAYSTACK_XAPIAN_USE_LOCKFILE', True)
+        )
+        super().__init__(connection_alias, **connection_options)
 
         if not 'PATH' in connection_options:
             raise ImproperlyConfigured("You must specify a 'PATH' in your settings for connection '{0}'.".format(
@@ -203,8 +205,12 @@ class XapianSearchBackend(BaseSearchBackend):
         if self.path != MEMORY_DB_NAME:
             try:
                 os.makedirs(self.path)
-            except DirectoryExistsException:
+            except FileExistsError:
                 pass
+
+            if self.use_lockfile:
+                lockfile = Path(self.path) / "lockfile"
+                self.filelock = FileLock(lockfile)
 
         self.flags = connection_options.get('FLAGS', DEFAULT_XAPIAN_FLAGS)
         self.language = getattr(settings, 'HAYSTACK_XAPIAN_LANGUAGE', 'english')
@@ -249,6 +255,7 @@ class XapianSearchBackend(BaseSearchBackend):
         self._update_cache()
         return self._columns
 
+    @filelocked
     def update(self, index, iterable, commit=True):
         """
         Updates the `index` with any objects in `iterable` by adding/updating
@@ -295,11 +302,7 @@ class XapianSearchBackend(BaseSearchBackend):
             term_generator = xapian.TermGenerator()
             term_generator.set_database(database)
             term_generator.set_stemmer(xapian.Stem(self.language))
-            try:
-                term_generator.set_stemming_strategy(self.stemming_strategy)
-            except AttributeError:  
-                # Versions before Xapian 1.2.11 do not support stemming strategies for TermGenerator
-                pass
+            term_generator.set_stemming_strategy(self.stemming_strategy)
             if self.include_spelling is True:
                 term_generator.set_flags(xapian.TermGenerator.FLAG_SPELLING)
 
@@ -356,7 +359,7 @@ class XapianSearchBackend(BaseSearchBackend):
             def _get_ngram_lengths(value):
                 values = value.split()
                 for item in values:
-                    for ngram_length in six.moves.range(NGRAM_MIN_LENGTH, NGRAM_MAX_LENGTH + 1):
+                    for ngram_length in range(NGRAM_MIN_LENGTH, NGRAM_MAX_LENGTH + 1):
                         yield item, ngram_length
 
             for obj in iterable:
@@ -366,8 +369,8 @@ class XapianSearchBackend(BaseSearchBackend):
                 def ngram_terms(value):
                     for item, length in _get_ngram_lengths(value):
                         item_length = len(item)
-                        for start in six.moves.range(0, item_length - length + 1):
-                            for size in six.moves.range(length, length + 1):
+                        for start in range(0, item_length - length + 1):
+                            for size in range(length, length + 1):
                                 end = start + size
                                 if end > item_length:
                                     continue
@@ -504,6 +507,7 @@ class XapianSearchBackend(BaseSearchBackend):
         finally:
             database.close()
 
+    @filelocked
     def remove(self, obj, commit=True):
         """
         Remove indexes for `obj` from the database.
@@ -658,10 +662,7 @@ class XapianSearchBackend(BaseSearchBackend):
         enquire.set_query(query)
 
         if sort_by:
-            try:
-                _xapian_sort(enquire, sort_by, self.column)
-            except NotSupportedError:
-                _old_xapian_sort(enquire, sort_by, self.column)
+            _xapian_sort(enquire, sort_by, self.column)
 
         results = []
         facets_dict = {
@@ -1246,7 +1247,7 @@ class XapianSearchQuery(BaseSearchQuery):
     ``SearchBackend`` itself.
     """
     def build_params(self, *args, **kwargs):
-        kwargs = super(XapianSearchQuery, self).build_params(*args, **kwargs)
+        kwargs = super().build_params(*args, **kwargs)
 
         if self.end_offset is not None:
             kwargs['end_offset'] = self.end_offset - self.start_offset
@@ -1629,10 +1630,7 @@ def _to_xapian_term(term):
     Converts a Python type to a
     Xapian term that can be indexed.
     """
-    if django.VERSION[0] == 3:
-        from django.utils.encoding import force_str
-        return force_str(term).lower()
-    return force_text(term).lower()
+    return str(term).lower()
 
 
 def _from_xapian_value(value, field_type):
@@ -1664,25 +1662,8 @@ def _from_xapian_value(value, field_type):
         return value
 
 
-def _old_xapian_sort(enquire, sort_by, column):
-    sorter = xapian.MultiValueSorter()
-
-    for sort_field in sort_by:
-        if sort_field.startswith('-'):
-            reverse = True
-            sort_field = sort_field[1:]  # Strip the '-'
-        else:
-            reverse = False  # Reverse is inverted in Xapian -- http://trac.xapian.org/ticket/311
-        sorter.add(column[sort_field], reverse)
-
-    enquire.set_sort_by_key_then_relevance(sorter, True)
-
-
 def _xapian_sort(enquire, sort_by, column):
-    try:
-        sorter = xapian.MultiValueKeyMaker()
-    except AttributeError:
-        raise NotSupportedError
+    sorter = xapian.MultiValueKeyMaker()
 
     for sort_field in sort_by:
         if sort_field.startswith('-'):

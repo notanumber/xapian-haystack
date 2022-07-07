@@ -7,5 +7,16 @@ exclude_lines =
 
 [run]
 source =
-    haystack/backends/xapian_backend.py
+    haystack.backends.xapian_backend
     test_haystack/xapian_tests
+
+[paths]
+# Merge coverage data from running tests in a django-haystack
+# checkout with our own paths for coverage reporting.
+backend =
+    ./
+    */django-haystack/haystack/backends/
+
+tests =
+    tests/xapian_tests/
+    */django-haystack/test_haystack/xapian_tests/

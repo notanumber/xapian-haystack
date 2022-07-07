@@ -1,7 +1,6 @@
-from __future__ import unicode_literals
-
 from decimal import Decimal
 import datetime
+import inspect
 import sys
 import xapian
 import subprocess
@@ -10,7 +9,6 @@ import os
 from django.apps import apps
 from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase
-from django.utils.encoding import force_text
 
 from haystack import connections
 from haystack.backends.xapian_backend import InvalidIndexError, _term_to_xapian_value
@@ -27,21 +25,21 @@ XAPIAN_VERSION = [int(x) for x in xapian.__version__.split('.')]
 
 class XapianSearchResult(SearchResult):
     def __init__(self, app_label, model_name, pk, score, **kwargs):
-        super(XapianSearchResult, self).__init__(app_label, model_name, pk, score, **kwargs)
+        super().__init__(app_label, model_name, pk, score, **kwargs)
         self._model = apps.get_model('xapian_tests', model_name)
 
 
 def get_terms(backend, *args):
-    if XAPIAN_VERSION[1] <= 2:
-        # old versions use "delve".
-        executable = 'delve'
-    else:
-        # new versions use 'xapian-delve'
-        executable = 'xapian-delve'
+    executable = 'xapian-delve'
 
     # dev versions (odd minor) use a suffix
     if XAPIAN_VERSION[1] % 2 != 0:
         executable = executable+'-%d.%d' % tuple(XAPIAN_VERSION[0:2])
+
+    # look for a xapian-delve built by `xapian_wheel_builder`
+    wheel_delve = os.path.join(os.path.dirname(inspect.getfile(xapian)), executable)
+    if os.path.exists(wheel_delve):
+        executable = wheel_delve
 
     result = subprocess.check_output([executable] + list(args) + [backend.path],
                                      env=os.environ.copy()).decode('utf-8')
@@ -56,7 +54,7 @@ def pks(results):
     return [result.pk for result in results]
 
 
-class HaystackBackendTestCase(object):
+class HaystackBackendTestCase:
     """
     Abstract TestCase that implements an hack to ensure `connections`
     has the right index
@@ -79,19 +77,13 @@ class HaystackBackendTestCase(object):
         self.backend.clear()
         connections['default']._index = self.old_ui
 
-    def assertExpectedQuery(self, query, string_or_list, xapian12string=''):
+    def assertExpectedQuery(self, query, string_or_list):
         if isinstance(string_or_list, list):
             strings = string_or_list
         else:
             strings = [string_or_list]
 
         expected = ['Query(%s)' % string for string in strings]
-
-        if XAPIAN_VERSION[1] <= 2:
-            if xapian12string:
-                expected = ['Xapian::Query(%s)' % xapian12string]
-            else:
-                expected = ['Xapian::Query(%s)' % string for string in strings]
 
         self.assertIn(str(query), expected)
 
@@ -108,7 +100,7 @@ class BackendIndexationTestCase(HaystackBackendTestCase, TestCase):
         return CompleteBlogEntryIndex()
 
     def setUp(self):
-        super(BackendIndexationTestCase, self).setUp()
+        super().setUp()
 
         tag1 = MockTag.objects.create(name='tag')
         tag2 = MockTag.objects.create(name='tag-tag')
@@ -305,7 +297,7 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
         return entry
 
     def setUp(self):
-        super(BackendFeaturesTestCase, self).setUp()
+        super().setUp()
 
         self.sample_objs = []
 
@@ -484,7 +476,7 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
 
         results = self.backend.search(xapian.Query('indexed'), highlight=True)['results']
         self.assertEqual([result.highlighted['text'] for result in results],
-                         ['<em>indexed</em>!\n1', '<em>indexed</em>!\n2', '<em>indexed</em>!\n3'])
+                         ['<em>indexed</em>!\n1\n', '<em>indexed</em>!\n2\n', '<em>indexed</em>!\n3\n'])
 
     def test_spelling_suggestion(self):
         self.assertEqual(self.backend.search(xapian.Query('indxe'))['hits'], 0)
@@ -573,7 +565,7 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
         self.assertEqual(_term_to_xapian_value([1, 2, 3], 'text'), '[1, 2, 3]')
         self.assertEqual(_term_to_xapian_value((1, 2, 3), 'text'), '(1, 2, 3)')
         self.assertEqual(_term_to_xapian_value({'a': 1, 'c': 3, 'b': 2}, 'text'),
-                         force_text({'a': 1, 'c': 3, 'b': 2}))
+                         str({'a': 1, 'c': 3, 'b': 2}))
         self.assertEqual(_term_to_xapian_value(datetime.datetime(2009, 5, 9, 16, 14), 'datetime'),
                          '20090509161400')
         self.assertEqual(_term_to_xapian_value(datetime.datetime(2009, 5, 9, 0, 0), 'date'),
@@ -608,11 +600,9 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
         ])
 
     def test_parse_query(self):
-        self.assertExpectedQuery(self.backend.parse_query('indexed'), 'Zindex@1',
-                                 xapian12string='Zindex:(pos=1)')
+        self.assertExpectedQuery(self.backend.parse_query('indexed'), 'Zindex@1')
 
-        self.assertExpectedQuery(self.backend.parse_query('name:david'),
-                                 'ZXNAMEdavid@1', xapian12string='ZXNAMEdavid:(pos=1)')
+        self.assertExpectedQuery(self.backend.parse_query('name:david'), 'ZXNAMEdavid@1')
 
         if xapian.minor_version() >= 2:
             # todo: why `SYNONYM WILDCARD OR XNAMEda`?
@@ -621,10 +611,7 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
                 [
                     '(SYNONYM WILDCARD OR XNAMEda)',
                     'WILDCARD SYNONYM XNAMEda',
-                ],
-                xapian12string='(XNAMEdavid1:(pos=1) SYNONYM '
-                'XNAMEdavid2:(pos=1) SYNONYM '
-                'XNAMEdavid3:(pos=1))')
+                ])
         else:
             self.assertEqual(str(self.backend.parse_query('name:da*')),
                              'Xapian::Query(('
@@ -637,26 +624,22 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
                                  [
                                      '0 * VALUE_RANGE 9 david1 david2',
                                      'VALUE_RANGE 9 david1 david2',
-                                 ],
-                                 xapian12string='VALUE_RANGE 9 david1 david2')
+                                 ])
         self.assertExpectedQuery(self.backend.parse_query('number:0..10'),
                                  [
                                      '0 * VALUE_RANGE 11 000000000000 000000000010',
                                      'VALUE_RANGE 11 000000000000 000000000010',
-                                 ],
-                                 xapian12string='VALUE_RANGE 11 000000000000 000000000010')
+                                 ])
         self.assertExpectedQuery(self.backend.parse_query('number:..10'),
                                  [
                                      '0 * VALUE_RANGE 11 %012d 000000000010' % (-sys.maxsize - 1),
                                      'VALUE_RANGE 11 %012d 000000000010' % (-sys.maxsize - 1),
-                                 ],
-                                 xapian12string='VALUE_RANGE 11 %012d 000000000010' % (-sys.maxsize - 1))
+                                 ])
         self.assertExpectedQuery(self.backend.parse_query('number:10..*'),
                                  [
                                      '0 * VALUE_RANGE 11 000000000010 %012d' % sys.maxsize,
                                      'VALUE_RANGE 11 000000000010 %012d' % sys.maxsize,
-                                 ],
-                                 xapian12string='VALUE_RANGE 11 000000000010 %012d' % sys.maxsize)
+                                 ])
 
     def test_order_by_django_id(self):
         """
@@ -702,7 +685,7 @@ class IndexationNGramTestCase(HaystackBackendTestCase, TestCase):
         return XapianNGramIndex()
 
     def setUp(self):
-        super(IndexationNGramTestCase, self).setUp()
+        super().setUp()
         mock = BlogEntry()
         mock.id = 1
         mock.author = 'david'
@@ -749,7 +732,7 @@ class IndexationEdgeNGramTestCase(HaystackBackendTestCase, TestCase):
         return XapianEdgeNGramIndex()
 
     def setUp(self):
-        super(IndexationEdgeNGramTestCase, self).setUp()
+        super().setUp()
         mock = BlogEntry()
         mock.id = 1
         mock.author = 'david'
@@ -795,7 +778,7 @@ class IndexationDjangoContentTypeTestCase(HaystackBackendTestCase, TestCase):
         return DjangoContentTypeIndex()
 
     def setUp(self):
-        super(IndexationDjangoContentTypeTestCase, self).setUp()
+        super().setUp()
 
         entry1 = ContentType(model='DjangoContentType')
         entry1.save()
