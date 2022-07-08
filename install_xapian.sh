@@ -8,6 +8,11 @@ if [ -z "$VERSION" ]; then
     exit 1
 fi
 
+JFLAG=1
+if [ "$2" = "--use-all-cores" ]; then
+  JFLAG=$(($(getconf _NPROCESSORS_ONLN) + 1))
+fi
+
 # prepare
 mkdir -p $VIRTUAL_ENV/packages && cd $VIRTUAL_ENV/packages
 
@@ -27,7 +32,7 @@ tar xf ${BINDINGS}.tar.xz
 # install
 echo "Installing Xapian-core..."
 cd $VIRTUAL_ENV/packages/${CORE}
-./configure --prefix=$VIRTUAL_ENV && make && make install
+./configure --prefix=$VIRTUAL_ENV && make -j$JFLAG && make install
 
 PYTHON_FLAG=--with-python3
 
