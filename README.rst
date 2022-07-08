@@ -92,7 +92,7 @@ The backend has the following optional settings:
   See `here <http://xapian.org/docs/apidoc/html/classXapian_1_1QueryParser.html#ac7dc3b55b6083bd3ff98fc8b2726c8fd>`__ for
   more information about the different strategies.
 
-- ``XAPIAN_NGRAM_MIN_LENGTH``, ``XAPIAN_NGRAM_MAX_LENGTH``: options used to configure custom ngram (phrases) length.
+- ``XAPIAN_NGRAM_MIN_LENGTH``, ``XAPIAN_NGRAM_MAX_LENGTH``: options for custom configuration of ngrams (phrases) length.
 
 - ``HAYSTACK_XAPIAN_USE_LOCKFILE``: Use a lockfile to prevent database locking errors when running management commands with multiple workers.
   Defaults to `True`.
