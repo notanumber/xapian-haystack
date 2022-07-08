@@ -130,7 +130,7 @@ class XHValueRangeProcessor(xapian.ValueRangeProcessor):
                         begin = -sys.maxsize - 1
                     elif field_type == 'float':
                         begin = float('-inf')
-                    elif field_type == 'date' or field_type == 'datetime':
+                    elif field_type in ['date', 'datetime']:
                         begin = '00010101000000'
                 elif end == '*':
                     if field_type == 'text':
@@ -139,7 +139,7 @@ class XHValueRangeProcessor(xapian.ValueRangeProcessor):
                         end = sys.maxsize
                     elif field_type == 'float':
                         end = float('inf')
-                    elif field_type == 'date' or field_type == 'datetime':
+                    elif field_type in ['date', 'datetime']:
                         end = '99990101000000'
 
                 if field_type == 'float':
@@ -1612,7 +1612,7 @@ def _term_to_xapian_value(term, field_type):
         value = INTEGER_FORMAT % term
     elif field_type == 'float':
         value = xapian.sortable_serialise(term)
-    elif field_type == 'date' or field_type == 'datetime':
+    elif field_type in ['date', 'datetime']:
         if field_type == 'date':
             # http://stackoverflow.com/a/1937636/931303 and comments
             term = datetime.datetime.combine(term, datetime.time())
@@ -1650,7 +1650,7 @@ def _from_xapian_value(value, field_type):
         return int(value)
     elif field_type == 'float':
         return xapian.sortable_unserialise(value)
-    elif field_type == 'date' or field_type == 'datetime':
+    elif field_type in ['date', 'datetime']:
         datetime_value = datetime.datetime.strptime(value, DATETIME_FORMAT)
         if field_type == 'datetime':
             return datetime_value
