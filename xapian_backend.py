@@ -446,7 +446,11 @@ class XapianSearchBackend(BaseSearchBackend):
                         # `django_id` is an int and `django_ct` is text;
                         # besides, they are indexed by their (unstemmed) value.
                         if field['field_name'] == DJANGO_ID:
-                            value = int(value)
+                            try:
+                                value = int(value)
+                            except ValueError:
+                                # Django_id is a string
+                                field['type'] = 'text'
                         value = _term_to_xapian_value(value, field['type'])
 
                         document.add_term(TERM_PREFIXES[field['field_name']] + value, weight)
@@ -1437,7 +1441,7 @@ class XapianSearchQuery(BaseSearchQuery):
 
         Assumes term is not a list.
         """
-        if field_type == 'text' and field_name not in (DJANGO_CT,):
+        if field_type == 'text' and field_name not in (DJANGO_CT, DJANGO_ID):
             term = '^ %s $' % term
             query = self._phrase_query(term.split(), field_name, field_type)
         else:
@@ -1508,7 +1512,11 @@ class XapianSearchQuery(BaseSearchQuery):
         if field_name in (ID, DJANGO_ID, DJANGO_CT):
             # to ensure the value is serialized correctly.
             if field_name == DJANGO_ID:
-                term = int(term)
+                try:
+                    term = int(term)
+                except ValueError:
+                    # Django_id is a string
+                    field_type = 'text'
             term = _term_to_xapian_value(term, field_type)
             return xapian.Query('%s%s' % (TERM_PREFIXES[field_name], term))
 
