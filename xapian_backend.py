@@ -19,8 +19,8 @@ from haystack.inputs import AutoQuery
 from haystack.models import SearchResult
 from haystack.utils import get_identifier, get_model_ct
 
-NGRAM_MIN_LENGTH = 2
-NGRAM_MAX_LENGTH = 15
+NGRAM_MIN_LENGTH = getattr(settings, 'XAPIAN_NGRAM_MIN_LENGTH', 2)
+NGRAM_MAX_LENGTH = getattr(settings, 'XAPIAN_NGRAM_MAX_LENGTH', 15)
 
 try:
     import xapian
@@ -130,7 +130,7 @@ class XHValueRangeProcessor(xapian.ValueRangeProcessor):
                         begin = -sys.maxsize - 1
                     elif field_type == 'float':
                         begin = float('-inf')
-                    elif field_type == 'date' or field_type == 'datetime':
+                    elif field_type in ['date', 'datetime']:
                         begin = '00010101000000'
                 elif end == '*':
                     if field_type == 'text':
@@ -139,7 +139,7 @@ class XHValueRangeProcessor(xapian.ValueRangeProcessor):
                         end = sys.maxsize
                     elif field_type == 'float':
                         end = float('inf')
-                    elif field_type == 'date' or field_type == 'datetime':
+                    elif field_type in ['date', 'datetime']:
                         end = '99990101000000'
 
                 if field_type == 'float':
@@ -195,8 +195,9 @@ class XapianSearchBackend(BaseSearchBackend):
         super().__init__(connection_alias, **connection_options)
 
         if not 'PATH' in connection_options:
-            raise ImproperlyConfigured("You must specify a 'PATH' in your settings for connection '%s'."
-                                       % connection_alias)
+            raise ImproperlyConfigured("You must specify a 'PATH' in your settings for connection '{0}'.".format(
+                connection_alias,
+            ))
 
         self.path = connection_options.get('PATH')
 
@@ -311,8 +312,8 @@ class XapianSearchBackend(BaseSearchBackend):
                 """
                 term_generator.set_termpos(termpos)
 
-                start_term = '%s^' % prefix
-                end_term = '%s$' % prefix
+                start_term = f'{prefix}^'
+                end_term = f'{prefix}$'
                 # add begin
                 document.add_posting(start_term, termpos, weight)
                 # add text
@@ -335,9 +336,9 @@ class XapianSearchBackend(BaseSearchBackend):
 
                 The sentence is bounded by "^" "$" to allow exact matches.
                 """
-                text = '^ %s $' % text
+                text = f'^ {text} $'
                 for word in text.split():
-                    term = '%s%s' % (prefix, word)
+                    term = f'{prefix}{word}'
                     document.add_posting(term, termpos, weight)
                     termpos += 1
                 termpos += TERMPOS_DISTANCE
@@ -559,7 +560,7 @@ class XapianSearchBackend(BaseSearchBackend):
         """
         registered_models_ct = self.build_models_list()
         if registered_models_ct:
-            restrictions = [xapian.Query('%s%s' % (TERM_PREFIXES[DJANGO_CT], model_ct))
+            restrictions = [xapian.Query(f'{TERM_PREFIXES[DJANGO_CT]}{model_ct}')
                             for model_ct in registered_models_ct]
             limit_query = xapian.Query(xapian.Query.OP_OR, restrictions)
 
@@ -577,7 +578,7 @@ class XapianSearchBackend(BaseSearchBackend):
                 try:
                     self.column[field_name]
                 except KeyError:
-                    raise InvalidIndexError('Trying to use non indexed field "%s"' % field_name)
+                    raise InvalidIndexError(f'Trying to use non indexed field "{field_name}"')
 
     @log_query
     def search(self, query, sort_by=None, start_offset=0, end_offset=None,
@@ -941,7 +942,7 @@ class XapianSearchBackend(BaseSearchBackend):
             term = term.decode('utf-8')
             for match in re.findall('[^A-Z]+', term):  # Ignore field identifiers
                 match_re = re.compile(match, re.I)
-                content = match_re.sub('<%s>%s</%s>' % (tag, term, tag), content)
+                content = match_re.sub(f'<{tag}>{term}</{tag}>', content)
 
         return content
 
@@ -1167,7 +1168,7 @@ class XapianSearchBackend(BaseSearchBackend):
             try:
                 database = xapian.Database(self.path)
             except xapian.DatabaseOpeningError:
-                raise InvalidIndexError('Unable to open index at %s' % self.path)
+                raise InvalidIndexError(f'Unable to open index at {self.path}')
 
         return database
 
@@ -1262,7 +1263,7 @@ class XapianSearchQuery(BaseSearchQuery):
             subqueries = [
                 xapian.Query(
                     xapian.Query.OP_SCALE_WEIGHT,
-                    xapian.Query('%s%s' % (TERM_PREFIXES[DJANGO_CT], get_model_ct(model))),
+                    xapian.Query(f'{TERM_PREFIXES[DJANGO_CT]}{get_model_ct(model)}'),
                     0  # Pure boolean sub-query
                 ) for model in self.models
             ]
@@ -1310,13 +1311,13 @@ class XapianSearchQuery(BaseSearchQuery):
         Uses arguments to construct a list of xapian.Query's.
         """
         if field_name != 'content' and field_name not in self.backend.column:
-            raise InvalidIndexError('field "%s" not indexed' % field_name)
+            raise InvalidIndexError(f'field "{field_name}" not indexed')
 
         # It it is an AutoQuery, it has no filters
         # or others, thus we short-circuit the procedure.
         if isinstance(term, AutoQuery):
             if field_name != 'content':
-                query = '%s:%s' % (field_name, term.prepare(self))
+                query = f'{field_name}:{term.prepare(self)}'
             else:
                 query = term.prepare(self)
             return [self.backend.parse_query(query)]
@@ -1438,7 +1439,7 @@ class XapianSearchQuery(BaseSearchQuery):
         Assumes term is not a list.
         """
         if field_type == 'text' and field_name not in (DJANGO_CT,):
-            term = '^ %s $' % term
+            term = f'^ {term} $'
             query = self._phrase_query(term.split(), field_name, field_type)
         else:
             query = self._term_query(term, field_name, field_type, stemmed=False)
@@ -1456,13 +1457,13 @@ class XapianSearchQuery(BaseSearchQuery):
         """
         if field_type == 'text':
             if len(term.split()) == 1:
-                term = '^ %s*' % term
+                term = f'^ {term}*'
                 query = self.backend.parse_query(term)
             else:
-                term = '^ %s' % term
+                term = f'^ {term}'
                 query = self._phrase_query(term.split(), field_name, field_type)
         else:
-            term = '^%s*' % term
+            term = f'^{term}*'
             query = self.backend.parse_query(term)
 
         if is_not:
@@ -1510,7 +1511,7 @@ class XapianSearchQuery(BaseSearchQuery):
             if field_name == DJANGO_ID:
                 term = int(term)
             term = _term_to_xapian_value(term, field_type)
-            return xapian.Query('%s%s' % (TERM_PREFIXES[field_name], term))
+            return xapian.Query(f'{TERM_PREFIXES[field_name]}{term}')
 
         # we construct the query dates in a slightly different way
         if field_type == 'datetime':
@@ -1548,7 +1549,7 @@ class XapianSearchQuery(BaseSearchQuery):
         that is greater than `term` in a specified `field`.
         """
         vrp = XHValueRangeProcessor(self.backend)
-        pos, begin, end = vrp('%s:%s' % (field_name, _term_to_xapian_value(term, field_type)), '*')
+        pos, begin, end = vrp(f'{field_name}:{_term_to_xapian_value(term, field_type)}', '*')
         if is_not:
             return xapian.Query(xapian.Query.OP_AND_NOT,
                                 self._all_query(),
@@ -1562,7 +1563,7 @@ class XapianSearchQuery(BaseSearchQuery):
         that is less than `term` in a specified `field`.
         """
         vrp = XHValueRangeProcessor(self.backend)
-        pos, begin, end = vrp('%s:' % field_name, '%s' % _term_to_xapian_value(term, field_type))
+        pos, begin, end = vrp(f'{field_name}:', f'{_term_to_xapian_value(term, field_type)}')
         if is_not:
             return xapian.Query(xapian.Query.OP_AND_NOT,
                                 self._all_query(),
@@ -1576,8 +1577,8 @@ class XapianSearchQuery(BaseSearchQuery):
         that is between the values from the `term` list.
         """
         vrp = XHValueRangeProcessor(self.backend)
-        pos, begin, end = vrp('%s:%s' % (field_name, _term_to_xapian_value(term[0], field_type)),
-                              '%s' % _term_to_xapian_value(term[1], field_type))
+        pos, begin, end = vrp(f'{field_name}:{_term_to_xapian_value(term[0], field_type)}',
+                              f'{_term_to_xapian_value(term[1], field_type)}')
         if is_not:
             return xapian.Query(xapian.Query.OP_AND_NOT,
                                 self._all_query(),
@@ -1612,7 +1613,7 @@ def _term_to_xapian_value(term, field_type):
         value = INTEGER_FORMAT % term
     elif field_type == 'float':
         value = xapian.sortable_serialise(term)
-    elif field_type == 'date' or field_type == 'datetime':
+    elif field_type in ['date', 'datetime']:
         if field_type == 'date':
             # http://stackoverflow.com/a/1937636/931303 and comments
             term = datetime.datetime.combine(term, datetime.time())
@@ -1650,7 +1651,7 @@ def _from_xapian_value(value, field_type):
         return int(value)
     elif field_type == 'float':
         return xapian.sortable_unserialise(value)
-    elif field_type == 'date' or field_type == 'datetime':
+    elif field_type in ['date', 'datetime']:
         datetime_value = datetime.datetime.strptime(value, DATETIME_FORMAT)
         if field_type == 'datetime':
             return datetime_value
