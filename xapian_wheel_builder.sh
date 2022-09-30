@@ -110,11 +110,16 @@ case "${uname_sysname}" in
     ;;
 esac
 
+JFLAG=1
+if [ "$2" = "--use-all-cores" ]; then
+  JFLAG=$(($(getconf _NPROCESSORS_ONLN) + 1))
+fi
+
 echo "Building xapian core..."
 (
     cd "src/${CORE}"
     ./configure --prefix="${pprefix}"
-    make
+    make -j$JFLAG
     make install
 )
 
