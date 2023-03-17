@@ -236,6 +236,13 @@ class XapianSearchQueryTestCase(HaystackBackendTestCase, TestCase):
         self.sq.add_filter(SQ(django_ct='time'))
         self.assertExpectedQuery(self.sq.build_query(), 'CONTENTTYPEtime')
 
+    def test_unphrased_id(self):
+        'An internal ID should NOT be phrased so one can exclude IDs.'
+        self.sq.add_filter(SQ(id__in=['testing123', 'testing456']))
+        expected = '(Qtesting123 OR Qtesting456)'
+        self.assertExpectedQuery(
+            query=self.sq.build_query(), string_or_list=expected)
+
 
 class SearchQueryTestCase(HaystackBackendTestCase, TestCase):
     """
