@@ -5,6 +5,7 @@ xapian-haystack Changelog
 Unreleased
 ----------
 
+- Add DJANGO_CT, DJANGO_ID, ID to be used with '__exact' internally.
 - Dropped support for Python 3.6.
 - Fixed DatabaseLocked errors when running management commands with
   multiple workers.
