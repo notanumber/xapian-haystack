@@ -2,10 +2,12 @@
 xapian-haystack Changelog
 =========================
 
-Unreleased
-----------
+v3.1.0 (2023-03-19)
+-------------------
 
 - Add DJANGO_CT, DJANGO_ID, ID to be used with '__exact' internally.
+- Ability to configure ngram min and max lengths.
+- Supported Django versions: 3.2, 4.0, 4.1
 - Dropped support for Python 3.6.
 - Fixed DatabaseLocked errors when running management commands with
   multiple workers.
