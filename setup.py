@@ -26,7 +26,7 @@ setup(
     license='GPL2',
     py_modules=['xapian_backend'],
     install_requires=[
-        'django>=3.2',
+        'django>=4.2',
         'django-haystack>=2.8.0',
         'filelock>=3.4',
     ]

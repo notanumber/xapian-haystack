@@ -2,6 +2,13 @@
 xapian-haystack Changelog
 =========================
 
+Unreleased
+----------
+- Dropped support for Python 3.7, 3.8, 3.9.
+- Added support for Python 3.11, 3.12, 3.13.
+- Dropped support for Django < 4.2.
+- Added support for Django 5.2, 6.0.
+
 v3.1.0 (2023-03-19)
 -------------------
 
