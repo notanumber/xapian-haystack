@@ -11,6 +11,8 @@ INSTALLED_APPS = [
     'test_haystack.xapian_tests',
 ]
 
+USE_TZ = True
+
 HAYSTACK_CONNECTIONS = {
     'default': {
         'ENGINE': 'haystack.backends.xapian_backend.XapianEngine',

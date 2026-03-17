@@ -13,6 +13,8 @@ from ..models import MockModel, AnotherMockModel, AFourthMockModel
 from ..search_indexes import MockQueryIndex, MockSearchIndex, BoostMockSearchIndex
 from ..tests.test_backend import HaystackBackendTestCase
 
+utc = datetime.timezone.utc
+
 
 class XapianSearchQueryTestCase(HaystackBackendTestCase, TestCase):
     """
@@ -67,15 +69,19 @@ class XapianSearchQueryTestCase(HaystackBackendTestCase, TestCase):
                                  '(Z2009-05-08 OR 2009-05-08))')
 
     def test_datetime(self):
-        self.sq.add_filter(SQ(content=datetime.datetime(2009, 5, 8, 11, 28)))
-        self.assertExpectedQuery(self.sq.build_query(),
-                                 '((Z2009-05-08 OR 2009-05-08) OR'
-                                 ' (Z11:28:00 OR 11:28:00))')
+        self.sq.add_filter(SQ(content=datetime.datetime(2009, 5, 8, 11, 28, tzinfo=utc)))
+        self.assertExpectedQuery(
+            self.sq.build_query(),
+            '((Z2009-05-08 OR 2009-05-08) OR (Z11:28:00+00:00 OR 11:28:00+00:00))'
+        )
 
     def test_datetime_not(self):
-        self.sq.add_filter(~SQ(content=datetime.datetime(2009, 5, 8, 11, 28)))
-        self.assertExpectedQuery(self.sq.build_query(),
-                                 '(<alldocuments> AND_NOT ((Z2009-05-08 OR 2009-05-08) OR (Z11:28:00 OR 11:28:00)))')
+        self.sq.add_filter(~SQ(content=datetime.datetime(2009, 5, 8, 11, 28, tzinfo=utc)))
+        self.assertExpectedQuery(
+            self.sq.build_query(),
+            '(<alldocuments> AND_NOT ((Z2009-05-08 OR 2009-05-08) OR '
+            '(Z11:28:00+00:00 OR 11:28:00+00:00)))'
+        )
 
     def test_float(self):
         self.sq.add_filter(SQ(content=25.52))
@@ -186,10 +192,10 @@ class XapianSearchQueryTestCase(HaystackBackendTestCase, TestCase):
 
     def test_in_filter_datetime(self):
         self.sq.add_filter(SQ(content='why'))
-        self.sq.add_filter(SQ(pub_date__in=[datetime.datetime(2009, 7, 6, 1, 56, 21)]))
+        self.sq.add_filter(SQ(pub_date__in=[datetime.datetime(2009, 7, 6, 1, 56, 21, tzinfo=utc)]))
         self.assertExpectedQuery(self.sq.build_query(),
                                  '((Zwhi OR why) AND '
-                                 '(XPUB_DATE2009-07-06 AND_MAYBE XPUB_DATE01:56:21))')
+                                 '(XPUB_DATE2009-07-06 AND_MAYBE XPUB_DATE01:56:21+00:00))')
 
     def test_clean(self):
         self.assertEqual(self.sq.clean('hello world'), 'hello world')
@@ -317,7 +323,7 @@ class SearchQueryTestCase(HaystackBackendTestCase, TestCase):
 
     def test_multiple_filter_types(self):
         self.sq.add_filter(SQ(content='why'))
-        self.sq.add_filter(SQ(pub_date__lte=datetime.datetime(2009, 2, 10, 1, 59, 0)))
+        self.sq.add_filter(SQ(pub_date__lte=datetime.datetime(2009, 2, 10, 1, 59, 0, tzinfo=utc)))
         self.sq.add_filter(SQ(name__gt='david'))
         self.sq.add_filter(SQ(title__gte='B'))
         self.sq.add_filter(SQ(django_id__in=[1, 2, 3]))

@@ -1086,7 +1086,8 @@ class XapianSearchBackend(BaseSearchBackend):
                 if not isinstance(result_date, datetime.datetime):
                     result_date = datetime.datetime(result_date.year,
                                                     result_date.month,
-                                                    result_date.day)
+                                                    result_date.day,
+                                                    tzinfo=datetime.timezone.utc)
 
                 # ignore results outside the boundaries.
                 if facet_list[0][0] < result_date < facet_list[-1][0]:

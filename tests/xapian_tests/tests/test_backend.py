@@ -117,7 +117,7 @@ class BackendIndexationTestCase(HaystackBackendTestCase, TestCase):
         entry.decimal_number = Decimal('22.34')
         entry.funny_text = 'this-text das das'
         entry.non_ascii = 'thsi sdas das corrup\xe7\xe3o das'
-        entry.datetime = datetime.datetime(2009, 2, 25, 1, 1, 1)
+        entry.datetime = datetime.datetime(2009, 2, 25, 1, 1, 1, tzinfo=datetime.timezone.utc)
         entry.date = datetime.date(2008, 8, 8)
         entry.save()
         entry.tags.add(tag1, tag2, tag3)
@@ -215,8 +215,8 @@ class BackendIndexationTestCase(HaystackBackendTestCase, TestCase):
 
         self.assertTrue('XDATETIME2009-02-25' in terms)
         self.assertTrue('2009-02-25' in terms)
-        self.assertTrue('01:01:01' in terms)
-        self.assertTrue('XDATETIME01:01:01' in terms)
+        self.assertTrue('01:01:01+00:00' in terms)
+        self.assertTrue('XDATETIME01:01:01+00:00' in terms)
 
     def test_date_field(self):
         terms = get_terms(self.backend, '-a')
@@ -292,7 +292,9 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
         entry.number = i*5
         entry.float_number = i*5.0
         entry.decimal_number = Decimal('22.34')
-        entry.datetime = datetime.datetime(2009, 2, 25, 1, 1, 1) - datetime.timedelta(seconds=i)
+        entry.datetime = datetime.datetime(
+            2009, 2, 25, 1, 1, 1, tzinfo=datetime.timezone.utc
+        ) - datetime.timedelta(seconds=i)
         entry.date = datetime.date(2009, 2, 23) + datetime.timedelta(days=i)
         return entry
 
@@ -408,8 +410,9 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
         self.assertRaises(InvalidIndexError, self.backend.search, xapian.Query(''), facets=['dsdas'])
 
     def test_date_facets_month(self):
-        facets = {'datetime': {'start_date': datetime.datetime(2008, 10, 26),
-                               'end_date': datetime.datetime(2009, 3, 26),
+        utc = datetime.timezone.utc
+        facets = {'datetime': {'start_date': datetime.datetime(2008, 10, 26, tzinfo=utc),
+                               'end_date': datetime.datetime(2009, 3, 26, tzinfo=utc),
                                'gap_by': 'month'}}
 
         self.assertEqual(self.backend.search(xapian.Query(), date_facets=facets),
@@ -417,18 +420,22 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
 
         results = self.backend.search(xapian.Query('indexed'), date_facets=facets)
         self.assertEqual(results['hits'], 3)
+        self.maxDiff = None
         self.assertEqual(results['facets']['dates']['datetime'], [
-            (datetime.datetime(2009, 2, 26, 0, 0), 0),
-            (datetime.datetime(2009, 1, 26, 0, 0), 3),
-            (datetime.datetime(2008, 12, 26, 0, 0), 0),
-            (datetime.datetime(2008, 11, 26, 0, 0), 0),
-            (datetime.datetime(2008, 10, 26, 0, 0), 0),
+            (datetime.datetime(2009, 2, 26, 0, 0, tzinfo=utc), 0),
+            (datetime.datetime(2009, 1, 26, 0, 0, tzinfo=utc), 3),
+            (datetime.datetime(2008, 12, 26, 0, 0, tzinfo=utc), 0),
+            (datetime.datetime(2008, 11, 26, 0, 0, tzinfo=utc), 0),
+            (datetime.datetime(2008, 10, 26, 0, 0, tzinfo=utc), 0),
         ])
 
     def test_date_facets_seconds(self):
-        facets = {'datetime': {'start_date': datetime.datetime(2009, 2, 25, 1, 0, 57),
-                               'end_date': datetime.datetime(2009, 2, 25, 1, 1, 1),
-                               'gap_by': 'second'}}
+        utc = datetime.timezone.utc
+        facets = {'datetime': {
+            'start_date': datetime.datetime(2009, 2, 25, 1, 0, 57, tzinfo=utc),
+            'end_date': datetime.datetime(2009, 2, 25, 1, 1, 1, tzinfo=utc),
+            'gap_by': 'second',
+        }}
 
         self.assertEqual(self.backend.search(xapian.Query(), date_facets=facets),
                          {'hits': 0, 'results': []})
@@ -436,23 +443,24 @@ class BackendFeaturesTestCase(HaystackBackendTestCase, TestCase):
         results = self.backend.search(xapian.Query('indexed'), date_facets=facets)
         self.assertEqual(results['hits'], 3)
         self.assertEqual(results['facets']['dates']['datetime'], [
-            (datetime.datetime(2009, 2, 25, 1, 1, 0), 0),
-            (datetime.datetime(2009, 2, 25, 1, 0, 59), 1),
-            (datetime.datetime(2009, 2, 25, 1, 0, 58), 1),
-            (datetime.datetime(2009, 2, 25, 1, 0, 57), 1),
+            (datetime.datetime(2009, 2, 25, 1, 1, 0, tzinfo=utc), 0),
+            (datetime.datetime(2009, 2, 25, 1, 0, 59, tzinfo=utc), 1),
+            (datetime.datetime(2009, 2, 25, 1, 0, 58, tzinfo=utc), 1),
+            (datetime.datetime(2009, 2, 25, 1, 0, 57, tzinfo=utc), 1),
         ])
 
     def test_date_facets_days(self):
-        facets = {'date': {'start_date': datetime.datetime(2009, 2, 1),
-                           'end_date': datetime.datetime(2009, 3, 15),
+        utc = datetime.timezone.utc
+        facets = {'date': {'start_date': datetime.datetime(2009, 2, 1, tzinfo=utc),
+                           'end_date': datetime.datetime(2009, 3, 15, tzinfo=utc),
                            'gap_by': 'day',
                            'gap_amount': 15}}
         results = self.backend.search(xapian.Query('indexed'), date_facets=facets)
         self.assertEqual(results['hits'], 3)
         self.assertEqual(results['facets']['dates']['date'], [
-            (datetime.datetime(2009, 3, 3, 0, 0), 0),
-            (datetime.datetime(2009, 2, 16, 0, 0), 3),
-            (datetime.datetime(2009, 2, 1, 0, 0), 0)
+            (datetime.datetime(2009, 3, 3, 0, 0, tzinfo=utc), 0),
+            (datetime.datetime(2009, 2, 16, 0, 0, tzinfo=utc), 3),
+            (datetime.datetime(2009, 2, 1, 0, 0, tzinfo=utc), 0)
         ])
 
     def test_query_facets(self):
