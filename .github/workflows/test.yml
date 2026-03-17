@@ -76,7 +76,7 @@ jobs:
       - name: Install Django and other Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install django~=${{ matrix.django-version }} filelock~=${{ matrix.filelock-version }} coveralls xapian*.whl
+          pip install django~=${{ matrix.django-version }} filelock~=${{ matrix.filelock-version }} coveralls packaging xapian*.whl
 
       - name: Checkout django-haystack
         uses: actions/checkout@v6
@@ -93,7 +93,7 @@ jobs:
 
       - name: Set PYTHONPATH
         run: |
-          echo "PYTHONPATH=/usr/lib/python3/dist-packages:." >> $GITHUB_ENV
+          echo "PYTHONPATH=." >> $GITHUB_ENV
 
       - name: Ensure all apps have migrations
         run: |
@@ -105,7 +105,7 @@ jobs:
           cd django-haystack
           coverage run $(command -v django-admin) test test_haystack.xapian_tests --settings=test_haystack.xapian_settings
         env:
-          PYTHONPATH: "/usr/lib/python3/dist-packages:."
+          PYTHONPATH: "."
 
       - name: Coveralls
         run: |
