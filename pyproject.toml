@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools >=77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "xapian-haystack"
+version = "4.0.0"
+description = "A Xapian backend for Haystack"
+readme = "README.rst"
+license = "GPL2"
+license-files = ["LICENSE"]
+authors = [
+    {name = "Jorge C. Leitão", email = "jorgecarleitao@gmail.com"}
+]
+maintainers = [
+    {name = "Claude Paroz", email = "claude@2xlibre.net"},
+]
+requires-python = ">=3.10"
+dependencies = [
+    "django>=4.2",
+    "django-haystack>=3.0",
+    "filelock>=3.4",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: GNU General Public License (GPL)",
+    "Topic :: Internet :: WWW/HTTP :: Indexing/Search",
+    "Framework :: Django",
+    "Programming Language :: Python :: 3 :: Only",
+]
+
+[project.urls]
+homepage = "https://github.com/notanumber/xapian-haystack"
