@@ -2,8 +2,25 @@
 xapian-haystack Changelog
 =========================
 
-Unreleased
-----------
+v4.0.0 (2026-04-03)
+-------------------
+
+- Eliminate use of xapian.ValueRangeProcessor
+
+    This class was deprecated in Xapian 1.4 and removed in Xapian 2.
+    Instead use xapian.RangeProcessor or construct Query objects directly.
+
+    This makes xapian-haystack compatible with Xapian 2.  Fixes #239.
+
+    Open-ended ranges now build open-ended Xapian range queries, addressing
+    two TODO comments.
+
+    A range query on an unknown field is now handle gracefully.  Fixes #236.
+
+    A range query of type int or float with an open upper end no longer
+    requires `*` for the upper end.  Fixes #217.
+
+- Replaced setup.py by pyproject.toml (PEP 621).
 - Dropped support for Python 3.7, 3.8, 3.9.
 - Added support for Python 3.11, 3.12, 3.13.
 - Dropped support for Django < 4.2.

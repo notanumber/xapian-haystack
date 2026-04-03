@@ -7,7 +7,7 @@ name = "xapian-haystack"
 version = "4.0.0"
 description = "A Xapian backend for Haystack"
 readme = "README.rst"
-license = "GPL2"
+license = "GPL-2.0-or-later"
 license-files = ["LICENSE"]
 authors = [
     {name = "Jorge C. Leitão", email = "jorgecarleitao@gmail.com"}
@@ -24,7 +24,6 @@ dependencies = [
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: GNU General Public License (GPL)",
     "Topic :: Internet :: WWW/HTTP :: Indexing/Search",
     "Framework :: Django",
     "Programming Language :: Python :: 3 :: Only",
